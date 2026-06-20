@@ -9,8 +9,9 @@ import {
   clearAdminSession,
   createAdminSession,
   getAdminPassword,
+  getScopedChurchId,
   hashPassword,
-  requireAdmin,
+  requireAdminContext,
   requireAdminRole,
   verifyPassword,
 } from "@/lib/auth";
@@ -25,6 +26,7 @@ const staffUserSchema = z.object({
   email: z.string().trim().email("Informe um e-mail valido.").transform((email) => email.toLowerCase()),
   password: z.string().min(6, "A senha precisa ter pelo menos 6 caracteres.").max(120),
   role: staffRoleSchema,
+  churchId: z.string().trim().optional(),
 });
 
 const optionSchema = z.object({
@@ -112,13 +114,14 @@ export async function logoutAdminAction() {
 }
 
 export async function createStaffUserAction(formData: FormData) {
-  await requireAdminRole([AdminRole.ADMIN]);
+  const context = await requireAdminContext();
 
   const parsed = staffUserSchema.safeParse({
     name: String(formData.get("name") || ""),
     email: String(formData.get("email") || ""),
     password: String(formData.get("password") || ""),
     role: String(formData.get("role") || ""),
+    churchId: String(formData.get("churchId") || ""),
   });
 
   if (!parsed.success) {
@@ -126,6 +129,59 @@ export async function createStaffUserAction(formData: FormData) {
   }
 
   const staffUser = parsed.data;
+  const role = staffUser.role as AdminRole;
+  let churchId = staffUser.churchId || null;
+
+  if (context.role === AdminRole.TEACHER) {
+    if (role !== AdminRole.TEACHER) {
+      errorRedirect("/admin/equipe", "Professores podem cadastrar apenas outros professores.");
+    }
+
+    if (!context.churchId) {
+      errorRedirect("/admin/equipe", "Seu usuario de professor ainda nao esta vinculado a uma igreja.");
+    }
+
+    churchId = context.churchId;
+  }
+
+  if (role === AdminRole.TEACHER) {
+    if (!churchId) {
+      errorRedirect("/admin/equipe", "Selecione a igreja do professor.");
+    }
+
+    const churchExists = await prisma.church.findFirst({
+      where: {
+        id: churchId,
+        active: true,
+      },
+      select: { id: true },
+    });
+
+    if (!churchExists) {
+      errorRedirect("/admin/equipe", "Igreja do professor nao encontrada.");
+    }
+  } else {
+    churchId = null;
+  }
+
+  const existingUser = await prisma.adminUser.findUnique({
+    where: {
+      email: staffUser.email,
+    },
+    select: {
+      role: true,
+      churchId: true,
+    },
+  });
+
+  if (
+    context.role === AdminRole.TEACHER &&
+    existingUser &&
+    (existingUser.role !== AdminRole.TEACHER || existingUser.churchId !== churchId)
+  ) {
+    errorRedirect("/admin/equipe", "Este e-mail ja pertence a outro perfil ou igreja.");
+  }
+
   const passwordHash = hashPassword(staffUser.password);
 
   await prisma.adminUser.upsert({
@@ -135,24 +191,26 @@ export async function createStaffUserAction(formData: FormData) {
     update: {
       name: staffUser.name,
       passwordHash,
-      role: staffUser.role as AdminRole,
+      role,
+      churchId,
       active: true,
     },
     create: {
       name: staffUser.name,
       email: staffUser.email,
       passwordHash,
-      role: staffUser.role as AdminRole,
+      role,
+      churchId,
     },
   });
 
   revalidatePath("/admin");
   revalidatePath("/admin/equipe");
-  redirect(`/admin/equipe?ok=${staffUser.role === "ADMIN" ? "admin" : "professor"}`);
+  redirect(`/admin/equipe?ok=${role === AdminRole.ADMIN ? "admin" : "professor"}`);
 }
 
 export async function createChurchAction(formData: FormData) {
-  await requireAdmin();
+  await requireAdminRole([AdminRole.ADMIN]);
 
   const name = String(formData.get("name") || "").trim();
   const city = String(formData.get("city") || "").trim();
@@ -179,11 +237,21 @@ export async function createChurchAction(formData: FormData) {
 }
 
 export async function createStudentAction(formData: FormData) {
-  await requireAdmin();
+  const context = await requireAdminContext();
+  const scopedChurchId = getScopedChurchId(context);
 
   const name = String(formData.get("name") || "").trim();
-  const churchId = String(formData.get("churchId") || "");
+  const requestedChurchId = String(formData.get("churchId") || "");
+  const churchId = scopedChurchId || requestedChurchId;
   const category = String(formData.get("category") || "") as Category;
+
+  if (context.role === AdminRole.TEACHER && !scopedChurchId) {
+    errorRedirect("/admin/cadastros", "Seu usuario de professor ainda nao esta vinculado a uma igreja.");
+  }
+
+  if (scopedChurchId && requestedChurchId && requestedChurchId !== scopedChurchId) {
+    errorRedirect("/admin/cadastros", "Professores so podem cadastrar alunos da propria igreja.");
+  }
 
   if (name.length < 3 || !churchId || !categorySchema.safeParse(category).success) {
     errorRedirect("/admin/cadastros", "Preencha igreja, categoria e nome do aluno.");
@@ -217,7 +285,8 @@ export async function createStudentAction(formData: FormData) {
 }
 
 export async function createExamAction(formData: FormData) {
-  await requireAdmin();
+  const context = await requireAdminContext();
+  const scopedChurchId = getScopedChurchId(context);
 
   const rawPayload = String(formData.get("payload") || "");
   const parsedJson = JSON.parse(rawPayload || "{}") as unknown;
@@ -228,12 +297,22 @@ export async function createExamAction(formData: FormData) {
   }
 
   const payload = parsed.data;
+  const churchIds = scopedChurchId ? [scopedChurchId] : payload.churchIds;
+
+  if (context.role === AdminRole.TEACHER && !scopedChurchId) {
+    errorRedirect("/admin/provas/nova", "Seu usuario de professor ainda nao esta vinculado a uma igreja.");
+  }
+
+  if (scopedChurchId && payload.churchIds.some((churchId) => churchId !== scopedChurchId)) {
+    errorRedirect("/admin/provas/nova", "Professores so podem aplicar provas para a propria igreja.");
+  }
+
   const accessCode = buildAccessCode(payload.accessCode);
 
   const students = await prisma.student.findMany({
     where: {
       active: true,
-      churchId: { in: payload.churchIds },
+      churchId: { in: churchIds },
       category: { in: payload.categories as Category[] },
     },
     select: { id: true },

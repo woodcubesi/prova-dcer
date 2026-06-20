@@ -1,18 +1,28 @@
 import Link from "next/link";
 import { AdminShell } from "@/components/admin/AdminShell";
+import { AdminRole } from "@/generated/prisma/client";
 import { getCategoryLabel } from "@/lib/categories";
-import { requireAdmin } from "@/lib/auth";
+import { requireAdminContext } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { formatDuration } from "@/lib/text";
 
 export const dynamic = "force-dynamic";
 
 export default async function CorrectionPage() {
-  await requireAdmin();
+  const context = await requireAdminContext();
+  const isTeacher = context.role === AdminRole.TEACHER;
+  const scopedChurchId = isTeacher ? context.churchId : null;
 
   const attempts = await prisma.attempt.findMany({
     where: {
       status: { in: ["SUBMITTED", "EXPIRED"] },
+      ...(isTeacher
+        ? {
+            student: {
+              churchId: scopedChurchId || "__missing_church__",
+            },
+          }
+        : {}),
     },
     orderBy: [{ submittedAt: "desc" }, { startedAt: "desc" }],
     include: {
@@ -32,6 +42,12 @@ export default async function CorrectionPage() {
 
   return (
     <AdminShell title="Correcao" description="Confira respostas enviadas e a pontuacao automatica.">
+      {isTeacher && !scopedChurchId ? (
+        <div className="mb-4 rounded-md border border-[#efc2bd] bg-[#fff4f2] px-4 py-3 text-sm text-[#9b2d20]">
+          Seu usuario de professor ainda nao esta vinculado a uma igreja.
+        </div>
+      ) : null}
+
       <section className="rounded-lg border border-[#dfe6dd] bg-white p-4">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>

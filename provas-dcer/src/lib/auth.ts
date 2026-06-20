@@ -9,6 +9,26 @@ const LEGACY_SESSION_VALUE = "admin";
 const USER_SESSION_PREFIX = "user:";
 const PASSWORD_HASH_PREFIX = "scrypt";
 
+type CurrentAdminUser = {
+  id: string;
+  name: string;
+  email: string;
+  role: AdminRole;
+  active: boolean;
+  churchId: string | null;
+  church?: {
+    id: string;
+    name: string;
+  } | null;
+};
+
+export type AdminContext = {
+  user: CurrentAdminUser | null;
+  role: AdminRole;
+  churchId: string | null;
+  isLegacy: boolean;
+};
+
 function sessionSecret() {
   return process.env.ADMIN_SESSION_SECRET || "dev-secret";
 }
@@ -103,7 +123,41 @@ export async function getCurrentAdminUser() {
       id: userId,
       active: true,
     },
+    include: {
+      church: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+    },
   });
+}
+
+export async function getAdminContext() {
+  const sessionValue = await getAdminSessionValue();
+
+  if (!sessionValue) return null;
+
+  if (sessionValue === LEGACY_SESSION_VALUE) {
+    return {
+      user: null,
+      role: AdminRole.ADMIN,
+      churchId: null,
+      isLegacy: true,
+    } satisfies AdminContext;
+  }
+
+  const user = await getCurrentAdminUser();
+
+  if (!user) return null;
+
+  return {
+    user,
+    role: user.role,
+    churchId: user.churchId,
+    isLegacy: false,
+  } satisfies AdminContext;
 }
 
 export async function isAdminSession() {
@@ -111,27 +165,33 @@ export async function isAdminSession() {
 }
 
 export async function requireAdmin() {
-  if (!(await isAdminSession())) {
+  if (!(await getAdminContext())) {
     redirect("/admin/login");
   }
 }
 
-export async function requireAdminRole(roles: AdminRole[]) {
-  const sessionValue = await getAdminSessionValue();
+export async function requireAdminContext() {
+  const context = await getAdminContext();
 
-  if (!sessionValue) {
+  if (!context) {
     redirect("/admin/login");
   }
 
-  if (sessionValue === LEGACY_SESSION_VALUE) {
-    return;
-  }
+  return context;
+}
 
-  const user = await getCurrentAdminUser();
+export async function requireAdminRole(roles: AdminRole[]) {
+  const context = await requireAdminContext();
 
-  if (!user || !roles.includes(user.role)) {
+  if (!roles.includes(context.role)) {
     redirect("/admin?erro=permissao");
   }
+
+  return context;
+}
+
+export function getScopedChurchId(context: AdminContext) {
+  return context.role === AdminRole.TEACHER ? context.churchId : null;
 }
 
 export function getAdminPassword() {

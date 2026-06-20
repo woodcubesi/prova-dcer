@@ -1,6 +1,7 @@
 import { AdminShell } from "@/components/admin/AdminShell";
 import { ExamBuilder } from "@/components/admin/ExamBuilder";
-import { requireAdmin } from "@/lib/auth";
+import { AdminRole } from "@/generated/prisma/client";
+import { requireAdminContext } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -12,11 +13,16 @@ type NewExamPageProps = {
 };
 
 export default async function NewExamPage({ searchParams }: NewExamPageProps) {
-  await requireAdmin();
+  const context = await requireAdminContext();
   const params = searchParams ? await searchParams : {};
+  const isTeacher = context.role === AdminRole.TEACHER;
+  const scopedChurchId = isTeacher ? context.churchId : null;
 
   const churches = await prisma.church.findMany({
-    where: { active: true },
+    where: {
+      active: true,
+      ...(isTeacher ? { id: scopedChurchId || "__missing_church__" } : {}),
+    },
     orderBy: { name: "asc" },
     include: {
       _count: {
@@ -30,6 +36,12 @@ export default async function NewExamPage({ searchParams }: NewExamPageProps) {
       title="Nova prova"
       description="Monte a prova manualmente. A geracao por IA ficara plugavel em uma proxima etapa."
     >
+      {isTeacher && !scopedChurchId ? (
+        <div className="mb-4 rounded-md border border-[#efc2bd] bg-[#fff4f2] px-4 py-3 text-sm text-[#9b2d20]">
+          Seu usuario de professor ainda nao esta vinculado a uma igreja.
+        </div>
+      ) : null}
+
       {params.erro ? (
         <div className="mb-4 rounded-md border border-[#efc2bd] bg-[#fff4f2] px-4 py-3 text-sm text-[#9b2d20]">
           {params.erro}

@@ -116,6 +116,8 @@ Senha: admin123
 
 Depois de entrar, acesse o menu `Equipe` para cadastrar administradores e professores. Os proximos acessos podem ser feitos com e-mail e senha cadastrados.
 
+Professores devem ser vinculados a uma igreja. Depois de vinculados, eles acessam apenas alunos, provas, aplicacoes e correcoes daquela igreja, mas podem cadastrar outros professores da mesma igreja.
+
 ## Rodar nesta maquina
 
 ```powershell
@@ -137,6 +139,8 @@ Senha: admin123
 ```
 
 Depois cadastre administradores e professores no menu `Equipe`.
+
+Ao cadastrar professor, selecione a igreja correspondente. Administradores veem todos os dados; professores ficam restritos a sua propria igreja.
 
 ## Dados de demonstracao
 

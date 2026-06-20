@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { AdminShell } from "@/components/admin/AdminShell";
+import { AdminRole } from "@/generated/prisma/client";
 import { getCategoryLabel } from "@/lib/categories";
-import { requireAdmin } from "@/lib/auth";
+import { requireAdminContext } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -14,26 +15,111 @@ type AdminPageProps = {
 };
 
 export default async function AdminPage({ searchParams }: AdminPageProps) {
-  await requireAdmin();
+  const context = await requireAdminContext();
   const params = searchParams ? await searchParams : {};
+  const isTeacher = context.role === AdminRole.TEACHER;
+  const scopedChurchId = isTeacher ? context.churchId : null;
+  const scopedChurchFilter = scopedChurchId || "__missing_church__";
 
   const [churches, students, exams, submittedAttempts, administrators, teachers, applications] = await Promise.all([
-    prisma.church.count({ where: { active: true } }),
-    prisma.student.count({ where: { active: true } }),
-    prisma.exam.count(),
-    prisma.attempt.count({ where: { status: "SUBMITTED" } }),
-    prisma.adminUser.count({ where: { active: true, role: "ADMIN" } }),
-    prisma.adminUser.count({ where: { active: true, role: "TEACHER" } }),
+    prisma.church.count({
+      where: {
+        active: true,
+        ...(isTeacher ? { id: scopedChurchFilter } : {}),
+      },
+    }),
+    prisma.student.count({
+      where: {
+        active: true,
+        ...(isTeacher ? { churchId: scopedChurchFilter } : {}),
+      },
+    }),
+    prisma.exam.count({
+      where: isTeacher
+        ? {
+            applications: {
+              some: {
+                participants: {
+                  some: {
+                    student: {
+                      churchId: scopedChurchFilter,
+                    },
+                  },
+                },
+              },
+            },
+          }
+        : {},
+    }),
+    prisma.attempt.count({
+      where: {
+        status: "SUBMITTED",
+        ...(isTeacher
+          ? {
+              student: {
+                churchId: scopedChurchFilter,
+              },
+            }
+          : {}),
+      },
+    }),
+    prisma.adminUser.count({ where: { active: true, role: "ADMIN", ...(isTeacher ? { id: "__hidden__" } : {}) } }),
+    prisma.adminUser.count({
+      where: {
+        active: true,
+        role: "TEACHER",
+        ...(isTeacher ? { churchId: scopedChurchFilter } : {}),
+      },
+    }),
     prisma.examApplication.findMany({
+      where: isTeacher
+        ? {
+            participants: {
+              some: {
+                student: {
+                  churchId: scopedChurchFilter,
+                },
+              },
+            },
+          }
+        : {},
       orderBy: { createdAt: "desc" },
       take: 6,
       include: {
         exam: true,
-        participants: true,
-        attempts: true,
+        participants: {
+          ...(isTeacher
+            ? {
+                where: {
+                  student: {
+                    churchId: scopedChurchFilter,
+                  },
+                },
+              }
+            : {}),
+        },
+        attempts: {
+          ...(isTeacher
+            ? {
+                where: {
+                  student: {
+                    churchId: scopedChurchFilter,
+                  },
+                },
+              }
+            : {}),
+        },
       },
     }),
   ]);
+  const stats = [
+    [isTeacher ? "Igreja" : "Igrejas", churches],
+    ["Alunos", students],
+    ["Provas", exams],
+    ["Enviadas", submittedAttempts],
+    ...(isTeacher ? [] : ([["Administradores", administrators]] as [string, number][])),
+    ["Professores", teachers],
+  ];
 
   return (
     <AdminShell
@@ -47,19 +133,17 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       ) : null}
       {params.erro === "permissao" ? (
         <div className="mb-5 rounded-md border border-[#efc2bd] bg-[#fff4f2] px-4 py-3 text-sm text-[#9b2d20]">
-          Acesso restrito a administradores.
+          Acesso restrito para este perfil.
+        </div>
+      ) : null}
+      {isTeacher && !scopedChurchId ? (
+        <div className="mb-5 rounded-md border border-[#efc2bd] bg-[#fff4f2] px-4 py-3 text-sm text-[#9b2d20]">
+          Seu usuario de professor ainda nao esta vinculado a uma igreja.
         </div>
       ) : null}
 
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
-        {[
-          ["Igrejas", churches],
-          ["Alunos", students],
-          ["Provas", exams],
-          ["Enviadas", submittedAttempts],
-          ["Administradores", administrators],
-          ["Professores", teachers],
-        ].map(([label, value]) => (
+        {stats.map(([label, value]) => (
           <div key={label} className="rounded-lg border border-[#dfe6dd] bg-white p-4">
             <p className="text-sm text-[#68766d]">{label}</p>
             <p className="mt-1 text-3xl font-semibold">{value}</p>

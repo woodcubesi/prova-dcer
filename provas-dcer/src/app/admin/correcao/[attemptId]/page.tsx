@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AdminShell } from "@/components/admin/AdminShell";
+import { AdminRole } from "@/generated/prisma/client";
 import { getCategoryLabel } from "@/lib/categories";
-import { requireAdmin } from "@/lib/auth";
+import { requireAdminContext } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { formatDuration } from "@/lib/text";
 
@@ -15,11 +16,22 @@ type CorrectionDetailPageProps = {
 };
 
 export default async function CorrectionDetailPage({ params }: CorrectionDetailPageProps) {
-  await requireAdmin();
+  const context = await requireAdminContext();
   const { attemptId } = await params;
+  const isTeacher = context.role === AdminRole.TEACHER;
+  const scopedChurchId = isTeacher ? context.churchId : null;
 
-  const attempt = await prisma.attempt.findUnique({
-    where: { id: attemptId },
+  const attempt = await prisma.attempt.findFirst({
+    where: {
+      id: attemptId,
+      ...(isTeacher
+        ? {
+            student: {
+              churchId: scopedChurchId || "__missing_church__",
+            },
+          }
+        : {}),
+    },
     include: {
       student: {
         include: {

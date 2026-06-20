@@ -47,11 +47,14 @@ model AdminUser {
   passwordHash String
   role         AdminRole @default(TEACHER)
   active       Boolean   @default(true)
+  churchId     String?
+  church       Church?   @relation(fields: [churchId], references: [id], onDelete: SetNull)
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
   @@index([role])
   @@index([active])
+  @@index([churchId])
 }
 
 model Church {
@@ -62,6 +65,7 @@ model Church {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   students  Student[]
+  staffUsers AdminUser[]
 }
 
 model Student {
