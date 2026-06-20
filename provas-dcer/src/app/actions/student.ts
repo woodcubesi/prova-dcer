@@ -18,7 +18,7 @@ export async function startAttemptAction(formData: FormData) {
   const studentName = String(formData.get("studentName") || "").trim();
 
   if (!applicationId || !churchId || !categories.includes(category) || studentName.length < 3) {
-    studentError("Selecione a prova, a igreja, a categoria e digite seu nome.");
+    studentError("Selecione a igreja, a categoria, digite seu nome e escolha uma prova disponivel.");
   }
 
   const normalizedName = normalizeName(studentName);

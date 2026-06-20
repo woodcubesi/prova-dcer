@@ -22,62 +22,59 @@ type ApplicationOption = {
 };
 
 export function StudentEntry({ applications }: { applications: ApplicationOption[] }) {
-  const [applicationId, setApplicationId] = useState(applications[0]?.id || "");
   const [churchId, setChurchId] = useState("");
   const [category, setCategory] = useState("");
   const [studentName, setStudentName] = useState("");
+  const [applicationId, setApplicationId] = useState("");
 
-  const application = applications.find((item) => item.id === applicationId);
   const churches = useMemo(() => {
     const map = new Map<string, string>();
-    application?.participants.forEach((participant) => {
-      map.set(participant.churchId, participant.churchName);
+    applications.forEach((application) => {
+      application.participants.forEach((participant) => {
+        map.set(participant.churchId, participant.churchName);
+      });
     });
     return [...map.entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
-  }, [application]);
+  }, [applications]);
 
   const studentOptions = useMemo(() => {
-    return (
-      application?.participants
-        .filter((participant) => (!churchId || participant.churchId === churchId) && (!category || participant.category === category))
-        .map((participant) => participant.name)
-        .sort((a, b) => a.localeCompare(b)) || []
-    );
-  }, [application, category, churchId]);
+    const names = new Set<string>();
 
-  function handleApplicationChange(value: string) {
-    setApplicationId(value);
-    setChurchId("");
-    setCategory("");
-    setStudentName("");
+    applications.forEach((application) => {
+      application.participants
+        .filter((participant) => (!churchId || participant.churchId === churchId) && (!category || participant.category === category))
+        .forEach((participant) => names.add(participant.name));
+    });
+
+    return [...names].sort((a, b) => a.localeCompare(b));
+  }, [applications, category, churchId]);
+
+  const normalizedStudentName = normalizeStudentName(studentName);
+  const canChooseApplication = Boolean(churchId && category && normalizedStudentName.length >= 3);
+
+  const availableApplications = useMemo(() => {
+    if (!canChooseApplication) return [];
+
+    return applications.filter((application) =>
+      application.participants.some(
+        (participant) =>
+          participant.churchId === churchId &&
+          participant.category === category &&
+          normalizeStudentName(participant.name) === normalizedStudentName,
+      ),
+    );
+  }, [applications, canChooseApplication, category, churchId, normalizedStudentName]);
+
+  const selectedApplicationId = availableApplications.some((item) => item.id === applicationId) ? applicationId : "";
+  const application = availableApplications.find((item) => item.id === selectedApplicationId);
+
+  function resetApplicationSelection() {
+    setApplicationId("");
   }
 
   return (
     <form action={startAttemptAction} className="rounded-lg border border-[#dfe6dd] bg-white p-4 shadow-sm sm:p-6">
       <div className="grid gap-4">
-        <label className="block">
-          <span className="text-sm font-medium">Prova</span>
-          <select
-            name="applicationId"
-            value={applicationId}
-            onChange={(event) => handleApplicationChange(event.target.value)}
-            className="mt-1 w-full rounded-md border border-[#cdd8cf] bg-white px-3 py-3 outline-none focus:ring-2 focus:ring-[#2c6d49]"
-          >
-            {applications.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.title} - {item.examTitle}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        {application ? (
-          <div className="rounded-md bg-[#effaf2] px-3 py-2 text-sm text-[#1f623e]">
-            Tempo total: <strong>{application.durationMinutes} minutos</strong>. Codigo:{" "}
-            <span className="font-mono">{application.accessCode}</span>
-          </div>
-        ) : null}
-
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="block">
             <span className="text-sm font-medium">Igreja</span>
@@ -87,6 +84,7 @@ export function StudentEntry({ applications }: { applications: ApplicationOption
               onChange={(event) => {
                 setChurchId(event.target.value);
                 setStudentName("");
+                resetApplicationSelection();
               }}
               className="mt-1 w-full rounded-md border border-[#cdd8cf] bg-white px-3 py-3 outline-none focus:ring-2 focus:ring-[#2c6d49]"
             >
@@ -107,6 +105,7 @@ export function StudentEntry({ applications }: { applications: ApplicationOption
               onChange={(event) => {
                 setCategory(event.target.value);
                 setStudentName("");
+                resetApplicationSelection();
               }}
               className="mt-1 w-full rounded-md border border-[#cdd8cf] bg-white px-3 py-3 outline-none focus:ring-2 focus:ring-[#2c6d49]"
             >
@@ -125,7 +124,10 @@ export function StudentEntry({ applications }: { applications: ApplicationOption
           <input
             name="studentName"
             value={studentName}
-            onChange={(event) => setStudentName(event.target.value)}
+            onChange={(event) => {
+              setStudentName(event.target.value);
+              resetApplicationSelection();
+            }}
             list="student-names"
             className="mt-1 w-full rounded-md border border-[#cdd8cf] px-3 py-3 outline-none focus:ring-2 focus:ring-[#2c6d49]"
             placeholder="Digite igual ao cadastro"
@@ -141,10 +143,53 @@ export function StudentEntry({ applications }: { applications: ApplicationOption
           </span>
         </label>
 
-        <button className="rounded-md bg-[#12382a] px-5 py-3 text-sm font-semibold text-white hover:bg-[#1c513d]">
+        <label className="block">
+          <span className="text-sm font-medium">Prova disponivel</span>
+          <select
+            name="applicationId"
+            value={selectedApplicationId}
+            onChange={(event) => setApplicationId(event.target.value)}
+            disabled={!availableApplications.length}
+            className="mt-1 w-full rounded-md border border-[#cdd8cf] bg-white px-3 py-3 outline-none focus:ring-2 focus:ring-[#2c6d49] disabled:bg-[#f2f4ef] disabled:text-[#8a948d]"
+          >
+            {!canChooseApplication ? (
+              <option value="">Informe igreja, categoria e nome primeiro</option>
+            ) : null}
+            {canChooseApplication && !availableApplications.length ? (
+              <option value="">Nenhuma prova disponivel para este aluno</option>
+            ) : null}
+            {availableApplications.length ? <option value="">Selecione a prova</option> : null}
+            {availableApplications.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.title} - {item.examTitle}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        {application ? (
+          <div className="rounded-md bg-[#effaf2] px-3 py-2 text-sm text-[#1f623e]">
+            Tempo total: <strong>{application.durationMinutes} minutos</strong>. Codigo:{" "}
+            <span className="font-mono">{application.accessCode}</span>
+          </div>
+        ) : null}
+
+        <button
+          disabled={!selectedApplicationId}
+          className="rounded-md bg-[#12382a] px-5 py-3 text-sm font-semibold text-white hover:bg-[#1c513d] disabled:cursor-not-allowed disabled:bg-[#8a948d]"
+        >
           Iniciar prova
         </button>
       </div>
     </form>
   );
+}
+
+function normalizeStudentName(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase();
 }

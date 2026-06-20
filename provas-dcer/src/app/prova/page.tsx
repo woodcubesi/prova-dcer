@@ -12,13 +12,29 @@ type StudentEntryPageProps = {
 
 export default async function StudentEntryPage({ searchParams }: StudentEntryPageProps) {
   const params = searchParams ? await searchParams : {};
+  const now = new Date();
 
   const applications = await prisma.examApplication.findMany({
-    where: { active: true },
+    where: {
+      active: true,
+      AND: [
+        {
+          OR: [{ startsAt: null }, { startsAt: { lte: now } }],
+        },
+        {
+          OR: [{ endsAt: null }, { endsAt: { gte: now } }],
+        },
+      ],
+    },
     orderBy: { createdAt: "desc" },
     include: {
       exam: true,
       participants: {
+        where: {
+          student: {
+            active: true,
+          },
+        },
         include: {
           student: {
             include: {
@@ -53,7 +69,7 @@ export default async function StudentEntryPage({ searchParams }: StudentEntryPag
         </Link>
         <h1 className="mt-3 text-3xl font-semibold">Entrada do aluno</h1>
         <p className="mt-2 text-sm leading-6 text-[#e8f5ee]">
-          Escolha sua prova, igreja e categoria. Depois digite o nome conforme o pre-cadastro.
+          Escolha sua igreja e categoria, digite seu nome e depois selecione uma prova disponivel.
         </p>
       </header>
 
