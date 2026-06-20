@@ -59,7 +59,49 @@ export default async function CorrectionPage() {
           </span>
         </div>
 
-        <div className="mt-4 overflow-x-auto">
+        <div className="mt-4 grid gap-3 md:hidden">
+          {attempts.map((attempt) => (
+            <div key={attempt.id} className="rounded-md border border-[#edf1eb] p-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="font-medium">{attempt.student.name}</p>
+                  <p className="mt-1 text-sm text-[#66736a]">
+                    {attempt.student.church.name} - {getCategoryLabel(attempt.student.category)}
+                  </p>
+                </div>
+                <span className="rounded-full bg-[#effaf2] px-2 py-1 text-xs font-medium text-[#1f623e]">
+                  {attempt.status === "SUBMITTED" ? "Enviada" : "Expirada"}
+                </span>
+              </div>
+              <p className="mt-3 text-sm font-medium">{attempt.application.exam.title}</p>
+              <p className="text-xs text-[#66736a]">{attempt.application.title}</p>
+              <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+                <div className="rounded-md bg-[#f7faf6] px-3 py-2">
+                  <p className="text-xs text-[#66736a]">Tempo usado</p>
+                  <p className="font-semibold">
+                    {attempt.timeUsedSeconds ? formatDuration(attempt.timeUsedSeconds) : "-"}
+                  </p>
+                </div>
+                <div className="rounded-md bg-[#f7faf6] px-3 py-2">
+                  <p className="text-xs text-[#66736a]">Pontuacao</p>
+                  <p className="font-semibold">
+                    {attempt.score === null || attempt.score === undefined
+                      ? "Pendente"
+                      : `${attempt.score} / ${attempt.totalPoints ?? "-"}`}
+                  </p>
+                </div>
+              </div>
+              <Link
+                href={`/admin/correcao/${attempt.id}`}
+                className="mt-3 block rounded-md border border-[#2c6d49] px-3 py-2 text-center text-sm font-semibold text-[#2c6d49]"
+              >
+                Abrir
+              </Link>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-4 hidden overflow-x-auto md:block">
           <table className="w-full min-w-[860px] text-left text-sm">
             <thead className="border-b border-[#dfe6dd] text-xs uppercase tracking-wide text-[#66736a]">
               <tr>

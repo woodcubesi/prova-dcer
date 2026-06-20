@@ -1,4 +1,4 @@
-import { createStaffUserAction } from "@/app/actions/admin";
+import { createStaffUserAction, updateStaffUserAction } from "@/app/actions/admin";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { AdminRole } from "@/generated/prisma/client";
 import { requireAdminContext } from "@/lib/auth";
@@ -8,6 +8,7 @@ export const dynamic = "force-dynamic";
 
 type StaffPageProps = {
   searchParams?: Promise<{
+    editar?: string;
     erro?: string;
     ok?: string;
   }>;
@@ -22,6 +23,13 @@ type StaffFormProps = {
   canChooseProfile: boolean;
   churches: ChurchOption[];
   fixedChurch?: ChurchOption | null;
+  editingUser?: {
+    id: string;
+    name: string;
+    email: string;
+    role: AdminRole;
+    churchId: string | null;
+  } | null;
 };
 
 function getRoleLabel(role: AdminRole) {
@@ -38,14 +46,24 @@ function isAdministratorProfile(role: AdminRole) {
   return role === AdminRole.ADMIN || role === AdminRole.ADMIN_TEACHER;
 }
 
-function StaffForm({ canChooseProfile, churches, fixedChurch }: StaffFormProps) {
+function StaffForm({ canChooseProfile, churches, fixedChurch, editingUser }: StaffFormProps) {
+  const isEditing = Boolean(editingUser);
+  const selectedRole = editingUser?.role || AdminRole.TEACHER;
+  const selectedChurchId = fixedChurch?.id || editingUser?.churchId || "";
+
   return (
-    <form action={createStaffUserAction} className="rounded-lg border border-[#dfe6dd] bg-white p-4">
-      <h2 className="text-lg font-semibold">Nova pessoa da equipe</h2>
+    <form
+      action={isEditing ? updateStaffUserAction : createStaffUserAction}
+      className="rounded-lg border border-[#dfe6dd] bg-white p-4"
+    >
+      {editingUser ? <input type="hidden" name="id" value={editingUser.id} /> : null}
+      <h2 className="text-lg font-semibold">{isEditing ? "Editar pessoa da equipe" : "Nova pessoa da equipe"}</h2>
       <p className="mt-1 text-sm text-[#66736a]">
-        {canChooseProfile
-          ? "Escolha se a pessoa sera administradora, professora ou os dois."
-          : "Professores podem cadastrar outros professores da propria igreja."}
+        {isEditing
+          ? "Atualize os dados e informe nova senha apenas se desejar trocar."
+          : canChooseProfile
+            ? "Escolha se a pessoa sera administradora, professora ou os dois."
+            : "Professores podem cadastrar outros professores da propria igreja."}
       </p>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -53,6 +71,7 @@ function StaffForm({ canChooseProfile, churches, fixedChurch }: StaffFormProps) 
           <span className="text-sm font-medium">Nome completo</span>
           <input
             name="name"
+            defaultValue={editingUser?.name || ""}
             className="mt-1 w-full rounded-md border border-[#cdd8cf] px-3 py-3 outline-none focus:ring-2 focus:ring-[#2c6d49]"
             placeholder="Ex.: Maria Oliveira"
           />
@@ -63,18 +82,19 @@ function StaffForm({ canChooseProfile, churches, fixedChurch }: StaffFormProps) 
           <input
             name="email"
             type="email"
+            defaultValue={editingUser?.email || ""}
             className="mt-1 w-full rounded-md border border-[#cdd8cf] px-3 py-3 outline-none focus:ring-2 focus:ring-[#2c6d49]"
             placeholder="nome@email.com"
           />
         </label>
 
         <label className="block">
-          <span className="text-sm font-medium">Senha inicial</span>
+          <span className="text-sm font-medium">{isEditing ? "Nova senha opcional" : "Senha inicial"}</span>
           <input
             name="password"
             type="password"
             className="mt-1 w-full rounded-md border border-[#cdd8cf] px-3 py-3 outline-none focus:ring-2 focus:ring-[#2c6d49]"
-            placeholder="Minimo 6 caracteres"
+            placeholder={isEditing ? "Deixe em branco para manter" : "Minimo 6 caracteres"}
           />
         </label>
 
@@ -83,7 +103,7 @@ function StaffForm({ canChooseProfile, churches, fixedChurch }: StaffFormProps) 
             <span className="text-sm font-medium">Perfil</span>
             <select
               name="role"
-              defaultValue={AdminRole.TEACHER}
+              defaultValue={selectedRole}
               className="mt-1 w-full rounded-md border border-[#cdd8cf] bg-white px-3 py-3 outline-none focus:ring-2 focus:ring-[#2c6d49]"
             >
               <option value={AdminRole.ADMIN}>Administrador</option>
@@ -108,6 +128,7 @@ function StaffForm({ canChooseProfile, churches, fixedChurch }: StaffFormProps) 
             <span className="text-sm font-medium">Igreja quando tambem for professor</span>
             <select
               name="churchId"
+              defaultValue={selectedChurchId}
               className="mt-1 w-full rounded-md border border-[#cdd8cf] bg-white px-3 py-3 outline-none focus:ring-2 focus:ring-[#2c6d49]"
             >
               <option value="">Sem igreja / apenas administrador</option>
@@ -121,9 +142,19 @@ function StaffForm({ canChooseProfile, churches, fixedChurch }: StaffFormProps) 
         )}
       </div>
 
-      <button className="mt-4 rounded-md bg-[#12382a] px-4 py-3 text-sm font-semibold text-white hover:bg-[#1c513d]">
-        Salvar equipe
-      </button>
+      <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+        <button className="rounded-md bg-[#12382a] px-4 py-3 text-sm font-semibold text-white hover:bg-[#1c513d]">
+          {isEditing ? "Atualizar equipe" : "Salvar equipe"}
+        </button>
+        {isEditing ? (
+          <a
+            href="/admin/equipe"
+            className="rounded-md border border-[#dfe6dd] px-4 py-3 text-center text-sm font-semibold text-[#2c6d49] hover:bg-[#f2f7f0]"
+          >
+            Cancelar
+          </a>
+        ) : null}
+      </div>
     </form>
   );
 }
@@ -164,6 +195,7 @@ export default async function StaffPage({ searchParams }: StaffPageProps) {
   ]);
 
   const fixedChurch = isTeacherOnly ? churches[0] || null : null;
+  const editingUser = params.editar ? staffUsers.find((user) => user.id === params.editar) || null : null;
   const administrators = staffUsers.filter((user) => isAdministratorProfile(user.role));
   const teachers = staffUsers.filter((user) => isTeacherProfile(user.role));
 
@@ -191,9 +223,19 @@ export default async function StaffPage({ searchParams }: StaffPageProps) {
           Cadastro salvo.
         </div>
       ) : null}
+      {params.editar && !editingUser ? (
+        <div className="mb-4 rounded-md border border-[#efc2bd] bg-[#fff4f2] px-4 py-3 text-sm text-[#9b2d20]">
+          Cadastro de equipe nao encontrado para edicao.
+        </div>
+      ) : null}
 
       {(!isTeacherOnly || fixedChurch) ? (
-        <StaffForm canChooseProfile={!isTeacherOnly} churches={churches} fixedChurch={fixedChurch} />
+        <StaffForm
+          canChooseProfile={!isTeacherOnly}
+          churches={churches}
+          fixedChurch={fixedChurch}
+          editingUser={editingUser}
+        />
       ) : null}
 
       <section className="mt-5 grid gap-4 lg:grid-cols-[280px_1fr]">
@@ -215,7 +257,35 @@ export default async function StaffPage({ searchParams }: StaffPageProps) {
 
         <div className="rounded-lg border border-[#dfe6dd] bg-white p-4">
           <h2 className="text-lg font-semibold">Pessoas cadastradas</h2>
-          <div className="mt-3 overflow-x-auto">
+          <div className="mt-3 grid gap-3 md:hidden">
+            {staffUsers.map((user) => (
+              <div key={user.id} className="rounded-md border border-[#edf1eb] p-3">
+                <p className="font-medium">{user.name}</p>
+                <p className="mt-1 break-all text-sm text-[#66736a]">{user.email}</p>
+                <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                  <span className="rounded-full bg-[#effaf2] px-2 py-1 font-medium text-[#1f623e]">
+                    {getRoleLabel(user.role)}
+                  </span>
+                  <span className="rounded-full bg-[#f7faf6] px-2 py-1 text-[#66736a]">
+                    {user.church?.name || "Geral"}
+                  </span>
+                </div>
+                <a
+                  href={`/admin/equipe?editar=${user.id}`}
+                  className="mt-3 inline-flex rounded-md border border-[#2c6d49] px-3 py-2 text-sm font-semibold text-[#2c6d49]"
+                >
+                  Editar
+                </a>
+              </div>
+            ))}
+          </div>
+          {staffUsers.length === 0 ? (
+            <div className="mt-3 rounded-md border border-[#edf1eb] bg-[#fbfcfa] p-4 text-sm text-[#66736a] md:hidden">
+              Nenhum administrador ou professor cadastrado ainda.
+            </div>
+          ) : null}
+
+          <div className="mt-3 hidden overflow-x-auto md:block">
             <table className="w-full min-w-[760px] text-left text-sm">
               <thead className="border-b border-[#dfe6dd] text-xs uppercase tracking-wide text-[#66736a]">
                 <tr>
@@ -224,6 +294,7 @@ export default async function StaffPage({ searchParams }: StaffPageProps) {
                   <th className="py-3 pr-4">Perfil</th>
                   <th className="py-3 pr-4">Igreja</th>
                   <th className="py-3 pr-4">Cadastro</th>
+                  <th className="py-3 pr-4">Acao</th>
                 </tr>
               </thead>
               <tbody>
@@ -238,11 +309,19 @@ export default async function StaffPage({ searchParams }: StaffPageProps) {
                     </td>
                     <td className="py-3 pr-4">{user.church?.name || "Geral"}</td>
                     <td className="py-3 pr-4">{user.createdAt.toLocaleDateString("pt-BR")}</td>
+                    <td className="py-3 pr-4">
+                      <a
+                        href={`/admin/equipe?editar=${user.id}`}
+                        className="rounded-md border border-[#2c6d49] px-3 py-2 text-sm font-semibold text-[#2c6d49] hover:bg-[#effaf2]"
+                      >
+                        Editar
+                      </a>
+                    </td>
                   </tr>
                 ))}
                 {staffUsers.length === 0 ? (
                   <tr>
-                    <td className="py-6 pr-4 text-sm text-[#66736a]" colSpan={5}>
+                    <td className="py-6 pr-4 text-sm text-[#66736a]" colSpan={6}>
                       Nenhum administrador ou professor cadastrado ainda.
                     </td>
                   </tr>

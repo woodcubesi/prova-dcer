@@ -172,7 +172,41 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             </Link>
           </div>
 
-          <div className="mt-4 overflow-x-auto">
+          <div className="mt-4 grid gap-3 md:hidden">
+            {applications.map((application) => (
+              <div key={application.id} className="rounded-md border border-[#edf1eb] p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-medium">{application.title}</p>
+                    <p className="mt-1 text-sm text-[#66736a]">{application.exam.title}</p>
+                  </div>
+                  <span className="rounded-full bg-[#effaf2] px-2 py-1 text-xs font-medium text-[#1f623e]">
+                    {application.active ? "Ativa" : "Inativa"}
+                  </span>
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+                  <div className="rounded-md bg-[#f7faf6] px-3 py-2">
+                    <p className="text-xs text-[#66736a]">Codigo</p>
+                    <p className="font-mono font-semibold">{application.accessCode}</p>
+                  </div>
+                  <div className="rounded-md bg-[#f7faf6] px-3 py-2">
+                    <p className="text-xs text-[#66736a]">Tempo</p>
+                    <p className="font-semibold">{application.exam.durationMinutes} min</p>
+                  </div>
+                  <div className="rounded-md bg-[#f7faf6] px-3 py-2">
+                    <p className="text-xs text-[#66736a]">Participantes</p>
+                    <p className="font-semibold">{application.participants.length}</p>
+                  </div>
+                  <div className="rounded-md bg-[#f7faf6] px-3 py-2">
+                    <p className="text-xs text-[#66736a]">Envios</p>
+                    <p className="font-semibold">{application.attempts.length}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-4 hidden overflow-x-auto md:block">
             <table className="w-full min-w-[720px] text-left text-sm">
               <thead className="border-b border-[#dfe6dd] text-xs uppercase tracking-wide text-[#66736a]">
                 <tr>
@@ -205,6 +239,11 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               </tbody>
             </table>
           </div>
+          {applications.length === 0 ? (
+            <div className="mt-4 rounded-md border border-[#edf1eb] bg-[#fbfcfa] p-4 text-sm text-[#66736a]">
+              Ainda nao ha aplicacoes criadas.
+            </div>
+          ) : null}
         </div>
 
         <aside className="space-y-3">

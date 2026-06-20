@@ -30,6 +30,15 @@ const staffUserSchema = z.object({
   churchId: z.string().trim().optional(),
 });
 
+const staffUpdateSchema = staffUserSchema.extend({
+  password: z
+    .string()
+    .trim()
+    .max(120)
+    .refine((password) => !password || password.length >= 6, "A senha precisa ter pelo menos 6 caracteres.")
+    .optional(),
+});
+
 const optionSchema = z.object({
   label: z.string().trim().min(1).max(3),
   text: z.string().trim().min(1, "Preencha todas as alternativas."),
@@ -84,6 +93,85 @@ function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
 }
 
+async function resolveStaffChurch(role: AdminRole, churchId: string | null) {
+  if (role === AdminRole.ADMIN) return null;
+
+  if (!churchId) {
+    errorRedirect("/admin/equipe", "Selecione a igreja do professor.");
+  }
+
+  const churchExists = await prisma.church.findFirst({
+    where: {
+      id: churchId,
+      active: true,
+    },
+    select: { id: true },
+  });
+
+  if (!churchExists) {
+    errorRedirect("/admin/equipe", "Igreja do professor nao encontrada.");
+  }
+
+  return churchId;
+}
+
+async function validateStaffScopeForTeacher(
+  target: { role: AdminRole; churchId: string | null } | null,
+  role: AdminRole,
+  contextChurchId: string | null,
+) {
+  if (role !== AdminRole.TEACHER) {
+    errorRedirect("/admin/equipe", "Professores podem cadastrar apenas outros professores.");
+  }
+
+  if (!contextChurchId) {
+    errorRedirect("/admin/equipe", "Seu usuario de professor ainda nao esta vinculado a uma igreja.");
+  }
+
+  if (target && (target.role !== AdminRole.TEACHER || target.churchId !== contextChurchId)) {
+    errorRedirect("/admin/equipe", "Voce so pode editar professores da sua igreja.");
+  }
+}
+
+async function ensureUniqueStaffEmail(email: string, ignoredId?: string) {
+  const existingUser = await prisma.adminUser.findUnique({
+    where: { email },
+    select: {
+      id: true,
+      role: true,
+      churchId: true,
+    },
+  });
+
+  if (existingUser && existingUser.id !== ignoredId) {
+    errorRedirect("/admin/equipe", "Este e-mail ja esta cadastrado para outra pessoa.");
+  }
+
+  return existingUser;
+}
+
+async function ensureUniqueStudent(
+  churchId: string,
+  category: Category,
+  normalizedName: string,
+  ignoredId?: string,
+) {
+  const existingStudent = await prisma.student.findUnique({
+    where: {
+      churchId_category_normalizedName: {
+        churchId,
+        category,
+        normalizedName,
+      },
+    },
+    select: { id: true },
+  });
+
+  if (existingStudent && existingStudent.id !== ignoredId) {
+    errorRedirect("/admin/cadastros", "Ja existe aluno com este nome, igreja e categoria.");
+  }
+}
+
 export async function loginAdminAction(formData: FormData) {
   const email = normalizeEmail(String(formData.get("email") || ""));
   const password = String(formData.get("password") || "");
@@ -134,46 +222,12 @@ export async function createStaffUserAction(formData: FormData) {
   let churchId = staffUser.churchId || null;
 
   if (!hasAdministratorAccess(context)) {
-    if (role !== AdminRole.TEACHER) {
-      errorRedirect("/admin/equipe", "Professores podem cadastrar apenas outros professores.");
-    }
-
-    if (!context.churchId) {
-      errorRedirect("/admin/equipe", "Seu usuario de professor ainda nao esta vinculado a uma igreja.");
-    }
-
+    await validateStaffScopeForTeacher(null, role, context.churchId);
     churchId = context.churchId;
   }
 
-  if (role !== AdminRole.ADMIN) {
-    if (!churchId) {
-      errorRedirect("/admin/equipe", "Selecione a igreja do professor.");
-    }
-
-    const churchExists = await prisma.church.findFirst({
-      where: {
-        id: churchId,
-        active: true,
-      },
-      select: { id: true },
-    });
-
-    if (!churchExists) {
-      errorRedirect("/admin/equipe", "Igreja do professor nao encontrada.");
-    }
-  } else {
-    churchId = null;
-  }
-
-  const existingUser = await prisma.adminUser.findUnique({
-    where: {
-      email: staffUser.email,
-    },
-    select: {
-      role: true,
-      churchId: true,
-    },
-  });
+  churchId = await resolveStaffChurch(role, churchId);
+  const existingUser = await ensureUniqueStaffEmail(staffUser.email);
 
   if (
     !hasAdministratorAccess(context) &&
@@ -210,6 +264,72 @@ export async function createStaffUserAction(formData: FormData) {
   redirect(`/admin/equipe?ok=${role === AdminRole.ADMIN ? "admin" : "professor"}`);
 }
 
+export async function updateStaffUserAction(formData: FormData) {
+  const context = await requireAdminContext();
+  const id = String(formData.get("id") || "");
+
+  const parsed = staffUpdateSchema.safeParse({
+    name: String(formData.get("name") || ""),
+    email: String(formData.get("email") || ""),
+    password: String(formData.get("password") || ""),
+    role: String(formData.get("role") || ""),
+    churchId: String(formData.get("churchId") || ""),
+  });
+
+  if (!id) {
+    errorRedirect("/admin/equipe", "Cadastro de equipe nao encontrado.");
+  }
+
+  if (!parsed.success) {
+    errorRedirect("/admin/equipe", parsed.error.issues[0]?.message || "Revise os dados da equipe.");
+  }
+
+  const target = await prisma.adminUser.findFirst({
+    where: {
+      id,
+      active: true,
+    },
+    select: {
+      role: true,
+      churchId: true,
+    },
+  });
+
+  if (!target) {
+    errorRedirect("/admin/equipe", "Cadastro de equipe nao encontrado.");
+  }
+
+  const staffUser = parsed.data;
+  const role = staffUser.role as AdminRole;
+  let churchId = staffUser.churchId || null;
+
+  if (!hasAdministratorAccess(context)) {
+    await validateStaffScopeForTeacher(target, role, context.churchId);
+    churchId = context.churchId;
+  }
+
+  churchId = await resolveStaffChurch(role, churchId);
+  await ensureUniqueStaffEmail(staffUser.email, id);
+
+  const password = staffUser.password || "";
+
+  await prisma.adminUser.update({
+    where: { id },
+    data: {
+      name: staffUser.name,
+      email: staffUser.email,
+      role,
+      churchId,
+      active: true,
+      ...(password ? { passwordHash: hashPassword(password) } : {}),
+    },
+  });
+
+  revalidatePath("/admin");
+  revalidatePath("/admin/equipe");
+  redirect("/admin/equipe?ok=equipe");
+}
+
 export async function createChurchAction(formData: FormData) {
   await requireAdminRole([AdminRole.ADMIN, AdminRole.ADMIN_TEACHER]);
 
@@ -229,6 +349,40 @@ export async function createChurchAction(formData: FormData) {
     create: {
       name,
       city: city || null,
+    },
+  });
+
+  revalidatePath("/admin");
+  revalidatePath("/admin/cadastros");
+  redirect("/admin/cadastros?ok=igreja");
+}
+
+export async function updateChurchAction(formData: FormData) {
+  await requireAdminRole([AdminRole.ADMIN, AdminRole.ADMIN_TEACHER]);
+
+  const id = String(formData.get("id") || "");
+  const name = String(formData.get("name") || "").trim();
+  const city = String(formData.get("city") || "").trim();
+
+  if (!id || name.length < 3) {
+    errorRedirect("/admin/cadastros", "Informe o nome da igreja.");
+  }
+
+  const duplicate = await prisma.church.findUnique({
+    where: { name },
+    select: { id: true },
+  });
+
+  if (duplicate && duplicate.id !== id) {
+    errorRedirect("/admin/cadastros", "Ja existe uma igreja com este nome.");
+  }
+
+  await prisma.church.update({
+    where: { id },
+    data: {
+      name,
+      city: city || null,
+      active: true,
     },
   });
 
@@ -259,6 +413,7 @@ export async function createStudentAction(formData: FormData) {
   }
 
   const normalizedName = normalizeName(name);
+  await ensureUniqueStudent(churchId, category, normalizedName);
 
   await prisma.student.upsert({
     where: {
@@ -277,6 +432,59 @@ export async function createStudentAction(formData: FormData) {
       normalizedName,
       category,
       churchId,
+    },
+  });
+
+  revalidatePath("/admin");
+  revalidatePath("/admin/cadastros");
+  redirect("/admin/cadastros?ok=aluno");
+}
+
+export async function updateStudentAction(formData: FormData) {
+  const context = await requireAdminContext();
+  const scopedChurchId = getScopedChurchId(context);
+  const id = String(formData.get("id") || "");
+  const name = String(formData.get("name") || "").trim();
+  const requestedChurchId = String(formData.get("churchId") || "");
+  const churchId = scopedChurchId || requestedChurchId;
+  const category = String(formData.get("category") || "") as Category;
+
+  if (context.role === AdminRole.TEACHER && !scopedChurchId) {
+    errorRedirect("/admin/cadastros", "Seu usuario de professor ainda nao esta vinculado a uma igreja.");
+  }
+
+  if (scopedChurchId && requestedChurchId && requestedChurchId !== scopedChurchId) {
+    errorRedirect("/admin/cadastros", "Professores so podem editar alunos da propria igreja.");
+  }
+
+  if (!id || name.length < 3 || !churchId || !categorySchema.safeParse(category).success) {
+    errorRedirect("/admin/cadastros", "Preencha igreja, categoria e nome do aluno.");
+  }
+
+  const target = await prisma.student.findFirst({
+    where: {
+      id,
+      active: true,
+      ...(scopedChurchId ? { churchId: scopedChurchId } : {}),
+    },
+    select: { id: true },
+  });
+
+  if (!target) {
+    errorRedirect("/admin/cadastros", "Aluno nao encontrado.");
+  }
+
+  const normalizedName = normalizeName(name);
+  await ensureUniqueStudent(churchId, category, normalizedName, id);
+
+  await prisma.student.update({
+    where: { id },
+    data: {
+      name,
+      normalizedName,
+      category,
+      churchId,
+      active: true,
     },
   });
 
