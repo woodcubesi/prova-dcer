@@ -11,6 +11,12 @@ Aplicacao web para montar, aplicar e conferir provas. A primeira versao usa:
 - Painel administrativo para cadastros, montagem e correcao
 - Resultado oculto para o aluno ao final
 
+## Ambientes
+
+- Desenvolvimento: esta maquina local, usada para codar e validar em `localhost`.
+- Homologacao: servidor Ubuntu `213.136.66.29`, publicado em `https://prova-dcer.woodcube.com.br`.
+- Producao: ainda nao definido.
+
 ## Instalacao rapida
 
 ### Pre-requisitos
