@@ -13,33 +13,40 @@ type StaffPageProps = {
   }>;
 };
 
+type ChurchOption = {
+  id: string;
+  name: string;
+};
+
 type StaffFormProps = {
-  role: AdminRole;
-  title: string;
-  description: string;
-  buttonLabel: string;
-  churches?: {
-    id: string;
-    name: string;
-  }[];
-  fixedChurch?: {
-    id: string;
-    name: string;
-  } | null;
+  canChooseProfile: boolean;
+  churches: ChurchOption[];
+  fixedChurch?: ChurchOption | null;
 };
 
 function getRoleLabel(role: AdminRole) {
-  return role === AdminRole.ADMIN ? "Administrador" : "Professor";
+  if (role === AdminRole.ADMIN) return "Administrador";
+  if (role === AdminRole.ADMIN_TEACHER) return "Administrador + Professor";
+  return "Professor";
 }
 
-function StaffForm({ role, title, description, buttonLabel, churches = [], fixedChurch }: StaffFormProps) {
-  const needsChurch = role === AdminRole.TEACHER;
+function isTeacherProfile(role: AdminRole) {
+  return role === AdminRole.TEACHER || role === AdminRole.ADMIN_TEACHER;
+}
 
+function isAdministratorProfile(role: AdminRole) {
+  return role === AdminRole.ADMIN || role === AdminRole.ADMIN_TEACHER;
+}
+
+function StaffForm({ canChooseProfile, churches, fixedChurch }: StaffFormProps) {
   return (
     <form action={createStaffUserAction} className="rounded-lg border border-[#dfe6dd] bg-white p-4">
-      <input type="hidden" name="role" value={role} />
-      <h2 className="text-lg font-semibold">{title}</h2>
-      <p className="mt-1 text-sm text-[#66736a]">{description}</p>
+      <h2 className="text-lg font-semibold">Nova pessoa da equipe</h2>
+      <p className="mt-1 text-sm text-[#66736a]">
+        {canChooseProfile
+          ? "Escolha se a pessoa sera administradora, professora ou os dois."
+          : "Professores podem cadastrar outros professores da propria igreja."}
+      </p>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <label className="block sm:col-span-2">
@@ -50,6 +57,7 @@ function StaffForm({ role, title, description, buttonLabel, churches = [], fixed
             placeholder="Ex.: Maria Oliveira"
           />
         </label>
+
         <label className="block">
           <span className="text-sm font-medium">E-mail</span>
           <input
@@ -59,6 +67,7 @@ function StaffForm({ role, title, description, buttonLabel, churches = [], fixed
             placeholder="nome@email.com"
           />
         </label>
+
         <label className="block">
           <span className="text-sm font-medium">Senha inicial</span>
           <input
@@ -69,7 +78,24 @@ function StaffForm({ role, title, description, buttonLabel, churches = [], fixed
           />
         </label>
 
-        {needsChurch && fixedChurch ? (
+        {canChooseProfile ? (
+          <label className="block sm:col-span-2">
+            <span className="text-sm font-medium">Perfil</span>
+            <select
+              name="role"
+              defaultValue={AdminRole.TEACHER}
+              className="mt-1 w-full rounded-md border border-[#cdd8cf] bg-white px-3 py-3 outline-none focus:ring-2 focus:ring-[#2c6d49]"
+            >
+              <option value={AdminRole.ADMIN}>Administrador</option>
+              <option value={AdminRole.TEACHER}>Professor</option>
+              <option value={AdminRole.ADMIN_TEACHER}>Administrador + Professor</option>
+            </select>
+          </label>
+        ) : (
+          <input type="hidden" name="role" value={AdminRole.TEACHER} />
+        )}
+
+        {fixedChurch ? (
           <label className="block sm:col-span-2">
             <span className="text-sm font-medium">Igreja</span>
             <input type="hidden" name="churchId" value={fixedChurch.id} />
@@ -77,16 +103,14 @@ function StaffForm({ role, title, description, buttonLabel, churches = [], fixed
               {fixedChurch.name}
             </div>
           </label>
-        ) : null}
-
-        {needsChurch && !fixedChurch ? (
+        ) : (
           <label className="block sm:col-span-2">
-            <span className="text-sm font-medium">Igreja do professor</span>
+            <span className="text-sm font-medium">Igreja quando tambem for professor</span>
             <select
               name="churchId"
               className="mt-1 w-full rounded-md border border-[#cdd8cf] bg-white px-3 py-3 outline-none focus:ring-2 focus:ring-[#2c6d49]"
             >
-              <option value="">Selecione</option>
+              <option value="">Sem igreja / apenas administrador</option>
               {churches.map((church) => (
                 <option key={church.id} value={church.id}>
                   {church.name}
@@ -94,11 +118,11 @@ function StaffForm({ role, title, description, buttonLabel, churches = [], fixed
               ))}
             </select>
           </label>
-        ) : null}
+        )}
       </div>
 
       <button className="mt-4 rounded-md bg-[#12382a] px-4 py-3 text-sm font-semibold text-white hover:bg-[#1c513d]">
-        {buttonLabel}
+        Salvar equipe
       </button>
     </form>
   );
@@ -107,14 +131,14 @@ function StaffForm({ role, title, description, buttonLabel, churches = [], fixed
 export default async function StaffPage({ searchParams }: StaffPageProps) {
   const context = await requireAdminContext();
   const params = searchParams ? await searchParams : {};
-  const isTeacher = context.role === AdminRole.TEACHER;
-  const scopedChurchId = isTeacher ? context.churchId : null;
+  const isTeacherOnly = context.role === AdminRole.TEACHER;
+  const scopedChurchId = isTeacherOnly ? context.churchId : null;
 
   const [staffUsers, churches] = await Promise.all([
     prisma.adminUser.findMany({
       where: {
         active: true,
-        ...(isTeacher
+        ...(isTeacherOnly
           ? {
               role: AdminRole.TEACHER,
               churchId: scopedChurchId || "__missing_church__",
@@ -129,7 +153,7 @@ export default async function StaffPage({ searchParams }: StaffPageProps) {
     prisma.church.findMany({
       where: {
         active: true,
-        ...(isTeacher ? { id: scopedChurchId || "__missing_church__" } : {}),
+        ...(isTeacherOnly ? { id: scopedChurchId || "__missing_church__" } : {}),
       },
       orderBy: { name: "asc" },
       select: {
@@ -139,21 +163,20 @@ export default async function StaffPage({ searchParams }: StaffPageProps) {
     }),
   ]);
 
-  const fixedChurch = isTeacher ? churches[0] || null : null;
-
-  const administrators = staffUsers.filter((user) => user.role === AdminRole.ADMIN);
-  const teachers = staffUsers.filter((user) => user.role === AdminRole.TEACHER);
+  const fixedChurch = isTeacherOnly ? churches[0] || null : null;
+  const administrators = staffUsers.filter((user) => isAdministratorProfile(user.role));
+  const teachers = staffUsers.filter((user) => isTeacherProfile(user.role));
 
   return (
     <AdminShell
       title="Equipe administrativa"
       description={
-        isTeacher
+        isTeacherOnly
           ? "Cadastre professores da sua igreja."
-          : "Cadastre quem administra o sistema e os professores vinculados a cada igreja."
+          : "Cadastre administradores, professores ou pessoas com os dois perfis."
       }
     >
-      {isTeacher && !scopedChurchId ? (
+      {isTeacherOnly && !scopedChurchId ? (
         <div className="mb-4 rounded-md border border-[#efc2bd] bg-[#fff4f2] px-4 py-3 text-sm text-[#9b2d20]">
           Seu usuario de professor ainda nao esta vinculado a uma igreja.
         </div>
@@ -169,36 +192,15 @@ export default async function StaffPage({ searchParams }: StaffPageProps) {
         </div>
       ) : null}
 
-      <section className="grid gap-4 lg:grid-cols-2">
-        {!isTeacher ? (
-          <StaffForm
-            role={AdminRole.ADMIN}
-            title="Novo administrador"
-            description="Administradores podem cadastrar equipe, alunos, igrejas, montar provas e conferir resultados."
-            buttonLabel="Salvar administrador"
-          />
-        ) : null}
-        {(!isTeacher || fixedChurch) ? (
-          <StaffForm
-            role={AdminRole.TEACHER}
-            title="Novo professor"
-            description={
-              isTeacher
-                ? "O novo professor ficara vinculado a sua igreja."
-                : "Professores acessam apenas alunos, provas e correcoes da igreja selecionada."
-            }
-            buttonLabel="Salvar professor"
-            churches={churches}
-            fixedChurch={fixedChurch}
-          />
-        ) : null}
-      </section>
+      {(!isTeacherOnly || fixedChurch) ? (
+        <StaffForm canChooseProfile={!isTeacherOnly} churches={churches} fixedChurch={fixedChurch} />
+      ) : null}
 
       <section className="mt-5 grid gap-4 lg:grid-cols-[280px_1fr]">
         <div className="rounded-lg border border-[#dfe6dd] bg-white p-4">
           <h2 className="text-lg font-semibold">Resumo</h2>
           <div className="mt-4 grid gap-3">
-            {!isTeacher ? (
+            {!isTeacherOnly ? (
               <div className="rounded-md border border-[#edf1eb] px-3 py-3">
                 <p className="text-sm text-[#68766d]">Administradores</p>
                 <p className="mt-1 text-3xl font-semibold">{administrators.length}</p>

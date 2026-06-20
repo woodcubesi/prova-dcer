@@ -10,6 +10,7 @@ import {
   createAdminSession,
   getAdminPassword,
   getScopedChurchId,
+  hasAdministratorAccess,
   hashPassword,
   requireAdminContext,
   requireAdminRole,
@@ -19,7 +20,7 @@ import { prisma } from "@/lib/prisma";
 import { normalizeName } from "@/lib/text";
 
 const categorySchema = z.enum(["JUNIOR", "ADOLESCENTES", "JUVENIL"]);
-const staffRoleSchema = z.enum(["ADMIN", "TEACHER"]);
+const staffRoleSchema = z.enum(["ADMIN", "TEACHER", "ADMIN_TEACHER"]);
 
 const staffUserSchema = z.object({
   name: z.string().trim().min(3, "Informe o nome completo.").max(120),
@@ -132,7 +133,7 @@ export async function createStaffUserAction(formData: FormData) {
   const role = staffUser.role as AdminRole;
   let churchId = staffUser.churchId || null;
 
-  if (context.role === AdminRole.TEACHER) {
+  if (!hasAdministratorAccess(context)) {
     if (role !== AdminRole.TEACHER) {
       errorRedirect("/admin/equipe", "Professores podem cadastrar apenas outros professores.");
     }
@@ -144,7 +145,7 @@ export async function createStaffUserAction(formData: FormData) {
     churchId = context.churchId;
   }
 
-  if (role === AdminRole.TEACHER) {
+  if (role !== AdminRole.ADMIN) {
     if (!churchId) {
       errorRedirect("/admin/equipe", "Selecione a igreja do professor.");
     }
@@ -175,7 +176,7 @@ export async function createStaffUserAction(formData: FormData) {
   });
 
   if (
-    context.role === AdminRole.TEACHER &&
+    !hasAdministratorAccess(context) &&
     existingUser &&
     (existingUser.role !== AdminRole.TEACHER || existingUser.churchId !== churchId)
   ) {
@@ -210,7 +211,7 @@ export async function createStaffUserAction(formData: FormData) {
 }
 
 export async function createChurchAction(formData: FormData) {
-  await requireAdminRole([AdminRole.ADMIN]);
+  await requireAdminRole([AdminRole.ADMIN, AdminRole.ADMIN_TEACHER]);
 
   const name = String(formData.get("name") || "").trim();
   const city = String(formData.get("city") || "").trim();

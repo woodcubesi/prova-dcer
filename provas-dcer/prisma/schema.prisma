@@ -38,6 +38,7 @@ enum AttemptStatus {
 enum AdminRole {
   ADMIN
   TEACHER
+  ADMIN_TEACHER
 }
 
 model AdminUser {

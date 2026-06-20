@@ -194,6 +194,14 @@ export function getScopedChurchId(context: AdminContext) {
   return context.role === AdminRole.TEACHER ? context.churchId : null;
 }
 
+export function hasAdministratorAccess(context: AdminContext) {
+  return context.role === AdminRole.ADMIN || context.role === AdminRole.ADMIN_TEACHER;
+}
+
+export function isTeacherOnly(context: AdminContext) {
+  return context.role === AdminRole.TEACHER;
+}
+
 export function getAdminPassword() {
   return process.env.ADMIN_PASSWORD || "admin123";
 }

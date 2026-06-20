@@ -63,11 +63,17 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           : {}),
       },
     }),
-    prisma.adminUser.count({ where: { active: true, role: "ADMIN", ...(isTeacher ? { id: "__hidden__" } : {}) } }),
     prisma.adminUser.count({
       where: {
         active: true,
-        role: "TEACHER",
+        role: { in: [AdminRole.ADMIN, AdminRole.ADMIN_TEACHER] },
+        ...(isTeacher ? { id: "__hidden__" } : {}),
+      },
+    }),
+    prisma.adminUser.count({
+      where: {
+        active: true,
+        role: { in: [AdminRole.TEACHER, AdminRole.ADMIN_TEACHER] },
         ...(isTeacher ? { churchId: scopedChurchFilter } : {}),
       },
     }),
