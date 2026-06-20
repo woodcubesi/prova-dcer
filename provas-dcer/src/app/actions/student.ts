@@ -1,7 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { AttemptStatus, Category, QuestionType } from "@/generated/prisma/client";
+import { AttemptStatus, Category } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { normalizeName } from "@/lib/text";
 
@@ -133,18 +133,6 @@ export async function submitAttemptAction(formData: FormData) {
 
   const now = new Date();
   const answers = attempt.application.exam.questions.map((question) => {
-    if (question.type === QuestionType.TEXT) {
-      const textAnswer = String(formData.get(`text_${question.id}`) || "").trim();
-      return {
-        attemptId: attempt.id,
-        questionId: question.id,
-        textAnswer: textAnswer || null,
-        selectedOptionId: null,
-        isCorrect: null,
-        pointsAwarded: null,
-      };
-    }
-
     const selectedOptionId = String(formData.get(`option_${question.id}`) || "");
     const selectedOption = question.options.find((option) => option.id === selectedOptionId);
 

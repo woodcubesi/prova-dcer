@@ -31,7 +31,7 @@ export default async function CorrectionPage() {
   });
 
   return (
-    <AdminShell title="Correcao" description="Confira respostas enviadas e finalize a pontuacao.">
+    <AdminShell title="Correcao" description="Confira respostas enviadas e a pontuacao automatica.">
       <section className="rounded-lg border border-[#dfe6dd] bg-white p-4">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>

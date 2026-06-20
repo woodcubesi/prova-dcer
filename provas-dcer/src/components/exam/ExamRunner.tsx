@@ -9,7 +9,6 @@ type Question = {
   id: string;
   position: number;
   statement: string;
-  type: "MULTIPLE_CHOICE" | "TEXT";
   points: number;
   options: {
     id: string;
@@ -97,34 +96,25 @@ export function ExamRunner({
             </span>
           </div>
 
-          {question.type === "MULTIPLE_CHOICE" ? (
-            <div className="mt-4 grid gap-2">
-              {question.options.map((option) => (
-                <label
-                  key={option.id}
-                  className="flex items-start gap-3 rounded-md border border-[#dfe6dd] p-3 transition has-[:checked]:border-[#2c6d49] has-[:checked]:bg-[#effaf2]"
-                >
-                  <input
-                    type="radio"
-                    name={`option_${question.id}`}
-                    value={option.id}
-                    className="mt-1 h-5 w-5 accent-[#2c6d49]"
-                  />
-                  <span>
-                    <span className="font-semibold">{option.label}) </span>
-                    {option.text}
-                  </span>
-                </label>
-              ))}
-            </div>
-          ) : (
-            <textarea
-              name={`text_${question.id}`}
-              rows={6}
-              className="mt-4 w-full rounded-md border border-[#cdd8cf] px-3 py-3 outline-none focus:ring-2 focus:ring-[#2c6d49]"
-              placeholder="Digite sua resposta"
-            />
-          )}
+          <div className="mt-4 grid gap-2">
+            {question.options.map((option) => (
+              <label
+                key={option.id}
+                className="flex items-start gap-3 rounded-md border border-[#dfe6dd] p-3 transition has-[:checked]:border-[#2c6d49] has-[:checked]:bg-[#effaf2]"
+              >
+                <input
+                  type="radio"
+                  name={`option_${question.id}`}
+                  value={option.id}
+                  className="mt-1 h-5 w-5 accent-[#2c6d49]"
+                />
+                <span>
+                  <span className="font-semibold">{option.label}) </span>
+                  {option.text}
+                </span>
+              </label>
+            ))}
+          </div>
         </section>
       ))}
 

@@ -4,7 +4,7 @@ import { randomInt } from "crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { AttemptStatus, Category, ExamStatus, QuestionType } from "@/generated/prisma/client";
+import { Category, ExamStatus } from "@/generated/prisma/client";
 import { clearAdminSession, createAdminSession, getAdminPassword, requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { normalizeName } from "@/lib/text";
@@ -18,27 +18,18 @@ const optionSchema = z.object({
 
 const questionSchema = z
   .object({
-    type: z.enum(["MULTIPLE_CHOICE", "TEXT"]),
+    type: z.literal("MULTIPLE_CHOICE", {
+      error: "Todas as questoes devem ser de multipla escolha.",
+    }),
     statement: z.string().trim().min(5, "A pergunta precisa ter pelo menos 5 caracteres."),
     points: z.coerce.number().positive("A pontuacao precisa ser maior que zero.").max(100),
-    options: z.array(optionSchema).optional(),
-    correctOptionIndex: z.coerce.number().int().optional(),
+    options: z.array(optionSchema).min(2, "Questao de multipla escolha precisa ter pelo menos duas alternativas."),
+    correctOptionIndex: z.coerce.number().int(),
   })
   .superRefine((question, ctx) => {
-    if (question.type !== "MULTIPLE_CHOICE") return;
-
-    if (!question.options || question.options.length < 2) {
-      ctx.addIssue({
-        code: "custom",
-        message: "Questao objetiva precisa ter pelo menos duas alternativas.",
-        path: ["options"],
-      });
-    }
-
     if (
-      question.correctOptionIndex === undefined ||
       question.correctOptionIndex < 0 ||
-      !question.options?.[question.correctOptionIndex]
+      !question.options[question.correctOptionIndex]
     ) {
       ctx.addIssue({
         code: "custom",
@@ -189,19 +180,16 @@ export async function createExamAction(formData: FormData) {
           create: payload.questions.map((question, questionIndex) => ({
             position: questionIndex + 1,
             statement: question.statement,
-            type: question.type as QuestionType,
+            type: "MULTIPLE_CHOICE",
             points: question.points,
-            options:
-              question.type === "MULTIPLE_CHOICE"
-                ? {
-                    create: question.options!.map((option, optionIndex) => ({
-                      position: optionIndex + 1,
-                      label: option.label,
-                      text: option.text,
-                      isCorrect: optionIndex === question.correctOptionIndex,
-                    })),
-                  }
-                : undefined,
+            options: {
+              create: question.options.map((option, optionIndex) => ({
+                position: optionIndex + 1,
+                label: option.label,
+                text: option.text,
+                isCorrect: optionIndex === question.correctOptionIndex,
+              })),
+            },
           })),
         },
       },
@@ -226,93 +214,4 @@ export async function createExamAction(formData: FormData) {
   revalidatePath("/admin");
   revalidatePath("/prova");
   redirect(`/admin?criada=${application.accessCode}`);
-}
-
-export async function updateManualGradesAction(formData: FormData) {
-  await requireAdmin();
-
-  const attemptId = String(formData.get("attemptId") || "");
-  const attempt = await prisma.attempt.findUnique({
-    where: { id: attemptId },
-    include: {
-      application: {
-        include: {
-          exam: {
-            include: {
-              questions: true,
-            },
-          },
-        },
-      },
-      answers: {
-        include: {
-          question: true,
-        },
-      },
-    },
-  });
-
-  if (!attempt) {
-    redirect("/admin/correcao");
-  }
-
-  const updates = attempt.answers
-    .filter((answer) => answer.question.type === QuestionType.TEXT)
-    .map((answer) => {
-      const rawPoints = String(formData.get(`points_${answer.id}`) || "").trim();
-      const comment = String(formData.get(`comment_${answer.id}`) || "").trim();
-      const parsedPoints = rawPoints === "" ? null : Number(rawPoints);
-      const pointsAwarded =
-        parsedPoints === null
-          ? null
-          : Math.min(Math.max(parsedPoints, 0), answer.question.points);
-
-      return prisma.answer.update({
-        where: { id: answer.id },
-        data: {
-          pointsAwarded,
-          manualComment: comment || null,
-          isCorrect: pointsAwarded === null ? null : pointsAwarded >= answer.question.points,
-        },
-      });
-    });
-
-  if (updates.length) {
-    await prisma.$transaction(updates);
-  }
-
-  const refreshedAttempt = await prisma.attempt.findUniqueOrThrow({
-    where: { id: attemptId },
-    include: {
-      application: {
-        include: {
-          exam: {
-            include: {
-              questions: true,
-            },
-          },
-        },
-      },
-      answers: true,
-    },
-  });
-
-  const score = refreshedAttempt.answers.reduce((sum, answer) => sum + (answer.pointsAwarded || 0), 0);
-  const totalPoints = refreshedAttempt.application.exam.questions.reduce(
-    (sum, question) => sum + question.points,
-    0,
-  );
-
-  await prisma.attempt.update({
-    where: { id: attemptId },
-    data: {
-      score,
-      totalPoints,
-      status: AttemptStatus.SUBMITTED,
-    },
-  });
-
-  revalidatePath("/admin/correcao");
-  revalidatePath(`/admin/correcao/${attemptId}`);
-  redirect(`/admin/correcao/${attemptId}?ok=correcao`);
 }

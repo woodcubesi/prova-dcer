@@ -69,7 +69,6 @@ export default async function ExamPage({ params }: ExamPageProps) {
           id: question.id,
           position: question.position,
           statement: question.statement,
-          type: question.type,
           points: question.points,
           options: question.options.map((option) => ({
             id: option.id,

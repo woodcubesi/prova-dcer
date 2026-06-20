@@ -6,6 +6,7 @@ Aplicacao web para montar, aplicar e conferir provas. A primeira versao usa:
 - PostgreSQL em Docker
 - Prisma ORM
 - Entrada do aluno por prova, igreja, categoria e nome
+- Provas sempre de multipla escolha
 - Tempo total da prova
 - Painel administrativo para cadastros, montagem e correcao
 - Resultado oculto para o aluno ao final

@@ -62,7 +62,7 @@ export default async function Home() {
           <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[#2c6d49]">Professor</p>
           <h2 className="mt-3 text-2xl font-semibold">Montar prova</h2>
           <p className="mt-2 text-sm leading-6 text-[#66736a]">
-            Crie questoes objetivas e discursivas, defina o tempo total e selecione igrejas/categorias.
+            Crie questoes de multipla escolha, defina o tempo total e selecione igrejas/categorias.
           </p>
         </Link>
 

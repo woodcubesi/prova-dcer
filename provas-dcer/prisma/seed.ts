@@ -127,9 +127,17 @@ async function main() {
           },
           {
             position: 4,
-            statement: "Explique, com suas palavras, o que significa servir ao proximo.",
-            type: QuestionType.TEXT,
-            points: 2,
+            statement: "Qual atitude melhor representa servir ao proximo?",
+            type: QuestionType.MULTIPLE_CHOICE,
+            points: 1,
+            options: {
+              create: [
+                { position: 1, label: "A", text: "Ajudar com humildade e amor", isCorrect: true },
+                { position: 2, label: "B", text: "Esperar sempre reconhecimento", isCorrect: false },
+                { position: 3, label: "C", text: "Fazer apenas quando houver recompensa", isCorrect: false },
+                { position: 4, label: "D", text: "Ignorar a necessidade dos outros", isCorrect: false },
+              ],
+            },
           },
         ],
       },

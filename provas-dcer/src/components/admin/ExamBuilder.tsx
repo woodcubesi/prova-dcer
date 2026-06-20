@@ -12,7 +12,6 @@ type ChurchOption = {
 
 type QuestionDraft = {
   id: string;
-  type: "MULTIPLE_CHOICE" | "TEXT";
   statement: string;
   points: number;
   options: { label: string; text: string }[];
@@ -22,7 +21,6 @@ type QuestionDraft = {
 function newQuestion(): QuestionDraft {
   return {
     id: crypto.randomUUID(),
-    type: "MULTIPLE_CHOICE",
     statement: "",
     points: 1,
     correctOptionIndex: 0,
@@ -56,7 +54,7 @@ export function ExamBuilder({ churches }: { churches: ChurchOption[] }) {
         churchIds: selectedChurchIds,
         categories: selectedCategories,
         questions: questions.map((question) => ({
-          type: question.type,
+          type: "MULTIPLE_CHOICE",
           statement: question.statement,
           points: question.points,
           options: question.options,
@@ -197,7 +195,7 @@ export function ExamBuilder({ churches }: { churches: ChurchOption[] }) {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-lg font-semibold">Questoes</h2>
-            <p className="text-sm text-[#66736a]">As questoes objetivas sao corrigidas automaticamente.</p>
+            <p className="text-sm text-[#66736a]">Todas as questoes sao de multipla escolha e corrigidas automaticamente.</p>
           </div>
           <button
             type="button"
@@ -223,21 +221,12 @@ export function ExamBuilder({ churches }: { churches: ChurchOption[] }) {
                   />
                 </label>
                 <div className="grid gap-3 sm:grid-cols-2 lg:w-72 lg:grid-cols-1">
-                  <label className="block">
-                    <span className="text-sm font-medium">Tipo</span>
-                    <select
-                      value={question.type}
-                      onChange={(event) =>
-                        updateQuestion(question.id, {
-                          type: event.target.value as QuestionDraft["type"],
-                        })
-                      }
-                      className="mt-1 w-full rounded-md border border-[#cdd8cf] bg-white px-3 py-3 outline-none focus:ring-2 focus:ring-[#2c6d49]"
-                    >
-                      <option value="MULTIPLE_CHOICE">Objetiva</option>
-                      <option value="TEXT">Discursiva</option>
-                    </select>
-                  </label>
+                  <div className="rounded-md border border-[#dfe6dd] bg-white px-3 py-3">
+                    <span className="text-xs font-semibold uppercase tracking-[0.16em] text-[#2c6d49]">
+                      Tipo
+                    </span>
+                    <p className="mt-1 text-sm font-medium">Multipla escolha</p>
+                  </div>
                   <label className="block">
                     <span className="text-sm font-medium">Pontos</span>
                     <input
@@ -252,34 +241,28 @@ export function ExamBuilder({ churches }: { churches: ChurchOption[] }) {
                 </div>
               </div>
 
-              {question.type === "MULTIPLE_CHOICE" ? (
-                <div className="mt-4 grid gap-2 lg:grid-cols-2">
-                  {question.options.map((option, optionIndex) => (
-                    <label key={option.label} className="flex gap-3 rounded-md border border-[#dfe6dd] bg-white p-3">
+              <div className="mt-4 grid gap-2 lg:grid-cols-2">
+                {question.options.map((option, optionIndex) => (
+                  <label key={option.label} className="flex gap-3 rounded-md border border-[#dfe6dd] bg-white p-3">
+                    <input
+                      type="radio"
+                      name={`correct-${question.id}`}
+                      checked={question.correctOptionIndex === optionIndex}
+                      onChange={() => updateQuestion(question.id, { correctOptionIndex: optionIndex })}
+                      className="mt-3 h-5 w-5 accent-[#2c6d49]"
+                    />
+                    <span className="flex-1">
+                      <span className="text-xs font-semibold text-[#2c6d49]">Alternativa {option.label}</span>
                       <input
-                        type="radio"
-                        name={`correct-${question.id}`}
-                        checked={question.correctOptionIndex === optionIndex}
-                        onChange={() => updateQuestion(question.id, { correctOptionIndex: optionIndex })}
-                        className="mt-3 h-5 w-5 accent-[#2c6d49]"
+                        value={option.text}
+                        onChange={(event) => updateOption(question.id, optionIndex, event.target.value)}
+                        className="mt-1 w-full rounded-md border border-[#cdd8cf] px-3 py-2 outline-none focus:ring-2 focus:ring-[#2c6d49]"
+                        placeholder={`Texto da alternativa ${option.label}`}
                       />
-                      <span className="flex-1">
-                        <span className="text-xs font-semibold text-[#2c6d49]">Alternativa {option.label}</span>
-                        <input
-                          value={option.text}
-                          onChange={(event) => updateOption(question.id, optionIndex, event.target.value)}
-                          className="mt-1 w-full rounded-md border border-[#cdd8cf] px-3 py-2 outline-none focus:ring-2 focus:ring-[#2c6d49]"
-                          placeholder={`Texto da alternativa ${option.label}`}
-                        />
-                      </span>
-                    </label>
-                  ))}
-                </div>
-              ) : (
-                <p className="mt-4 rounded-md bg-[#fff9e8] px-3 py-2 text-sm text-[#6f5714]">
-                  Questao discursiva: sera conferida manualmente no painel de correcao.
-                </p>
-              )}
+                    </span>
+                  </label>
+                ))}
+              </div>
 
               <div className="mt-4 flex justify-end">
                 <button
