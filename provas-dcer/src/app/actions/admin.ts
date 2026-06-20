@@ -4,12 +4,28 @@ import { randomInt } from "crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { Category, ExamStatus } from "@/generated/prisma/client";
-import { clearAdminSession, createAdminSession, getAdminPassword, requireAdmin } from "@/lib/auth";
+import { AdminRole, Category, ExamStatus } from "@/generated/prisma/client";
+import {
+  clearAdminSession,
+  createAdminSession,
+  getAdminPassword,
+  hashPassword,
+  requireAdmin,
+  requireAdminRole,
+  verifyPassword,
+} from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { normalizeName } from "@/lib/text";
 
 const categorySchema = z.enum(["JUNIOR", "ADOLESCENTES", "JUVENIL"]);
+const staffRoleSchema = z.enum(["ADMIN", "TEACHER"]);
+
+const staffUserSchema = z.object({
+  name: z.string().trim().min(3, "Informe o nome completo.").max(120),
+  email: z.string().trim().email("Informe um e-mail valido.").transform((email) => email.toLowerCase()),
+  password: z.string().min(6, "A senha precisa ter pelo menos 6 caracteres.").max(120),
+  role: staffRoleSchema,
+});
 
 const optionSchema = z.object({
   label: z.string().trim().min(1).max(3),
@@ -61,10 +77,28 @@ function buildAccessCode(rawCode?: string) {
   return `P${randomInt(100000, 999999)}`;
 }
 
+function normalizeEmail(email: string) {
+  return email.trim().toLowerCase();
+}
+
 export async function loginAdminAction(formData: FormData) {
+  const email = normalizeEmail(String(formData.get("email") || ""));
   const password = String(formData.get("password") || "");
 
-  if (password !== getAdminPassword()) {
+  if (email) {
+    const user = await prisma.adminUser.findUnique({
+      where: { email },
+    });
+
+    if (!user || !user.active || !verifyPassword(password, user.passwordHash)) {
+      redirect("/admin/login?erro=senha");
+    }
+
+    await createAdminSession(user.id);
+    redirect("/admin");
+  }
+
+  if (!password || password !== getAdminPassword()) {
     redirect("/admin/login?erro=senha");
   }
 
@@ -75,6 +109,46 @@ export async function loginAdminAction(formData: FormData) {
 export async function logoutAdminAction() {
   await clearAdminSession();
   redirect("/admin/login");
+}
+
+export async function createStaffUserAction(formData: FormData) {
+  await requireAdminRole([AdminRole.ADMIN]);
+
+  const parsed = staffUserSchema.safeParse({
+    name: String(formData.get("name") || ""),
+    email: String(formData.get("email") || ""),
+    password: String(formData.get("password") || ""),
+    role: String(formData.get("role") || ""),
+  });
+
+  if (!parsed.success) {
+    errorRedirect("/admin/equipe", parsed.error.issues[0]?.message || "Revise os dados da equipe.");
+  }
+
+  const staffUser = parsed.data;
+  const passwordHash = hashPassword(staffUser.password);
+
+  await prisma.adminUser.upsert({
+    where: {
+      email: staffUser.email,
+    },
+    update: {
+      name: staffUser.name,
+      passwordHash,
+      role: staffUser.role as AdminRole,
+      active: true,
+    },
+    create: {
+      name: staffUser.name,
+      email: staffUser.email,
+      passwordHash,
+      role: staffUser.role as AdminRole,
+    },
+  });
+
+  revalidatePath("/admin");
+  revalidatePath("/admin/equipe");
+  redirect(`/admin/equipe?ok=${staffUser.role === "ADMIN" ? "admin" : "professor"}`);
 }
 
 export async function createChurchAction(formData: FormData) {

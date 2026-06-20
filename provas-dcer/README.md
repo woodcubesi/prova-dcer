@@ -9,6 +9,7 @@ Aplicacao web para montar, aplicar e conferir provas. A primeira versao usa:
 - Provas sempre de multipla escolha
 - Tempo total da prova
 - Painel administrativo para cadastros, montagem e correcao
+- Cadastro de administradores e professores
 - Resultado oculto para o aluno ao final
 
 ## Ambientes
@@ -106,11 +107,14 @@ Acesse:
 - Aluno: http://localhost:3000/prova
 - Administracao: http://localhost:3000/admin
 
-Senha administrativa local padrao:
+Primeiro acesso administrativo local:
 
 ```text
-admin123
+E-mail: deixe em branco
+Senha: admin123
 ```
+
+Depois de entrar, acesse o menu `Equipe` para cadastrar administradores e professores. Os proximos acessos podem ser feitos com e-mail e senha cadastrados.
 
 ## Rodar nesta maquina
 
@@ -125,11 +129,14 @@ Acesse:
 - Aluno: http://localhost:3000/prova
 - Administracao: http://localhost:3000/admin
 
-Senha administrativa local:
+Primeiro acesso administrativo nesta maquina:
 
 ```text
-admin123
+E-mail: deixe em branco
+Senha: admin123
 ```
+
+Depois cadastre administradores e professores no menu `Equipe`.
 
 ## Dados de demonstracao
 

@@ -43,7 +43,7 @@ export default async function Home() {
         </div>
       </section>
 
-      <section className="mt-5 grid flex-1 gap-4 lg:grid-cols-3">
+      <section className="mt-5 grid flex-1 gap-4 lg:grid-cols-[1.1fr_1fr]">
         <Link
           href="/prova"
           className="rounded-lg border border-[#dfe6dd] bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-[#8fc9a6] hover:shadow-md"
@@ -55,27 +55,32 @@ export default async function Home() {
           </p>
         </Link>
 
-        <Link
-          href="/admin/provas/nova"
-          className="rounded-lg border border-[#dfe6dd] bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-[#8fc9a6] hover:shadow-md"
-        >
-          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[#2c6d49]">Professor</p>
-          <h2 className="mt-3 text-2xl font-semibold">Montar prova</h2>
+        <section className="rounded-lg border border-[#dfe6dd] bg-white p-5 shadow-sm">
+          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[#2c6d49]">Administrativo</p>
+          <h2 className="mt-3 text-2xl font-semibold">Acesso da equipe</h2>
           <p className="mt-2 text-sm leading-6 text-[#66736a]">
-            Crie questoes de multipla escolha, defina o tempo total e selecione igrejas/categorias.
+            Administradores e professores entram aqui para montar provas, cadastrar pessoas e conferir resultados.
           </p>
-        </Link>
 
-        <Link
-          href="/admin/correcao"
-          className="rounded-lg border border-[#dfe6dd] bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-[#8fc9a6] hover:shadow-md"
-        >
-          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[#2c6d49]">Coordenacao</p>
-          <h2 className="mt-3 text-2xl font-semibold">Conferir provas</h2>
-          <p className="mt-2 text-sm leading-6 text-[#66736a]">
-            Veja respostas enviadas, tempo usado e finalize a pontuacao das questoes abertas.
-          </p>
-        </Link>
+          <Link
+            href="/admin/login"
+            className="mt-4 inline-flex rounded-md bg-[#12382a] px-4 py-3 text-sm font-semibold text-white hover:bg-[#1c513d]"
+          >
+            Entrar no painel
+          </Link>
+
+          <div className="mt-5 grid gap-2 border-t border-[#edf1eb] pt-4 text-sm">
+            <Link className="font-medium text-[#2c6d49] hover:underline" href="/admin/equipe">
+              Cadastrar administradores e professores
+            </Link>
+            <Link className="font-medium text-[#2c6d49] hover:underline" href="/admin/provas/nova">
+              Montar prova de multipla escolha
+            </Link>
+            <Link className="font-medium text-[#2c6d49] hover:underline" href="/admin/correcao">
+              Conferir provas enviadas
+            </Link>
+          </div>
+        </section>
       </section>
 
       <footer className="py-6 text-center text-xs text-[#68766d]">

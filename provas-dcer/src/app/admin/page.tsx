@@ -9,6 +9,7 @@ export const dynamic = "force-dynamic";
 type AdminPageProps = {
   searchParams?: Promise<{
     criada?: string;
+    erro?: string;
   }>;
 };
 
@@ -16,11 +17,13 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   await requireAdmin();
   const params = searchParams ? await searchParams : {};
 
-  const [churches, students, exams, submittedAttempts, applications] = await Promise.all([
+  const [churches, students, exams, submittedAttempts, administrators, teachers, applications] = await Promise.all([
     prisma.church.count({ where: { active: true } }),
     prisma.student.count({ where: { active: true } }),
     prisma.exam.count(),
     prisma.attempt.count({ where: { status: "SUBMITTED" } }),
+    prisma.adminUser.count({ where: { active: true, role: "ADMIN" } }),
+    prisma.adminUser.count({ where: { active: true, role: "TEACHER" } }),
     prisma.examApplication.findMany({
       orderBy: { createdAt: "desc" },
       take: 6,
@@ -42,13 +45,20 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           Prova criada com sucesso. Codigo da aplicacao: <strong>{params.criada}</strong>
         </div>
       ) : null}
+      {params.erro === "permissao" ? (
+        <div className="mb-5 rounded-md border border-[#efc2bd] bg-[#fff4f2] px-4 py-3 text-sm text-[#9b2d20]">
+          Acesso restrito a administradores.
+        </div>
+      ) : null}
 
-      <section className="grid gap-3 md:grid-cols-4">
+      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
         {[
           ["Igrejas", churches],
           ["Alunos", students],
           ["Provas", exams],
           ["Enviadas", submittedAttempts],
+          ["Administradores", administrators],
+          ["Professores", teachers],
         ].map(([label, value]) => (
           <div key={label} className="rounded-lg border border-[#dfe6dd] bg-white p-4">
             <p className="text-sm text-[#68766d]">{label}</p>
@@ -121,6 +131,13 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           >
             <p className="text-sm font-semibold text-[#2c6d49]">Pre-cadastro</p>
             <p className="mt-1 text-sm text-[#66736a]">Adicionar igrejas e alunos antes da aplicacao.</p>
+          </Link>
+          <Link
+            href="/admin/equipe"
+            className="block rounded-lg border border-[#dfe6dd] bg-white p-4 transition hover:border-[#8fc9a6]"
+          >
+            <p className="text-sm font-semibold text-[#2c6d49]">Equipe administrativa</p>
+            <p className="mt-1 text-sm text-[#66736a]">Cadastrar administradores e professores.</p>
           </Link>
           <Link
             href="/admin/correcao"
