@@ -45,7 +45,7 @@ export default async function AdminLoginPage({ searchParams }: LoginPageProps) {
         </form>
 
         <p className="mt-4 text-xs text-[#66736a]">
-          Senha inicial de desenvolvimento: <span className="font-semibold">admin123</span>
+          A senha administrativa e configurada no ambiente do servidor.
         </p>
       </section>
     </main>
