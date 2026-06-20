@@ -1,0 +1,167 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Category {
+  JUNIOR
+  ADOLESCENTES
+  JUVENIL
+}
+
+enum ExamStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum QuestionType {
+  MULTIPLE_CHOICE
+  TEXT
+}
+
+enum AttemptStatus {
+  IN_PROGRESS
+  SUBMITTED
+  EXPIRED
+}
+
+model Church {
+  id        String    @id @default(cuid())
+  name      String    @unique
+  city      String?
+  active    Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  students  Student[]
+}
+
+model Student {
+  id             String                   @id @default(cuid())
+  name           String
+  normalizedName String
+  category       Category
+  externalId     String?
+  active         Boolean                  @default(true)
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
+  churchId       String
+  church         Church                   @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  participants   ApplicationParticipant[]
+  attempts       Attempt[]
+
+  @@unique([churchId, category, normalizedName])
+  @@index([category])
+}
+
+model Exam {
+  id              String            @id @default(cuid())
+  title           String
+  description     String?
+  durationMinutes Int               @default(60)
+  status          ExamStatus         @default(DRAFT)
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  questions       Question[]
+  applications    ExamApplication[]
+}
+
+model Question {
+  id        String       @id @default(cuid())
+  examId    String
+  exam      Exam         @relation(fields: [examId], references: [id], onDelete: Cascade)
+  position  Int
+  statement String
+  type      QuestionType @default(MULTIPLE_CHOICE)
+  points    Float        @default(1)
+  options   Option[]
+  answers   Answer[]
+
+  @@unique([examId, position])
+}
+
+model Option {
+  id         String   @id @default(cuid())
+  questionId String
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  position   Int
+  label      String
+  text       String
+  isCorrect  Boolean  @default(false)
+  answers    Answer[]
+
+  @@unique([questionId, position])
+}
+
+model ExamApplication {
+  id                  String                   @id @default(cuid())
+  examId              String
+  exam                Exam                     @relation(fields: [examId], references: [id], onDelete: Cascade)
+  title               String
+  accessCode          String                   @unique
+  active              Boolean                  @default(true)
+  startsAt            DateTime?
+  endsAt              DateTime?
+  showResultToStudent Boolean                  @default(false)
+  createdAt           DateTime                 @default(now())
+  updatedAt           DateTime                 @updatedAt
+  participants        ApplicationParticipant[]
+  attempts            Attempt[]
+}
+
+model ApplicationParticipant {
+  id            String          @id @default(cuid())
+  applicationId String
+  application   ExamApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  studentId     String
+  student       Student         @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  createdAt     DateTime        @default(now())
+
+  @@unique([applicationId, studentId])
+}
+
+model Attempt {
+  id              String          @id @default(cuid())
+  applicationId   String
+  application     ExamApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  studentId       String
+  student         Student         @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  startedAt       DateTime        @default(now())
+  submittedAt     DateTime?
+  expiresAt       DateTime
+  status          AttemptStatus   @default(IN_PROGRESS)
+  score           Float?
+  totalPoints     Float?
+  timeUsedSeconds Int?
+  answers         Answer[]
+
+  @@unique([applicationId, studentId])
+  @@index([status])
+}
+
+model Answer {
+  id               String    @id @default(cuid())
+  attemptId        String
+  attempt          Attempt   @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  questionId       String
+  question         Question  @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  selectedOptionId String?
+  selectedOption   Option?   @relation(fields: [selectedOptionId], references: [id], onDelete: SetNull)
+  textAnswer       String?
+  isCorrect        Boolean?
+  pointsAwarded    Float?
+  manualComment    String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@unique([attemptId, questionId])
+}
