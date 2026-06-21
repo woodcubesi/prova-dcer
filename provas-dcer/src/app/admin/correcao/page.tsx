@@ -8,6 +8,12 @@ import { formatDuration } from "@/lib/text";
 
 export const dynamic = "force-dynamic";
 
+type CorrectionPageProps = {
+  searchParams?: Promise<{
+    igreja?: string;
+  }>;
+};
+
 function formatScore(value: number) {
   return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
@@ -34,37 +40,53 @@ function getAttemptResult(score?: number | null, totalPoints?: number | null, pa
   };
 }
 
-export default async function CorrectionPage() {
+export default async function CorrectionPage({ searchParams }: CorrectionPageProps) {
   const context = await requireAdminContext();
+  const params = searchParams ? await searchParams : {};
   const isTeacher = context.role === AdminRole.TEACHER;
   const scopedChurchId = isTeacher ? context.churchId : null;
+  const selectedChurchId = isTeacher ? scopedChurchId || "" : params.igreja || "";
+  const churchFilterId = selectedChurchId || undefined;
 
-  const attempts = await prisma.attempt.findMany({
-    where: {
-      status: { in: ["SUBMITTED", "EXPIRED"] },
-      ...(isTeacher
-        ? {
-            student: {
-              churchId: scopedChurchId || "__missing_church__",
-            },
-          }
-        : {}),
-    },
-    orderBy: [{ submittedAt: "desc" }, { startedAt: "desc" }],
-    include: {
-      student: {
-        include: {
-          church: true,
-        },
+  const [churches, attempts] = await Promise.all([
+    prisma.church.findMany({
+      where: {
+        active: true,
+        ...(isTeacher ? { id: scopedChurchId || "__missing_church__" } : {}),
       },
-      application: {
-        include: {
-          exam: true,
-        },
+      orderBy: { name: "asc" },
+      select: {
+        id: true,
+        name: true,
       },
-      answers: true,
-    },
-  });
+    }),
+    prisma.attempt.findMany({
+      where: {
+        status: { in: ["SUBMITTED", "EXPIRED"] },
+        ...(churchFilterId
+          ? {
+              student: {
+                churchId: churchFilterId,
+              },
+            }
+          : {}),
+      },
+      orderBy: [{ submittedAt: "desc" }, { startedAt: "desc" }],
+      include: {
+        student: {
+          include: {
+            church: true,
+          },
+        },
+        application: {
+          include: {
+            exam: true,
+          },
+        },
+        answers: true,
+      },
+    }),
+  ]);
 
   return (
     <AdminShell title="Correcao" description="Confira respostas enviadas e a pontuacao automatica.">
@@ -85,14 +107,45 @@ export default async function CorrectionPage() {
           </span>
         </div>
 
+        <form
+          action="/admin/correcao"
+          className="mt-4 grid gap-3 rounded-md border border-[#edf1eb] bg-[#fbfcfa] p-3 sm:grid-cols-[1fr_auto] sm:items-end"
+        >
+          <label className="block">
+            <span className="text-sm font-medium">Filtrar por igreja</span>
+            {isTeacher ? (
+              <>
+                <input type="hidden" name="igreja" value={scopedChurchId || ""} />
+                <div className="mt-1 rounded-md border border-[#cdd8cf] bg-white px-3 py-3 text-sm">
+                  {churches[0]?.name || "Igreja nao vinculada"}
+                </div>
+              </>
+            ) : (
+              <select
+                name="igreja"
+                defaultValue={selectedChurchId}
+                className="mt-1 w-full rounded-md border border-[#cdd8cf] bg-white px-3 py-3 outline-none focus:ring-2 focus:ring-[#2c6d49]"
+              >
+                <option value="">Todas as igrejas</option>
+                {churches.map((church) => (
+                  <option key={church.id} value={church.id}>
+                    {church.name}
+                  </option>
+                ))}
+              </select>
+            )}
+          </label>
+          {!isTeacher ? (
+            <button className="rounded-md bg-[#12382a] px-4 py-3 text-sm font-semibold text-white hover:bg-[#1c513d]">
+              Filtrar
+            </button>
+          ) : null}
+        </form>
+
         <div className="mt-4 grid gap-3 md:hidden">
           {attempts.map((attempt) => {
             const passingPercent = attempt.application.exam.passingPercent ?? 70;
-            const result = getAttemptResult(
-              attempt.score,
-              attempt.totalPoints,
-              passingPercent,
-            );
+            const result = getAttemptResult(attempt.score, attempt.totalPoints, passingPercent);
 
             return (
               <div key={attempt.id} className="rounded-md border border-[#edf1eb] p-3">
@@ -163,11 +216,7 @@ export default async function CorrectionPage() {
             <tbody>
               {attempts.map((attempt) => {
                 const passingPercent = attempt.application.exam.passingPercent ?? 70;
-                const result = getAttemptResult(
-                  attempt.score,
-                  attempt.totalPoints,
-                  passingPercent,
-                );
+                const result = getAttemptResult(attempt.score, attempt.totalPoints, passingPercent);
 
                 return (
                   <tr key={attempt.id} className="border-b border-[#edf1eb] last:border-0">

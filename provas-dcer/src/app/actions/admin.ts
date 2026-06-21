@@ -745,3 +745,108 @@ export async function updateExamAction(formData: FormData) {
   revalidatePath("/prova");
   redirect("/admin/provas?ok=editada");
 }
+
+export async function deleteExamApplicationAction(formData: FormData) {
+  const context = await requireAdminContext();
+  const applicationId = String(formData.get("applicationId") || "");
+
+  if (!applicationId) {
+    errorRedirect("/admin/provas", "Aplicacao de prova nao encontrada.");
+  }
+
+  const application = await prisma.examApplication.findFirst({
+    where: {
+      id: applicationId,
+    },
+    include: {
+      exam: {
+        select: { id: true },
+      },
+      participants: {
+        select: {
+          student: {
+            select: {
+              churchId: true,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (!application) {
+    errorRedirect("/admin/provas", "Aplicacao de prova nao encontrada.");
+  }
+
+  if (!hasAdministratorAccess(context)) {
+    if (!context.churchId) {
+      errorRedirect("/admin/provas", "Seu usuario de professor ainda nao esta vinculado a uma igreja.");
+    }
+
+    const hasOutsideChurch = application.participants.some(
+      (participant) => participant.student.churchId !== context.churchId,
+    );
+
+    if (hasOutsideChurch) {
+      errorRedirect("/admin/provas", "Professores so podem excluir provas da propria igreja.");
+    }
+  }
+
+  await prisma.$transaction(async (tx) => {
+    const attempts = await tx.attempt.findMany({
+      where: {
+        applicationId: application.id,
+      },
+      select: {
+        id: true,
+      },
+    });
+    const attemptIds = attempts.map((attempt) => attempt.id);
+
+    if (attemptIds.length > 0) {
+      await tx.answer.deleteMany({
+        where: {
+          attemptId: { in: attemptIds },
+        },
+      });
+    }
+
+    await tx.attempt.deleteMany({
+      where: {
+        applicationId: application.id,
+      },
+    });
+
+    await tx.applicationParticipant.deleteMany({
+      where: {
+        applicationId: application.id,
+      },
+    });
+
+    await tx.examApplication.delete({
+      where: {
+        id: application.id,
+      },
+    });
+
+    const remainingApplications = await tx.examApplication.count({
+      where: {
+        examId: application.exam.id,
+      },
+    });
+
+    if (remainingApplications === 0) {
+      await tx.exam.delete({
+        where: {
+          id: application.exam.id,
+        },
+      });
+    }
+  });
+
+  revalidatePath("/admin");
+  revalidatePath("/admin/provas");
+  revalidatePath("/admin/correcao");
+  revalidatePath("/prova");
+  redirect("/admin/provas?ok=excluida");
+}

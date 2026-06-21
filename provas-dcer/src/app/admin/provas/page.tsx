@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { deleteExamApplicationAction } from "@/app/actions/admin";
 import { AdminShell } from "@/components/admin/AdminShell";
+import { ConfirmSubmitButton } from "@/components/admin/ConfirmSubmitButton";
 import { AdminRole } from "@/generated/prisma/client";
 import { requireAdminContext } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -60,13 +62,18 @@ export default async function ExamsPage({ searchParams }: ExamsPageProps) {
           Prova atualizada com sucesso.
         </div>
       ) : null}
+      {params.ok === "excluida" ? (
+        <div className="mb-4 rounded-md border border-[#b9dfc7] bg-[#effaf2] px-4 py-3 text-sm text-[#1f623e]">
+          Prova excluida com sucesso.
+        </div>
+      ) : null}
 
       <section className="rounded-lg border border-[#dfe6dd] bg-white p-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-lg font-semibold">Provas criadas</h2>
             <p className="text-sm text-[#66736a]">
-              Provas com tentativas iniciadas ficam protegidas contra edicao de conteudo.
+              Provas com tentativas iniciadas ficam protegidas contra edicao de conteudo, mas podem ser excluidas.
             </p>
           </div>
           <Link
@@ -113,6 +120,15 @@ export default async function ExamsPage({ searchParams }: ExamsPageProps) {
               >
                 Editar
               </Link>
+              <form action={deleteExamApplicationAction} className="mt-2">
+                <input type="hidden" name="applicationId" value={application.id} />
+                <ConfirmSubmitButton
+                  message={`Excluir a prova "${application.exam.title}"? Esta acao tambem remove envios e respostas desta aplicacao.`}
+                  className="w-full rounded-md border border-[#d7b6ad] px-3 py-2 text-center text-sm font-semibold text-[#8d3b2d]"
+                >
+                  Excluir
+                </ConfirmSubmitButton>
+              </form>
             </div>
           ))}
         </div>
@@ -143,12 +159,23 @@ export default async function ExamsPage({ searchParams }: ExamsPageProps) {
                   <td className="py-3 pr-4">{application._count.participants}</td>
                   <td className="py-3 pr-4">{application._count.attempts}</td>
                   <td className="py-3 pr-4">
-                    <Link
-                      href={`/admin/provas/${application.id}/editar`}
-                      className="rounded-md border border-[#2c6d49] px-3 py-2 text-sm font-semibold text-[#2c6d49] hover:bg-[#effaf2]"
-                    >
-                      Editar
-                    </Link>
+                    <div className="flex flex-wrap gap-2">
+                      <Link
+                        href={`/admin/provas/${application.id}/editar`}
+                        className="rounded-md border border-[#2c6d49] px-3 py-2 text-sm font-semibold text-[#2c6d49] hover:bg-[#effaf2]"
+                      >
+                        Editar
+                      </Link>
+                      <form action={deleteExamApplicationAction}>
+                        <input type="hidden" name="applicationId" value={application.id} />
+                        <ConfirmSubmitButton
+                          message={`Excluir a prova "${application.exam.title}"? Esta acao tambem remove envios e respostas desta aplicacao.`}
+                          className="rounded-md border border-[#d7b6ad] px-3 py-2 text-sm font-semibold text-[#8d3b2d] hover:bg-[#fff4f2]"
+                        >
+                          Excluir
+                        </ConfirmSubmitButton>
+                      </form>
+                    </div>
                   </td>
                 </tr>
               ))}

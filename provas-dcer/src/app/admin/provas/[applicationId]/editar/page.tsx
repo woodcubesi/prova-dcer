@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { deleteExamApplicationAction } from "@/app/actions/admin";
 import { AdminShell } from "@/components/admin/AdminShell";
+import { ConfirmSubmitButton } from "@/components/admin/ConfirmSubmitButton";
 import { ExamBuilder, type ExamBuilderInitialData } from "@/components/admin/ExamBuilder";
 import { AdminRole } from "@/generated/prisma/client";
 import { type CategoryCode } from "@/lib/categories";
@@ -132,12 +134,23 @@ export default async function EditExamPage({ params, searchParams }: EditExamPag
         <Link href="/admin/provas" className="text-sm font-semibold text-[#2c6d49]">
           Voltar para provas
         </Link>
-        <Link
-          href="/admin/provas/nova"
-          className="rounded-md border border-[#2c6d49] px-3 py-2 text-center text-sm font-semibold text-[#2c6d49] hover:bg-[#effaf2]"
-        >
-          Criar nova prova
-        </Link>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <Link
+            href="/admin/provas/nova"
+            className="rounded-md border border-[#2c6d49] px-3 py-2 text-center text-sm font-semibold text-[#2c6d49] hover:bg-[#effaf2]"
+          >
+            Criar nova prova
+          </Link>
+          <form action={deleteExamApplicationAction}>
+            <input type="hidden" name="applicationId" value={application.id} />
+            <ConfirmSubmitButton
+              message={`Excluir a prova "${application.exam.title}"? Esta acao tambem remove envios e respostas desta aplicacao.`}
+              className="w-full rounded-md border border-[#d7b6ad] px-3 py-2 text-center text-sm font-semibold text-[#8d3b2d] hover:bg-[#fff4f2]"
+            >
+              Excluir prova
+            </ConfirmSubmitButton>
+          </form>
+        </div>
       </div>
 
       {isTeacher && !scopedChurchId ? (
