@@ -22,7 +22,7 @@ export default async function FinishedPage({ searchParams }: FinishedPageProps) 
         <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#000060]">Prova finalizada</p>
         <h1 className="mt-3 text-3xl font-semibold">{message}</h1>
         <p className="mt-3 text-sm leading-6 text-[#5d6480]">
-          Obrigado. O resultado nao e exibido para o aluno ao final da prova; a equipe responsavel fara a conferencia.
+          Obrigado. O resultado nao e exibido para o embaixador ao final da prova; a equipe responsavel fara a conferencia.
         </p>
         <Link
           href="/"

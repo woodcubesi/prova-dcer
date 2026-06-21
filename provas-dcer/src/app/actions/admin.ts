@@ -217,7 +217,7 @@ async function ensureUniqueStudent(
   });
 
   if (existingStudent && existingStudent.id !== ignoredId) {
-    errorRedirect("/admin/cadastros", "Ja existe aluno com este nome, igreja e categoria.");
+    errorRedirect("/admin/cadastros", "Ja existe embaixador com este nome, igreja e categoria.");
   }
 }
 
@@ -466,11 +466,11 @@ export async function createStudentAction(formData: FormData) {
   }
 
   if (scopedChurchId && requestedChurchId && requestedChurchId !== scopedChurchId) {
-    errorRedirect("/admin/cadastros", "Conselheiros so podem cadastrar alunos da propria igreja.");
+    errorRedirect("/admin/cadastros", "Conselheiros so podem cadastrar embaixadores da propria igreja.");
   }
 
   if (name.length < 3 || !churchId || !categorySchema.safeParse(category).success) {
-    errorRedirect("/admin/cadastros", "Preencha igreja, categoria e nome do aluno.");
+    errorRedirect("/admin/cadastros", "Preencha igreja, categoria e nome do embaixador.");
   }
 
   const normalizedName = normalizeName(name);
@@ -498,7 +498,7 @@ export async function createStudentAction(formData: FormData) {
 
   revalidatePath("/admin");
   revalidatePath("/admin/cadastros");
-  redirect("/admin/cadastros?ok=aluno");
+  redirect("/admin/cadastros?ok=embaixador");
 }
 
 export async function updateStudentAction(formData: FormData) {
@@ -515,11 +515,11 @@ export async function updateStudentAction(formData: FormData) {
   }
 
   if (scopedChurchId && requestedChurchId && requestedChurchId !== scopedChurchId) {
-    errorRedirect("/admin/cadastros", "Conselheiros so podem editar alunos da propria igreja.");
+    errorRedirect("/admin/cadastros", "Conselheiros so podem editar embaixadores da propria igreja.");
   }
 
   if (!id || name.length < 3 || !churchId || !categorySchema.safeParse(category).success) {
-    errorRedirect("/admin/cadastros", "Preencha igreja, categoria e nome do aluno.");
+    errorRedirect("/admin/cadastros", "Preencha igreja, categoria e nome do embaixador.");
   }
 
   const target = await prisma.student.findFirst({
@@ -532,7 +532,7 @@ export async function updateStudentAction(formData: FormData) {
   });
 
   if (!target) {
-    errorRedirect("/admin/cadastros", "Aluno nao encontrado.");
+    errorRedirect("/admin/cadastros", "Embaixador nao encontrado.");
   }
 
   const normalizedName = normalizeName(name);
@@ -551,7 +551,7 @@ export async function updateStudentAction(formData: FormData) {
 
   revalidatePath("/admin");
   revalidatePath("/admin/cadastros");
-  redirect("/admin/cadastros?ok=aluno");
+  redirect("/admin/cadastros?ok=embaixador");
 }
 
 export async function createExamAction(formData: FormData) {
@@ -573,7 +573,7 @@ export async function createExamAction(formData: FormData) {
   });
 
   if (students.length === 0) {
-    errorRedirect("/admin/provas/nova", "Nao ha alunos cadastrados para os filtros escolhidos.");
+    errorRedirect("/admin/provas/nova", "Nao ha embaixadores cadastrados para os filtros escolhidos.");
   }
 
   const application = await prisma.$transaction(async (tx) => {
@@ -672,7 +672,7 @@ export async function updateExamAction(formData: FormData) {
   if (application.attempts.length > 0) {
     errorRedirect(
       errorPath,
-      "Nao e possivel editar uma prova que ja foi iniciada por alunos. Crie uma nova aplicacao para preservar as respostas.",
+      "Nao e possivel editar uma prova que ja foi iniciada por embaixadores. Crie uma nova aplicacao para preservar as respostas.",
     );
   }
 
@@ -688,7 +688,7 @@ export async function updateExamAction(formData: FormData) {
   });
 
   if (students.length === 0) {
-    errorRedirect(errorPath, "Nao ha alunos cadastrados para os filtros escolhidos.");
+    errorRedirect(errorPath, "Nao ha embaixadores cadastrados para os filtros escolhidos.");
   }
 
   await prisma.$transaction(async (tx) => {

@@ -7,12 +7,12 @@ O sistema permite:
 - criar provas sempre de multipla escolha;
 - definir tempo total da prova;
 - definir percentual minimo de aprovacao;
-- liberar provas por igreja, categoria e aluno;
-- acesso do aluno por igreja, categoria, nome e prova disponivel;
+- liberar provas por igreja, categoria e embaixador;
+- acesso do embaixador por igreja, categoria, nome e prova disponivel;
 - cadastro de administradores e conselheiros;
 - restricao de conselheiros por igreja;
-- correcao sem exibir nota ao aluno no final;
-- relatorio PDF individual do aluno;
+- correcao sem exibir nota ao embaixador no final;
+- relatorio PDF individual do embaixador;
 - relatorio PDF geral da prova.
 
 ## Senhas padrao de desenvolvimento
@@ -130,7 +130,7 @@ pnpm dev
 
 ```text
 Inicio: http://localhost:3000
-Aluno: http://localhost:3000/prova
+Embaixador: http://localhost:3000/prova
 Administracao: http://localhost:3000/admin/login
 ```
 
@@ -147,7 +147,7 @@ Depois de entrar, acesse `Equipe` e cadastre administradores e conselheiros com 
 
 ## Dados de demonstracao
 
-O seed cria igrejas, alunos e uma aplicacao demonstrativa.
+O seed cria igrejas, embaixadores e uma aplicacao demonstrativa.
 
 Exemplo para teste:
 
@@ -155,7 +155,7 @@ Exemplo para teste:
 Codigo da aplicacao: DEMO2026
 Igreja: Igreja Sede Central
 Categoria: Junior
-Aluno: Ana Clara Souza
+Embaixador: Ana Clara Souza
 ```
 
 ## Comandos uteis

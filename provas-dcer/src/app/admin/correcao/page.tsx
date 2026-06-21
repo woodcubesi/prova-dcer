@@ -100,7 +100,7 @@ export default async function CorrectionPage({ searchParams }: CorrectionPagePro
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-lg font-semibold">Provas recebidas</h2>
-            <p className="text-sm text-[#5d6480]">O aluno nao visualiza nota ao final.</p>
+            <p className="text-sm text-[#5d6480]">O embaixador nao visualiza nota ao final.</p>
           </div>
           <span className="rounded-full bg-[#effaf2] px-3 py-1 text-sm font-semibold text-[#1f623e]">
             {attempts.length} envio(s)
@@ -210,7 +210,7 @@ export default async function CorrectionPage({ searchParams }: CorrectionPagePro
           <table className="w-full min-w-[980px] text-left text-sm">
             <thead className="border-b border-[#d8def0] text-xs uppercase tracking-wide text-[#5d6480]">
               <tr>
-                <th className="py-3 pr-4">Aluno</th>
+                <th className="py-3 pr-4">Embaixador</th>
                 <th className="py-3 pr-4">Prova</th>
                 <th className="py-3 pr-4">Status</th>
                 <th className="py-3 pr-4">Tempo usado</th>

@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 
 type RegisterPageProps = {
   searchParams?: Promise<{
-    aluno?: string;
+    embaixador?: string;
     erro?: string;
     igreja?: string;
     ok?: string;
@@ -55,10 +55,12 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
 
   const editingChurch =
     !isTeacher && params.igreja ? churches.find((church) => church.id === params.igreja) || null : null;
-  const editingStudent = params.aluno ? students.find((student) => student.id === params.aluno) || null : null;
+  const editingStudent = params.embaixador
+    ? students.find((student) => student.id === params.embaixador) || null
+    : null;
 
   return (
-    <AdminShell title="Cadastros" description="Pre-cadastre igrejas e alunos antes de liberar uma prova.">
+    <AdminShell title="Cadastros" description="Pre-cadastre igrejas e embaixadores antes de liberar uma prova.">
       {isTeacher && !scopedChurchId ? (
         <div className="mb-4 rounded-md border border-[#f2b8bf] bg-[#fff4f2] px-4 py-3 text-sm text-[#b00018]">
           Seu usuario de conselheiro ainda nao esta vinculado a uma igreja.
@@ -79,9 +81,9 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
           Igreja nao encontrada para edicao.
         </div>
       ) : null}
-      {params.aluno && !editingStudent ? (
+      {params.embaixador && !editingStudent ? (
         <div className="mb-4 rounded-md border border-[#f2b8bf] bg-[#fff4f2] px-4 py-3 text-sm text-[#b00018]">
-          Aluno nao encontrado para edicao.
+          Embaixador nao encontrado para edicao.
         </div>
       ) : null}
 
@@ -134,7 +136,7 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
           className="rounded-lg border border-[#d8def0] bg-white p-4"
         >
           {editingStudent ? <input type="hidden" name="id" value={editingStudent.id} /> : null}
-          <h2 className="text-lg font-semibold">{editingStudent ? "Editar aluno" : "Novo aluno"}</h2>
+          <h2 className="text-lg font-semibold">{editingStudent ? "Editar embaixador" : "Novo embaixador"}</h2>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             {isTeacher ? (
               <label className="block">
@@ -177,7 +179,7 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
               </select>
             </label>
             <label className="block sm:col-span-2">
-              <span className="text-sm font-medium">Nome do aluno</span>
+              <span className="text-sm font-medium">Nome do embaixador</span>
               <input
                 name="name"
                 defaultValue={editingStudent?.name || ""}
@@ -188,7 +190,7 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
           </div>
           <div className="mt-4 flex flex-col gap-2 sm:flex-row">
             <button className="rounded-md bg-[#000060] px-4 py-3 text-sm font-semibold text-white hover:bg-[#000044]">
-              {editingStudent ? "Atualizar aluno" : "Salvar aluno"}
+              {editingStudent ? "Atualizar embaixador" : "Salvar embaixador"}
             </button>
             {editingStudent ? (
               <a
@@ -210,7 +212,7 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
               <div key={church.id} className="rounded-md border border-[#e8ecf8] px-3 py-2">
                 <p className="font-medium">{church.name}</p>
                 <p className="text-xs text-[#5d6480]">
-                  {church._count.students} aluno(s) {church.city ? `- ${church.city}` : ""}
+                  {church._count.students} embaixador(es) {church.city ? `- ${church.city}` : ""}
                 </p>
                 {!isTeacher ? (
                   <a
@@ -226,7 +228,7 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
         </div>
 
         <div className="rounded-lg border border-[#d8def0] bg-white p-4">
-          <h2 className="text-lg font-semibold">Alunos cadastrados</h2>
+          <h2 className="text-lg font-semibold">Embaixadores cadastrados</h2>
           <div className="mt-3 grid gap-3 md:hidden">
             {students.map((student) => (
               <div key={student.id} className="rounded-md border border-[#e8ecf8] p-3">
@@ -236,7 +238,7 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
                   {getCategoryLabel(student.category)}
                 </span>
                 <a
-                  href={`/admin/cadastros?aluno=${student.id}`}
+                  href={`/admin/cadastros?embaixador=${student.id}`}
                   className="mt-3 block rounded-md border border-[#000060] px-3 py-2 text-center text-sm font-semibold text-[#000060]"
                 >
                   Editar
@@ -262,7 +264,7 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
                     <td className="py-3 pr-4">{getCategoryLabel(student.category)}</td>
                     <td className="py-3 pr-4">
                       <a
-                        href={`/admin/cadastros?aluno=${student.id}`}
+                        href={`/admin/cadastros?embaixador=${student.id}`}
                         className="rounded-md border border-[#000060] px-3 py-2 text-sm font-semibold text-[#000060] hover:bg-[#effaf2]"
                       >
                         Editar
@@ -273,7 +275,7 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
                 {students.length === 0 ? (
                   <tr>
                     <td className="py-6 pr-4 text-sm text-[#5d6480]" colSpan={4}>
-                      Nenhum aluno cadastrado ainda.
+                      Nenhum embaixador cadastrado ainda.
                     </td>
                   </tr>
                 ) : null}
@@ -282,7 +284,7 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
           </div>
           {students.length === 0 ? (
             <div className="mt-3 rounded-md border border-[#e8ecf8] bg-[#fbfcff] p-4 text-sm text-[#5d6480] md:hidden">
-              Nenhum aluno cadastrado ainda.
+              Nenhum embaixador cadastrado ainda.
             </div>
           ) : null}
         </div>

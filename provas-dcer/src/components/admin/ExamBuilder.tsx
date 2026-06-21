@@ -158,7 +158,7 @@ export function ExamBuilder({ churches, initialData, locked = false, mode = "cre
 
       {locked ? (
         <div className="rounded-lg border border-[#f2b8bf] bg-[#fff4f2] p-4 text-sm text-[#b00018]">
-          Esta prova ja foi iniciada por alunos. Para preservar respostas e gabaritos, crie uma nova aplicacao se
+          Esta prova ja foi iniciada por embaixadores. Para preservar respostas e gabaritos, crie uma nova aplicacao se
           precisar mudar perguntas, alternativas ou participantes.
         </div>
       ) : null}
@@ -251,7 +251,7 @@ export function ExamBuilder({ churches, initialData, locked = false, mode = "cre
               >
                 <span>
                   <span className="block text-sm font-medium">{church.name}</span>
-                  <span className="text-xs text-[#5d6480]">{church.students} aluno(s)</span>
+                  <span className="text-xs text-[#5d6480]">{church.students} embaixador(es)</span>
                 </span>
                 <input
                   type="checkbox"

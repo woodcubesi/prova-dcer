@@ -43,7 +43,7 @@ export async function startAttemptAction(formData: FormData) {
   });
 
   if (!participant) {
-    studentError("Aluno nao encontrado nesta prova. Confira igreja, categoria e nome.");
+    studentError("Embaixador nao encontrado nesta prova. Confira igreja, categoria e nome.");
   }
 
   const now = new Date();

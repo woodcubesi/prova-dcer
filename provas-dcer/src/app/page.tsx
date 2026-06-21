@@ -29,10 +29,10 @@ export default function Home() {
           href="/prova"
           className="rounded-lg border border-[#d8def0] bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-[#ffd500] hover:shadow-md"
         >
-          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[#000060]">Aluno</p>
+          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[#000060]">Embaixador</p>
           <h2 className="mt-3 text-2xl font-semibold">Entrar na prova</h2>
           <p className="mt-2 text-sm leading-6 text-[#5d6480]">
-            O aluno escolhe a prova, igreja e categoria, depois digita o nome conforme o cadastro.
+            O embaixador escolhe a prova, igreja e categoria, depois digita o nome conforme o cadastro.
           </p>
         </Link>
 

@@ -139,7 +139,7 @@ export function StudentEntry({ applications }: { applications: ApplicationOption
             ))}
           </datalist>
           <span className="mt-1 block text-xs text-[#5d6480]">
-            A lista sugere apenas alunos da igreja e categoria selecionadas.
+            A lista sugere apenas embaixadores da igreja e categoria selecionadas.
           </span>
         </label>
 
@@ -156,7 +156,7 @@ export function StudentEntry({ applications }: { applications: ApplicationOption
               <option value="">Informe igreja, categoria e nome primeiro</option>
             ) : null}
             {canChooseApplication && !availableApplications.length ? (
-              <option value="">Nenhuma prova disponivel para este aluno</option>
+              <option value="">Nenhuma prova disponivel para este embaixador</option>
             ) : null}
             {availableApplications.length ? <option value="">Selecione a prova</option> : null}
             {availableApplications.map((item) => (

@@ -151,7 +151,7 @@ export default async function CorrectionDetailPage({ params }: CorrectionDetailP
 
               <div className="mt-4 grid gap-2">
                 <div className="rounded-md border border-[#e8ecf8] bg-[#fbfcff] px-3 py-2 text-sm">
-                  Resposta do aluno:{" "}
+                  Resposta do embaixador:{" "}
                   <strong>
                     {answer?.selectedOption
                       ? `${answer.selectedOption.label}) ${answer.selectedOption.text}`

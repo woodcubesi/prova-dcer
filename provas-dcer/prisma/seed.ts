@@ -78,7 +78,7 @@ async function main() {
   const exam = await prisma.exam.create({
     data: {
       title: "Simulado de Conhecimentos Biblicos",
-      description: "Prova de demonstracao para validar o fluxo de alunos, aplicacao e correcao.",
+      description: "Prova de demonstracao para validar o fluxo de embaixadores, aplicacao e correcao.",
       durationMinutes: 30,
       status: ExamStatus.PUBLISHED,
       questions: {

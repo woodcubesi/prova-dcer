@@ -113,7 +113,7 @@ export function buildStudentCorrectionPdf(data: StudentCorrectionPdfData) {
     doc.info.Title = `Correcao - ${data.studentName}`;
     drawHeader(doc, "Correcao individual", data.examTitle);
     drawMetaGrid(doc, [
-      ["Aluno", data.studentName],
+      ["Embaixador", data.studentName],
       ["Igreja", data.churchName],
       ["Categoria", getCategoryLabel(data.category)],
       ["Aplicacao", data.applicationTitle],
@@ -159,7 +159,7 @@ export function buildStudentCorrectionPdf(data: StudentCorrectionPdfData) {
         width: contentWidth(doc),
       });
       doc.moveDown(0.45);
-      doc.font("Helvetica-Bold").fillColor("#111827").text(`Resposta do aluno: `, { continued: true });
+      doc.font("Helvetica-Bold").fillColor("#111827").text(`Resposta do embaixador: `, { continued: true });
       doc.font("Helvetica").text(studentAnswer);
       doc.font("Helvetica-Bold").text(`Gabarito: `, { continued: true });
       doc.font("Helvetica").text(correctAnswer);
@@ -182,7 +182,7 @@ export function buildApplicationSummaryPdf(data: ApplicationSummaryPdfData) {
       ["Aplicacao", data.applicationTitle],
       ["Codigo", data.accessCode],
       ["Aprovacao minima", formatPercent(data.passingPercent)],
-      ["Alunos que fizeram", String(data.rows.length)],
+      ["Embaixadores que fizeram", String(data.rows.length)],
     ]);
 
     const rowResults = data.rows.map((row) => {
@@ -202,10 +202,10 @@ export function buildApplicationSummaryPdf(data: ApplicationSummaryPdfData) {
       ["Total", String(rowResults.length)],
     ]);
 
-    sectionTitle(doc, "Alunos");
+    sectionTitle(doc, "Embaixadores");
 
     if (rowResults.length === 0) {
-      doc.font("Helvetica").fontSize(10).fillColor(mutedColor).text("Nenhum aluno concluiu ou expirou esta prova.");
+      doc.font("Helvetica").fontSize(10).fillColor(mutedColor).text("Nenhum embaixador concluiu ou expirou esta prova.");
       return;
     }
 
@@ -331,7 +331,7 @@ function drawTableHeader(doc: PDFKit.PDFDocument) {
   const y = doc.y;
   doc.roundedRect(pageMargin, y, contentWidth(doc), 24, 4).fill(brandColor);
   doc.font("Helvetica-Bold").fontSize(8).fillColor("#ffffff");
-  doc.text("Aluno", pageMargin + 8, y + 8, { width: 142 });
+  doc.text("Embaixador", pageMargin + 8, y + 8, { width: 142 });
   doc.text("Igreja", pageMargin + 154, y + 8, { width: 112 });
   doc.text("Categoria", pageMargin + 272, y + 8, { width: 70 });
   doc.text("Aproveit.", pageMargin + 348, y + 8, { width: 58 });

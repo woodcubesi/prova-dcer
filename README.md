@@ -123,7 +123,7 @@ pnpm dev
 
 ```text
 Inicio: http://localhost:3000
-Aluno: http://localhost:3000/prova
+Embaixador: http://localhost:3000/prova
 Administracao: http://localhost:3000/admin/login
 ```
 
@@ -140,7 +140,7 @@ Depois de entrar, acesse `Equipe` e cadastre administradores e conselheiros com 
 
 ## Dados de demonstracao
 
-O seed cria igrejas, alunos e uma aplicacao demonstrativa.
+O seed cria igrejas, embaixadores e uma aplicacao demonstrativa.
 
 Exemplo para teste:
 
@@ -148,7 +148,7 @@ Exemplo para teste:
 Codigo da aplicacao: DEMO2026
 Igreja: Igreja Sede Central
 Categoria: Junior
-Aluno: Ana Clara Souza
+Embaixador: Ana Clara Souza
 ```
 
 ## Comandos uteis

@@ -121,7 +121,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   ]);
   const stats = [
     [isTeacher ? "Igreja" : "Igrejas", churches],
-    ["Alunos", students],
+    ["Embaixadores", students],
     ["Provas", exams],
     ["Enviadas", submittedAttempts],
     ...(isTeacher ? [] : ([["Administradores", administrators]] as [string, number][])),
@@ -168,7 +168,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-lg font-semibold">Aplicacoes recentes</h2>
-              <p className="text-sm text-[#5d6480]">Use o codigo ou o link de aluno para aplicar a prova.</p>
+              <p className="text-sm text-[#5d6480]">Use o codigo ou o link do embaixador para aplicar a prova.</p>
             </div>
             <Link
               href="/admin/provas/nova"
@@ -272,7 +272,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             href="/prova"
             className="block rounded-lg border border-[#d8def0] bg-white p-4 transition hover:border-[#ffd500]"
           >
-            <p className="text-sm font-semibold text-[#000060]">Tela do aluno</p>
+            <p className="text-sm font-semibold text-[#000060]">Tela do embaixador</p>
             <p className="mt-1 text-sm text-[#5d6480]">Abrir entrada por igreja, categoria e nome.</p>
           </Link>
           <Link
@@ -280,7 +280,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             className="block rounded-lg border border-[#d8def0] bg-white p-4 transition hover:border-[#ffd500]"
           >
             <p className="text-sm font-semibold text-[#000060]">Pre-cadastro</p>
-            <p className="mt-1 text-sm text-[#5d6480]">Adicionar igrejas e alunos antes da aplicacao.</p>
+            <p className="mt-1 text-sm text-[#5d6480]">Adicionar igrejas e embaixadores antes da aplicacao.</p>
           </Link>
           <Link
             href="/admin/equipe"

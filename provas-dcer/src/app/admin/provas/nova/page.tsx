@@ -50,7 +50,7 @@ export default async function NewExamPage({ searchParams }: NewExamPageProps) {
 
       {churches.length === 0 ? (
         <div className="rounded-lg border border-[#d8def0] bg-white p-5 text-sm text-[#5d6480]">
-          Cadastre pelo menos uma igreja e um aluno antes de criar a prova.
+          Cadastre pelo menos uma igreja e um embaixador antes de criar a prova.
         </div>
       ) : (
         <ExamBuilder
