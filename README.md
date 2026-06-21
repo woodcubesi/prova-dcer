@@ -2,18 +2,11 @@
 
 Aplicacao web para montar, aplicar, corrigir e gerar relatorios de provas do DCER Paulista.
 
-O sistema permite:
+O codigo da aplicacao fica na pasta:
 
-- criar provas sempre de multipla escolha;
-- definir tempo total da prova;
-- definir percentual minimo de aprovacao;
-- liberar provas por igreja, categoria e aluno;
-- acesso do aluno por igreja, categoria, nome e prova disponivel;
-- cadastro de administradores e conselheiros;
-- restricao de conselheiros por igreja;
-- correcao sem exibir nota ao aluno no final;
-- relatorio PDF individual do aluno;
-- relatorio PDF geral da prova.
+```text
+provas-dcer/
+```
 
 ## Senhas padrao de desenvolvimento
 
@@ -52,7 +45,7 @@ Instale antes:
 - Docker
 - Docker Compose
 
-No Windows, pode instalar com:
+No Windows:
 
 ```powershell
 winget install Git.Git
@@ -126,7 +119,7 @@ pnpm setup
 pnpm dev
 ```
 
-7. Acesse no navegador:
+7. Acesse:
 
 ```text
 Inicio: http://localhost:3000
