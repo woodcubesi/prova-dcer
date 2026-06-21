@@ -93,6 +93,12 @@ export default async function CorrectionDetailPage({ params }: CorrectionDetailP
             <p className="mt-1 text-sm text-[#66736a]">
               {attempt.student.name} - {attempt.student.church.name} - {getCategoryLabel(attempt.student.category)}
             </p>
+            <Link
+              href={`/admin/correcao/${attempt.id}/pdf`}
+              className="mt-3 inline-flex rounded-md bg-[#12382a] px-4 py-2 text-sm font-semibold text-white hover:bg-[#1c513d]"
+            >
+              Baixar correcao em PDF
+            </Link>
           </div>
           <div className="grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-5">
             <div className="rounded-md bg-[#effaf2] px-3 py-2">

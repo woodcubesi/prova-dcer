@@ -141,6 +141,12 @@ export default async function EditExamPage({ params, searchParams }: EditExamPag
           >
             Criar nova prova
           </Link>
+          <Link
+            href={`/admin/provas/${application.id}/relatorio`}
+            className="rounded-md bg-[#12382a] px-3 py-2 text-center text-sm font-semibold text-white hover:bg-[#1c513d]"
+          >
+            Relatorio PDF
+          </Link>
           <form action={deleteExamApplicationAction}>
             <input type="hidden" name="applicationId" value={application.id} />
             <ConfirmSubmitButton

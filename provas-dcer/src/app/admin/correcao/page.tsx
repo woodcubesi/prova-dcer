@@ -195,6 +195,12 @@ export default async function CorrectionPage({ searchParams }: CorrectionPagePro
                 >
                   Abrir
                 </Link>
+                <Link
+                  href={`/admin/correcao/${attempt.id}/pdf`}
+                  className="mt-2 block rounded-md bg-[#12382a] px-3 py-2 text-center text-sm font-semibold text-white"
+                >
+                  Baixar PDF
+                </Link>
               </div>
             );
           })}
@@ -210,7 +216,7 @@ export default async function CorrectionPage({ searchParams }: CorrectionPagePro
                 <th className="py-3 pr-4">Tempo usado</th>
                 <th className="py-3 pr-4">Pontuacao</th>
                 <th className="py-3 pr-4">Resultado</th>
-                <th className="py-3 pr-4">Acao</th>
+                <th className="py-3 pr-4">Acoes</th>
               </tr>
             </thead>
             <tbody>
@@ -254,12 +260,20 @@ export default async function CorrectionPage({ searchParams }: CorrectionPagePro
                       </p>
                     </td>
                     <td className="py-3 pr-4">
-                      <Link
-                        href={`/admin/correcao/${attempt.id}`}
-                        className="rounded-md border border-[#2c6d49] px-3 py-2 text-sm font-semibold text-[#2c6d49] hover:bg-[#effaf2]"
-                      >
-                        Abrir
-                      </Link>
+                      <div className="flex flex-wrap gap-2">
+                        <Link
+                          href={`/admin/correcao/${attempt.id}`}
+                          className="rounded-md border border-[#2c6d49] px-3 py-2 text-sm font-semibold text-[#2c6d49] hover:bg-[#effaf2]"
+                        >
+                          Abrir
+                        </Link>
+                        <Link
+                          href={`/admin/correcao/${attempt.id}/pdf`}
+                          className="rounded-md bg-[#12382a] px-3 py-2 text-sm font-semibold text-white hover:bg-[#1c513d]"
+                        >
+                          PDF
+                        </Link>
+                      </div>
                     </td>
                   </tr>
                 );

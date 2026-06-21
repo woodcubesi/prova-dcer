@@ -120,6 +120,12 @@ export default async function ExamsPage({ searchParams }: ExamsPageProps) {
               >
                 Editar
               </Link>
+              <Link
+                href={`/admin/provas/${application.id}/relatorio`}
+                className="mt-2 block rounded-md bg-[#12382a] px-3 py-2 text-center text-sm font-semibold text-white"
+              >
+                Relatorio PDF
+              </Link>
               <form action={deleteExamApplicationAction} className="mt-2">
                 <input type="hidden" name="applicationId" value={application.id} />
                 <ConfirmSubmitButton
@@ -143,7 +149,7 @@ export default async function ExamsPage({ searchParams }: ExamsPageProps) {
                 <th className="py-3 pr-4">Aprovacao</th>
                 <th className="py-3 pr-4">Participantes</th>
                 <th className="py-3 pr-4">Tentativas</th>
-                <th className="py-3 pr-4">Acao</th>
+                <th className="py-3 pr-4">Acoes</th>
               </tr>
             </thead>
             <tbody>
@@ -165,6 +171,12 @@ export default async function ExamsPage({ searchParams }: ExamsPageProps) {
                         className="rounded-md border border-[#2c6d49] px-3 py-2 text-sm font-semibold text-[#2c6d49] hover:bg-[#effaf2]"
                       >
                         Editar
+                      </Link>
+                      <Link
+                        href={`/admin/provas/${application.id}/relatorio`}
+                        className="rounded-md bg-[#12382a] px-3 py-2 text-sm font-semibold text-white hover:bg-[#1c513d]"
+                      >
+                        Relatorio PDF
                       </Link>
                       <form action={deleteExamApplicationAction}>
                         <input type="hidden" name="applicationId" value={application.id} />
