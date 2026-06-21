@@ -13,9 +13,6 @@ export default function Home() {
             <div>
               <p className="text-sm font-medium uppercase tracking-[0.2em] text-[#fff200]">DCER Paulista</p>
               <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Sistema de Provas</h1>
-              <p className="mt-2 max-w-xl text-sm leading-6 text-[#f8f9ff]">
-                Avaliacoes para Embaixadores do Rei, com identidade visual do DCER Paulista.
-              </p>
             </div>
           </div>
           <Link
