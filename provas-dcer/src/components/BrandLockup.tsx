@@ -17,6 +17,7 @@ export function BrandLockup({ compact = false, className = "" }: BrandLockupProp
           alt="DCER Paulista"
           width={680}
           height={373}
+          unoptimized
           priority={!compact}
           className={`${dcerLogoClass} object-contain`}
         />
@@ -26,6 +27,7 @@ export function BrandLockup({ compact = false, className = "" }: BrandLockupProp
         alt="Insignia dos Embaixadores do Rei"
         width={512}
         height={512}
+        unoptimized
         priority={!compact}
         className={`${insigniaClass} shrink-0 object-contain`}
       />

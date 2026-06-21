@@ -226,9 +226,21 @@ export async function loginAdminAction(formData: FormData) {
   const password = String(formData.get("password") || "");
 
   if (email) {
-    const user = await prisma.adminUser.findUnique({
-      where: { email },
-    });
+    let user: { id: string; active: boolean; passwordHash: string } | null = null;
+
+    try {
+      user = await prisma.adminUser.findUnique({
+        where: { email },
+        select: {
+          id: true,
+          active: true,
+          passwordHash: true,
+        },
+      });
+    } catch (error) {
+      console.error("Admin login lookup failed", error);
+      redirect("/admin/login?erro=senha");
+    }
 
     if (!user || !user.active || !verifyPassword(password, user.passwordHash)) {
       redirect("/admin/login?erro=senha");
