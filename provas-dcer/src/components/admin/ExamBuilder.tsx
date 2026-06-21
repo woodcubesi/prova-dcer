@@ -157,13 +157,13 @@ export function ExamBuilder({ churches, initialData, locked = false, mode = "cre
       ) : null}
 
       {locked ? (
-        <div className="rounded-lg border border-[#efc2bd] bg-[#fff4f2] p-4 text-sm text-[#9b2d20]">
+        <div className="rounded-lg border border-[#f2b8bf] bg-[#fff4f2] p-4 text-sm text-[#b00018]">
           Esta prova ja foi iniciada por alunos. Para preservar respostas e gabaritos, crie uma nova aplicacao se
           precisar mudar perguntas, alternativas ou participantes.
         </div>
       ) : null}
 
-      <section className="rounded-lg border border-[#dfe6dd] bg-white p-4">
+      <section className="rounded-lg border border-[#d8def0] bg-white p-4">
         <h2 className="text-lg font-semibold">Dados da prova</h2>
         <div className="mt-4 grid gap-3 lg:grid-cols-2">
           <label className="block lg:col-span-2">
@@ -172,7 +172,7 @@ export function ExamBuilder({ churches, initialData, locked = false, mode = "cre
               value={title}
               disabled={locked}
               onChange={(event) => setTitle(event.target.value)}
-              className="mt-1 w-full rounded-md border border-[#cdd8cf] px-3 py-3 outline-none focus:ring-2 focus:ring-[#2c6d49] disabled:bg-[#f7faf6]"
+              className="mt-1 w-full rounded-md border border-[#c5cce4] px-3 py-3 outline-none focus:ring-2 focus:ring-[#000060] disabled:bg-[#f8faff]"
             />
           </label>
           <label className="block lg:col-span-2">
@@ -182,7 +182,7 @@ export function ExamBuilder({ churches, initialData, locked = false, mode = "cre
               disabled={locked}
               onChange={(event) => setDescription(event.target.value)}
               rows={3}
-              className="mt-1 w-full rounded-md border border-[#cdd8cf] px-3 py-3 outline-none focus:ring-2 focus:ring-[#2c6d49] disabled:bg-[#f7faf6]"
+              className="mt-1 w-full rounded-md border border-[#c5cce4] px-3 py-3 outline-none focus:ring-2 focus:ring-[#000060] disabled:bg-[#f8faff]"
             />
           </label>
           <label className="block">
@@ -194,12 +194,12 @@ export function ExamBuilder({ churches, initialData, locked = false, mode = "cre
               value={durationMinutes}
               disabled={locked}
               onChange={(event) => setDurationMinutes(Number(event.target.value))}
-              className="mt-1 w-full rounded-md border border-[#cdd8cf] px-3 py-3 outline-none focus:ring-2 focus:ring-[#2c6d49] disabled:bg-[#f7faf6]"
+              className="mt-1 w-full rounded-md border border-[#c5cce4] px-3 py-3 outline-none focus:ring-2 focus:ring-[#000060] disabled:bg-[#f8faff]"
             />
           </label>
           <label className="block">
             <span className="text-sm font-medium">Percentual minimo para aprovacao</span>
-            <div className="mt-1 flex rounded-md border border-[#cdd8cf] bg-white focus-within:ring-2 focus-within:ring-[#2c6d49]">
+            <div className="mt-1 flex rounded-md border border-[#c5cce4] bg-white focus-within:ring-2 focus-within:ring-[#000060]">
               <input
                 type="number"
                 min={0}
@@ -208,13 +208,13 @@ export function ExamBuilder({ churches, initialData, locked = false, mode = "cre
                 value={passingPercent}
                 disabled={locked}
                 onChange={(event) => setPassingPercent(Number(event.target.value))}
-                className="w-full rounded-l-md px-3 py-3 outline-none disabled:bg-[#f7faf6]"
+                className="w-full rounded-l-md px-3 py-3 outline-none disabled:bg-[#f8faff]"
               />
-              <span className="flex items-center rounded-r-md bg-[#f7faf6] px-3 text-sm font-semibold text-[#66736a]">
+              <span className="flex items-center rounded-r-md bg-[#f8faff] px-3 text-sm font-semibold text-[#5d6480]">
                 %
               </span>
             </div>
-            <span className="mt-1 block text-xs text-[#66736a]">
+            <span className="mt-1 block text-xs text-[#5d6480]">
               Com {totalPoints || 0} ponto(s), o minimo sera {minimumPoints.toFixed(1)} ponto(s).
             </span>
           </label>
@@ -224,7 +224,7 @@ export function ExamBuilder({ churches, initialData, locked = false, mode = "cre
               value={applicationTitle}
               disabled={locked}
               onChange={(event) => setApplicationTitle(event.target.value)}
-              className="mt-1 w-full rounded-md border border-[#cdd8cf] px-3 py-3 outline-none focus:ring-2 focus:ring-[#2c6d49] disabled:bg-[#f7faf6]"
+              className="mt-1 w-full rounded-md border border-[#c5cce4] px-3 py-3 outline-none focus:ring-2 focus:ring-[#000060] disabled:bg-[#f8faff]"
             />
           </label>
           <label className="block lg:col-span-2">
@@ -233,7 +233,7 @@ export function ExamBuilder({ churches, initialData, locked = false, mode = "cre
               value={accessCode}
               disabled={locked}
               onChange={(event) => setAccessCode(event.target.value.toUpperCase())}
-              className="mt-1 w-full rounded-md border border-[#cdd8cf] px-3 py-3 font-mono uppercase outline-none focus:ring-2 focus:ring-[#2c6d49] disabled:bg-[#f7faf6]"
+              className="mt-1 w-full rounded-md border border-[#c5cce4] px-3 py-3 font-mono uppercase outline-none focus:ring-2 focus:ring-[#000060] disabled:bg-[#f8faff]"
               placeholder="Ex.: PROVA2026"
             />
           </label>
@@ -241,37 +241,37 @@ export function ExamBuilder({ churches, initialData, locked = false, mode = "cre
       </section>
 
       <section className="grid gap-4 lg:grid-cols-2">
-        <div className="rounded-lg border border-[#dfe6dd] bg-white p-4">
+        <div className="rounded-lg border border-[#d8def0] bg-white p-4">
           <h2 className="text-lg font-semibold">Igrejas participantes</h2>
           <div className="mt-3 space-y-2">
             {churches.map((church) => (
               <label
                 key={church.id}
-                className="flex items-center justify-between gap-3 rounded-md border border-[#edf1eb] px-3 py-2"
+                className="flex items-center justify-between gap-3 rounded-md border border-[#e8ecf8] px-3 py-2"
               >
                 <span>
                   <span className="block text-sm font-medium">{church.name}</span>
-                  <span className="text-xs text-[#66736a]">{church.students} aluno(s)</span>
+                  <span className="text-xs text-[#5d6480]">{church.students} aluno(s)</span>
                 </span>
                 <input
                   type="checkbox"
                   checked={selectedChurchIds.includes(church.id)}
                   disabled={locked}
                   onChange={() => toggleChurch(church.id)}
-                  className="h-5 w-5 accent-[#2c6d49]"
+                  className="h-5 w-5 accent-[#000060]"
                 />
               </label>
             ))}
           </div>
         </div>
 
-        <div className="rounded-lg border border-[#dfe6dd] bg-white p-4">
+        <div className="rounded-lg border border-[#d8def0] bg-white p-4">
           <h2 className="text-lg font-semibold">Categorias participantes</h2>
           <div className="mt-3 grid gap-2 sm:grid-cols-3 lg:grid-cols-1">
             {CATEGORIES.map((category) => (
               <label
                 key={category.value}
-                className="flex items-center justify-between gap-3 rounded-md border border-[#edf1eb] px-3 py-3"
+                className="flex items-center justify-between gap-3 rounded-md border border-[#e8ecf8] px-3 py-3"
               >
                 <span className="text-sm font-medium">{category.label}</span>
                 <input
@@ -279,7 +279,7 @@ export function ExamBuilder({ churches, initialData, locked = false, mode = "cre
                   checked={selectedCategories.includes(category.value)}
                   disabled={locked}
                   onChange={() => toggleCategory(category.value)}
-                  className="h-5 w-5 accent-[#2c6d49]"
+                  className="h-5 w-5 accent-[#000060]"
                 />
               </label>
             ))}
@@ -287,11 +287,11 @@ export function ExamBuilder({ churches, initialData, locked = false, mode = "cre
         </div>
       </section>
 
-      <section className="rounded-lg border border-[#dfe6dd] bg-white p-4">
+      <section className="rounded-lg border border-[#d8def0] bg-white p-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-lg font-semibold">Questoes</h2>
-            <p className="text-sm text-[#66736a]">
+            <p className="text-sm text-[#5d6480]">
               Todas as questoes sao de multipla escolha. Marque uma alternativa correta em cada questao.
             </p>
           </div>
@@ -299,7 +299,7 @@ export function ExamBuilder({ churches, initialData, locked = false, mode = "cre
             type="button"
             disabled={locked}
             onClick={() => setQuestions((current) => [...current, newQuestion()])}
-            className="rounded-md border border-[#2c6d49] px-4 py-2 text-sm font-semibold text-[#2c6d49] hover:bg-[#effaf2] disabled:cursor-not-allowed disabled:opacity-40"
+            className="rounded-md border border-[#000060] px-4 py-2 text-sm font-semibold text-[#000060] hover:bg-[#effaf2] disabled:cursor-not-allowed disabled:opacity-40"
           >
             Adicionar questao
           </button>
@@ -307,7 +307,7 @@ export function ExamBuilder({ churches, initialData, locked = false, mode = "cre
 
         <div className="mt-4 space-y-4">
           {questions.map((question, questionIndex) => (
-            <div key={question.id} className="rounded-lg border border-[#edf1eb] bg-[#fbfcfa] p-4">
+            <div key={question.id} className="rounded-lg border border-[#e8ecf8] bg-[#fbfcff] p-4">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-start">
                 <label className="block flex-1">
                   <span className="text-sm font-medium">Pergunta {questionIndex + 1}</span>
@@ -316,13 +316,13 @@ export function ExamBuilder({ churches, initialData, locked = false, mode = "cre
                     disabled={locked}
                     onChange={(event) => updateQuestion(question.id, { statement: event.target.value })}
                     rows={3}
-                    className="mt-1 w-full rounded-md border border-[#cdd8cf] bg-white px-3 py-3 outline-none focus:ring-2 focus:ring-[#2c6d49] disabled:bg-[#f7faf6]"
+                    className="mt-1 w-full rounded-md border border-[#c5cce4] bg-white px-3 py-3 outline-none focus:ring-2 focus:ring-[#000060] disabled:bg-[#f8faff]"
                     placeholder="Digite o enunciado"
                   />
                 </label>
                 <div className="grid gap-3 sm:grid-cols-2 lg:w-72 lg:grid-cols-1">
-                  <div className="rounded-md border border-[#dfe6dd] bg-white px-3 py-3">
-                    <span className="text-xs font-semibold uppercase tracking-[0.16em] text-[#2c6d49]">
+                  <div className="rounded-md border border-[#d8def0] bg-white px-3 py-3">
+                    <span className="text-xs font-semibold uppercase tracking-[0.16em] text-[#000060]">
                       Tipo
                     </span>
                     <p className="mt-1 text-sm font-medium">Multipla escolha</p>
@@ -336,7 +336,7 @@ export function ExamBuilder({ churches, initialData, locked = false, mode = "cre
                       value={question.points}
                       disabled={locked}
                       onChange={(event) => updateQuestion(question.id, { points: Number(event.target.value) })}
-                      className="mt-1 w-full rounded-md border border-[#cdd8cf] bg-white px-3 py-3 outline-none focus:ring-2 focus:ring-[#2c6d49] disabled:bg-[#f7faf6]"
+                      className="mt-1 w-full rounded-md border border-[#c5cce4] bg-white px-3 py-3 outline-none focus:ring-2 focus:ring-[#000060] disabled:bg-[#f8faff]"
                     />
                   </label>
                 </div>
@@ -350,7 +350,7 @@ export function ExamBuilder({ churches, initialData, locked = false, mode = "cre
                     <label
                       key={option.label}
                       className={`flex gap-3 rounded-md border p-3 ${
-                        isCorrect ? "border-[#2c6d49] bg-[#effaf2]" : "border-[#dfe6dd] bg-white"
+                        isCorrect ? "border-[#000060] bg-[#effaf2]" : "border-[#d8def0] bg-white"
                       }`}
                     >
                       <input
@@ -359,17 +359,17 @@ export function ExamBuilder({ churches, initialData, locked = false, mode = "cre
                         checked={isCorrect}
                         disabled={locked}
                         onChange={() => updateQuestion(question.id, { correctOptionIndex: optionIndex })}
-                        className="mt-1 h-5 w-5 accent-[#2c6d49]"
+                        className="mt-1 h-5 w-5 accent-[#000060]"
                         aria-label={`Marcar alternativa ${option.label} como correta`}
                       />
                       <span className="flex-1">
                         <span className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                          <span className="text-xs font-semibold text-[#2c6d49]">
+                          <span className="text-xs font-semibold text-[#000060]">
                             Alternativa {option.label}
                           </span>
                           <span
                             className={`w-fit rounded-full px-2 py-1 text-xs font-semibold ${
-                              isCorrect ? "bg-[#2c6d49] text-white" : "bg-[#f7faf6] text-[#66736a]"
+                              isCorrect ? "bg-[#000060] text-white" : "bg-[#f8faff] text-[#5d6480]"
                             }`}
                           >
                             {isCorrect ? "Resposta correta" : "Marcar correta"}
@@ -379,7 +379,7 @@ export function ExamBuilder({ churches, initialData, locked = false, mode = "cre
                           value={option.text}
                           disabled={locked}
                           onChange={(event) => updateOption(question.id, optionIndex, event.target.value)}
-                          className="mt-2 w-full rounded-md border border-[#cdd8cf] bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-[#2c6d49] disabled:bg-[#f7faf6]"
+                          className="mt-2 w-full rounded-md border border-[#c5cce4] bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-[#000060] disabled:bg-[#f8faff]"
                           placeholder={`Texto da alternativa ${option.label}`}
                         />
                       </span>
@@ -393,7 +393,7 @@ export function ExamBuilder({ churches, initialData, locked = false, mode = "cre
                   type="button"
                   disabled={locked || questions.length === 1}
                   onClick={() => setQuestions((current) => current.filter((item) => item.id !== question.id))}
-                  className="rounded-md border border-[#d7b6ad] px-3 py-2 text-sm font-medium text-[#8d3b2d] disabled:cursor-not-allowed disabled:opacity-40"
+                  className="rounded-md border border-[#efb6bf] px-3 py-2 text-sm font-medium text-[#b00018] disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   Remover questao
                 </button>
@@ -403,10 +403,10 @@ export function ExamBuilder({ churches, initialData, locked = false, mode = "cre
         </div>
       </section>
 
-      <div className="sticky bottom-0 rounded-lg border border-[#dfe6dd] bg-white/95 p-4 shadow-lg backdrop-blur">
+      <div className="sticky bottom-0 rounded-lg border border-[#d8def0] bg-white/95 p-4 shadow-lg backdrop-blur">
         <button
           disabled={locked}
-          className="w-full rounded-md bg-[#12382a] px-5 py-3 text-sm font-semibold text-white hover:bg-[#1c513d] disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+          className="w-full rounded-md bg-[#000060] px-5 py-3 text-sm font-semibold text-white hover:bg-[#000044] disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
         >
           {isEditing ? "Salvar alteracoes da prova" : "Criar prova e liberar aplicacao"}
         </button>

@@ -131,19 +131,19 @@ export default async function EditExamPage({ params, searchParams }: EditExamPag
   return (
     <AdminShell title="Editar prova" description="Atualize dados, participantes, questoes e gabarito da aplicacao.">
       <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <Link href="/admin/provas" className="text-sm font-semibold text-[#2c6d49]">
+        <Link href="/admin/provas" className="text-sm font-semibold text-[#000060]">
           Voltar para provas
         </Link>
         <div className="flex flex-col gap-2 sm:flex-row">
           <Link
             href="/admin/provas/nova"
-            className="rounded-md border border-[#2c6d49] px-3 py-2 text-center text-sm font-semibold text-[#2c6d49] hover:bg-[#effaf2]"
+            className="rounded-md border border-[#000060] px-3 py-2 text-center text-sm font-semibold text-[#000060] hover:bg-[#effaf2]"
           >
             Criar nova prova
           </Link>
           <Link
             href={`/admin/provas/${application.id}/relatorio`}
-            className="rounded-md bg-[#12382a] px-3 py-2 text-center text-sm font-semibold text-white hover:bg-[#1c513d]"
+            className="rounded-md bg-[#000060] px-3 py-2 text-center text-sm font-semibold text-white hover:bg-[#000044]"
           >
             Relatorio PDF
           </Link>
@@ -151,7 +151,7 @@ export default async function EditExamPage({ params, searchParams }: EditExamPag
             <input type="hidden" name="applicationId" value={application.id} />
             <ConfirmSubmitButton
               message={`Excluir a prova "${application.exam.title}"? Esta acao tambem remove envios e respostas desta aplicacao.`}
-              className="w-full rounded-md border border-[#d7b6ad] px-3 py-2 text-center text-sm font-semibold text-[#8d3b2d] hover:bg-[#fff4f2]"
+              className="w-full rounded-md border border-[#efb6bf] px-3 py-2 text-center text-sm font-semibold text-[#b00018] hover:bg-[#fff4f2]"
             >
               Excluir prova
             </ConfirmSubmitButton>
@@ -160,12 +160,12 @@ export default async function EditExamPage({ params, searchParams }: EditExamPag
       </div>
 
       {isTeacher && !scopedChurchId ? (
-        <div className="mb-4 rounded-md border border-[#efc2bd] bg-[#fff4f2] px-4 py-3 text-sm text-[#9b2d20]">
-          Seu usuario de professor ainda nao esta vinculado a uma igreja.
+        <div className="mb-4 rounded-md border border-[#f2b8bf] bg-[#fff4f2] px-4 py-3 text-sm text-[#b00018]">
+          Seu usuario de conselheiro ainda nao esta vinculado a uma igreja.
         </div>
       ) : null}
       {query.erro ? (
-        <div className="mb-4 rounded-md border border-[#efc2bd] bg-[#fff4f2] px-4 py-3 text-sm text-[#9b2d20]">
+        <div className="mb-4 rounded-md border border-[#f2b8bf] bg-[#fff4f2] px-4 py-3 text-sm text-[#b00018]">
           {query.erro}
         </div>
       ) : null}

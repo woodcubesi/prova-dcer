@@ -9,7 +9,7 @@ Aplicacao web para montar, aplicar e conferir provas. A primeira versao usa:
 - Provas sempre de multipla escolha
 - Tempo total da prova
 - Painel administrativo para cadastros, montagem e correcao
-- Cadastro de administradores e professores
+- Cadastro de administradores e conselheiros
 - Resultado oculto para o aluno ao final
 
 ## Ambientes
@@ -114,9 +114,9 @@ E-mail: deixe em branco
 Senha: admin123
 ```
 
-Depois de entrar, acesse o menu `Equipe` para cadastrar administradores e professores. Os proximos acessos podem ser feitos com e-mail e senha cadastrados.
+Depois de entrar, acesse o menu `Equipe` para cadastrar administradores e conselheiros. Os proximos acessos podem ser feitos com e-mail e senha cadastrados.
 
-No cadastro de equipe, escolha entre `Administrador`, `Professor` ou `Administrador + Professor`. Professores e administradores que tambem forem professores devem ser vinculados a uma igreja. Professores acessam apenas alunos, provas, aplicacoes e correcoes daquela igreja, mas podem cadastrar outros professores da mesma igreja.
+No cadastro de equipe, escolha entre `Administrador`, `Conselheiro` ou `Administrador + Conselheiro`. Conselheiros e administradores que tambem forem conselheiros devem ser vinculados a uma igreja. Conselheiros acessam apenas alunos, provas, aplicacoes e correcoes daquela igreja, mas podem cadastrar outros conselheiros da mesma igreja.
 
 ## Rodar nesta maquina
 
@@ -138,9 +138,9 @@ E-mail: deixe em branco
 Senha: admin123
 ```
 
-Depois cadastre administradores e professores no menu `Equipe`.
+Depois cadastre administradores e conselheiros no menu `Equipe`.
 
-Ao cadastrar professor ou administrador que tambem seja professor, selecione a igreja correspondente. Administradores veem todos os dados; professores ficam restritos a sua propria igreja.
+Ao cadastrar conselheiro ou administrador que tambem seja conselheiro, selecione a igreja correspondente. Administradores veem todos os dados; conselheiros ficam restritos a sua propria igreja.
 
 ## Dados de demonstracao
 

@@ -91,16 +91,16 @@ export default async function CorrectionPage({ searchParams }: CorrectionPagePro
   return (
     <AdminShell title="Correcao" description="Confira respostas enviadas e a pontuacao automatica.">
       {isTeacher && !scopedChurchId ? (
-        <div className="mb-4 rounded-md border border-[#efc2bd] bg-[#fff4f2] px-4 py-3 text-sm text-[#9b2d20]">
-          Seu usuario de professor ainda nao esta vinculado a uma igreja.
+        <div className="mb-4 rounded-md border border-[#f2b8bf] bg-[#fff4f2] px-4 py-3 text-sm text-[#b00018]">
+          Seu usuario de conselheiro ainda nao esta vinculado a uma igreja.
         </div>
       ) : null}
 
-      <section className="rounded-lg border border-[#dfe6dd] bg-white p-4">
+      <section className="rounded-lg border border-[#d8def0] bg-white p-4">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-lg font-semibold">Provas recebidas</h2>
-            <p className="text-sm text-[#66736a]">O aluno nao visualiza nota ao final.</p>
+            <p className="text-sm text-[#5d6480]">O aluno nao visualiza nota ao final.</p>
           </div>
           <span className="rounded-full bg-[#effaf2] px-3 py-1 text-sm font-semibold text-[#1f623e]">
             {attempts.length} envio(s)
@@ -109,14 +109,14 @@ export default async function CorrectionPage({ searchParams }: CorrectionPagePro
 
         <form
           action="/admin/correcao"
-          className="mt-4 grid gap-3 rounded-md border border-[#edf1eb] bg-[#fbfcfa] p-3 sm:grid-cols-[1fr_auto] sm:items-end"
+          className="mt-4 grid gap-3 rounded-md border border-[#e8ecf8] bg-[#fbfcff] p-3 sm:grid-cols-[1fr_auto] sm:items-end"
         >
           <label className="block">
             <span className="text-sm font-medium">Filtrar por igreja</span>
             {isTeacher ? (
               <>
                 <input type="hidden" name="igreja" value={scopedChurchId || ""} />
-                <div className="mt-1 rounded-md border border-[#cdd8cf] bg-white px-3 py-3 text-sm">
+                <div className="mt-1 rounded-md border border-[#c5cce4] bg-white px-3 py-3 text-sm">
                   {churches[0]?.name || "Igreja nao vinculada"}
                 </div>
               </>
@@ -124,7 +124,7 @@ export default async function CorrectionPage({ searchParams }: CorrectionPagePro
               <select
                 name="igreja"
                 defaultValue={selectedChurchId}
-                className="mt-1 w-full rounded-md border border-[#cdd8cf] bg-white px-3 py-3 outline-none focus:ring-2 focus:ring-[#2c6d49]"
+                className="mt-1 w-full rounded-md border border-[#c5cce4] bg-white px-3 py-3 outline-none focus:ring-2 focus:ring-[#000060]"
               >
                 <option value="">Todas as igrejas</option>
                 {churches.map((church) => (
@@ -136,7 +136,7 @@ export default async function CorrectionPage({ searchParams }: CorrectionPagePro
             )}
           </label>
           {!isTeacher ? (
-            <button className="rounded-md bg-[#12382a] px-4 py-3 text-sm font-semibold text-white hover:bg-[#1c513d]">
+            <button className="rounded-md bg-[#000060] px-4 py-3 text-sm font-semibold text-white hover:bg-[#000044]">
               Filtrar
             </button>
           ) : null}
@@ -148,11 +148,11 @@ export default async function CorrectionPage({ searchParams }: CorrectionPagePro
             const result = getAttemptResult(attempt.score, attempt.totalPoints, passingPercent);
 
             return (
-              <div key={attempt.id} className="rounded-md border border-[#edf1eb] p-3">
+              <div key={attempt.id} className="rounded-md border border-[#e8ecf8] p-3">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="font-medium">{attempt.student.name}</p>
-                    <p className="mt-1 text-sm text-[#66736a]">
+                    <p className="mt-1 text-sm text-[#5d6480]">
                       {attempt.student.church.name} - {getCategoryLabel(attempt.student.category)}
                     </p>
                   </div>
@@ -161,29 +161,29 @@ export default async function CorrectionPage({ searchParams }: CorrectionPagePro
                   </span>
                 </div>
                 <p className="mt-3 text-sm font-medium">{attempt.application.exam.title}</p>
-                <p className="text-xs text-[#66736a]">{attempt.application.title}</p>
+                <p className="text-xs text-[#5d6480]">{attempt.application.title}</p>
                 <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
-                  <div className="rounded-md bg-[#f7faf6] px-3 py-2">
-                    <p className="text-xs text-[#66736a]">Tempo usado</p>
+                  <div className="rounded-md bg-[#f8faff] px-3 py-2">
+                    <p className="text-xs text-[#5d6480]">Tempo usado</p>
                     <p className="font-semibold">
                       {attempt.timeUsedSeconds ? formatDuration(attempt.timeUsedSeconds) : "-"}
                     </p>
                   </div>
-                  <div className="rounded-md bg-[#f7faf6] px-3 py-2">
-                    <p className="text-xs text-[#66736a]">Pontuacao</p>
+                  <div className="rounded-md bg-[#f8faff] px-3 py-2">
+                    <p className="text-xs text-[#5d6480]">Pontuacao</p>
                     <p className="font-semibold">
                       {attempt.score === null || attempt.score === undefined
                         ? "Pendente"
                         : `${formatScore(attempt.score)} / ${formatScore(attempt.totalPoints ?? 0)}`}
                     </p>
                   </div>
-                  <div className="rounded-md bg-[#f7faf6] px-3 py-2">
-                    <p className="text-xs text-[#66736a]">Aprovacao minima</p>
+                  <div className="rounded-md bg-[#f8faff] px-3 py-2">
+                    <p className="text-xs text-[#5d6480]">Aprovacao minima</p>
                     <p className="font-semibold">{formatPercent(passingPercent)}</p>
                   </div>
-                  <div className="rounded-md bg-[#f7faf6] px-3 py-2">
-                    <p className="text-xs text-[#66736a]">Resultado</p>
-                    <p className={`font-semibold ${result.passed ? "text-[#1f623e]" : "text-[#8d3b2d]"}`}>
+                  <div className="rounded-md bg-[#f8faff] px-3 py-2">
+                    <p className="text-xs text-[#5d6480]">Resultado</p>
+                    <p className={`font-semibold ${result.passed ? "text-[#1f623e]" : "text-[#b00018]"}`}>
                       {result.label}
                       {result.percent !== null ? ` (${formatPercent(result.percent)})` : ""}
                     </p>
@@ -191,13 +191,13 @@ export default async function CorrectionPage({ searchParams }: CorrectionPagePro
                 </div>
                 <Link
                   href={`/admin/correcao/${attempt.id}`}
-                  className="mt-3 block rounded-md border border-[#2c6d49] px-3 py-2 text-center text-sm font-semibold text-[#2c6d49]"
+                  className="mt-3 block rounded-md border border-[#000060] px-3 py-2 text-center text-sm font-semibold text-[#000060]"
                 >
                   Abrir
                 </Link>
                 <Link
                   href={`/admin/correcao/${attempt.id}/pdf`}
-                  className="mt-2 block rounded-md bg-[#12382a] px-3 py-2 text-center text-sm font-semibold text-white"
+                  className="mt-2 block rounded-md bg-[#000060] px-3 py-2 text-center text-sm font-semibold text-white"
                 >
                   Baixar PDF
                 </Link>
@@ -208,7 +208,7 @@ export default async function CorrectionPage({ searchParams }: CorrectionPagePro
 
         <div className="mt-4 hidden overflow-x-auto md:block">
           <table className="w-full min-w-[980px] text-left text-sm">
-            <thead className="border-b border-[#dfe6dd] text-xs uppercase tracking-wide text-[#66736a]">
+            <thead className="border-b border-[#d8def0] text-xs uppercase tracking-wide text-[#5d6480]">
               <tr>
                 <th className="py-3 pr-4">Aluno</th>
                 <th className="py-3 pr-4">Prova</th>
@@ -225,16 +225,16 @@ export default async function CorrectionPage({ searchParams }: CorrectionPagePro
                 const result = getAttemptResult(attempt.score, attempt.totalPoints, passingPercent);
 
                 return (
-                  <tr key={attempt.id} className="border-b border-[#edf1eb] last:border-0">
+                  <tr key={attempt.id} className="border-b border-[#e8ecf8] last:border-0">
                     <td className="py-3 pr-4">
                       <p className="font-medium">{attempt.student.name}</p>
-                      <p className="text-xs text-[#66736a]">
+                      <p className="text-xs text-[#5d6480]">
                         {attempt.student.church.name} - {getCategoryLabel(attempt.student.category)}
                       </p>
                     </td>
                     <td className="py-3 pr-4">
                       <p>{attempt.application.exam.title}</p>
-                      <p className="text-xs text-[#66736a]">{attempt.application.title}</p>
+                      <p className="text-xs text-[#5d6480]">{attempt.application.title}</p>
                     </td>
                     <td className="py-3 pr-4">
                       <span className="rounded-full bg-[#effaf2] px-2 py-1 text-xs font-medium text-[#1f623e]">
@@ -250,10 +250,10 @@ export default async function CorrectionPage({ searchParams }: CorrectionPagePro
                         : `${formatScore(attempt.score)} / ${formatScore(attempt.totalPoints ?? 0)}`}
                     </td>
                     <td className="py-3 pr-4">
-                      <p className={result.passed ? "font-semibold text-[#1f623e]" : "font-semibold text-[#8d3b2d]"}>
+                      <p className={result.passed ? "font-semibold text-[#1f623e]" : "font-semibold text-[#b00018]"}>
                         {result.label}
                       </p>
-                      <p className="text-xs text-[#66736a]">
+                      <p className="text-xs text-[#5d6480]">
                         {result.percent !== null
                           ? `${formatPercent(result.percent)} de ${formatPercent(passingPercent)}`
                           : `Minimo ${formatPercent(passingPercent)}`}
@@ -263,13 +263,13 @@ export default async function CorrectionPage({ searchParams }: CorrectionPagePro
                       <div className="flex flex-wrap gap-2">
                         <Link
                           href={`/admin/correcao/${attempt.id}`}
-                          className="rounded-md border border-[#2c6d49] px-3 py-2 text-sm font-semibold text-[#2c6d49] hover:bg-[#effaf2]"
+                          className="rounded-md border border-[#000060] px-3 py-2 text-sm font-semibold text-[#000060] hover:bg-[#effaf2]"
                         >
                           Abrir
                         </Link>
                         <Link
                           href={`/admin/correcao/${attempt.id}/pdf`}
-                          className="rounded-md bg-[#12382a] px-3 py-2 text-sm font-semibold text-white hover:bg-[#1c513d]"
+                          className="rounded-md bg-[#000060] px-3 py-2 text-sm font-semibold text-white hover:bg-[#000044]"
                         >
                           PDF
                         </Link>
@@ -283,7 +283,7 @@ export default async function CorrectionPage({ searchParams }: CorrectionPagePro
         </div>
 
         {attempts.length === 0 ? (
-          <div className="mt-4 rounded-md border border-[#edf1eb] bg-[#fbfcfa] p-4 text-sm text-[#66736a]">
+          <div className="mt-4 rounded-md border border-[#e8ecf8] bg-[#fbfcff] p-4 text-sm text-[#5d6480]">
             Ainda nao ha provas enviadas.
           </div>
         ) : null}

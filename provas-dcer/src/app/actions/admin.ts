@@ -117,11 +117,11 @@ function resolveExamChurchIds(
   const scopedChurchId = getScopedChurchId(context);
 
   if (context.role === AdminRole.TEACHER && !scopedChurchId) {
-    errorRedirect(errorPath, "Seu usuario de professor ainda nao esta vinculado a uma igreja.");
+    errorRedirect(errorPath, "Seu usuario de conselheiro ainda nao esta vinculado a uma igreja.");
   }
 
   if (scopedChurchId && churchIds.some((churchId) => churchId !== scopedChurchId)) {
-    errorRedirect(errorPath, "Professores so podem aplicar provas para a propria igreja.");
+    errorRedirect(errorPath, "Conselheiros so podem aplicar provas para a propria igreja.");
   }
 
   return scopedChurchId ? [scopedChurchId] : churchIds;
@@ -146,7 +146,7 @@ async function resolveStaffChurch(role: AdminRole, churchId: string | null) {
   if (role === AdminRole.ADMIN) return null;
 
   if (!churchId) {
-    errorRedirect("/admin/equipe", "Selecione a igreja do professor.");
+    errorRedirect("/admin/equipe", "Selecione a igreja do conselheiro.");
   }
 
   const churchExists = await prisma.church.findFirst({
@@ -158,7 +158,7 @@ async function resolveStaffChurch(role: AdminRole, churchId: string | null) {
   });
 
   if (!churchExists) {
-    errorRedirect("/admin/equipe", "Igreja do professor nao encontrada.");
+    errorRedirect("/admin/equipe", "Igreja do conselheiro nao encontrada.");
   }
 
   return churchId;
@@ -170,15 +170,15 @@ async function validateStaffScopeForTeacher(
   contextChurchId: string | null,
 ) {
   if (role !== AdminRole.TEACHER) {
-    errorRedirect("/admin/equipe", "Professores podem cadastrar apenas outros professores.");
+    errorRedirect("/admin/equipe", "Conselheiros podem cadastrar apenas outros conselheiros.");
   }
 
   if (!contextChurchId) {
-    errorRedirect("/admin/equipe", "Seu usuario de professor ainda nao esta vinculado a uma igreja.");
+    errorRedirect("/admin/equipe", "Seu usuario de conselheiro ainda nao esta vinculado a uma igreja.");
   }
 
   if (target && (target.role !== AdminRole.TEACHER || target.churchId !== contextChurchId)) {
-    errorRedirect("/admin/equipe", "Voce so pode editar professores da sua igreja.");
+    errorRedirect("/admin/equipe", "Voce so pode editar conselheiros da sua igreja.");
   }
 }
 
@@ -310,7 +310,7 @@ export async function createStaffUserAction(formData: FormData) {
 
   revalidatePath("/admin");
   revalidatePath("/admin/equipe");
-  redirect(`/admin/equipe?ok=${role === AdminRole.ADMIN ? "admin" : "professor"}`);
+  redirect(`/admin/equipe?ok=${role === AdminRole.ADMIN ? "admin" : "conselheiro"}`);
 }
 
 export async function updateStaffUserAction(formData: FormData) {
@@ -450,11 +450,11 @@ export async function createStudentAction(formData: FormData) {
   const category = String(formData.get("category") || "") as Category;
 
   if (context.role === AdminRole.TEACHER && !scopedChurchId) {
-    errorRedirect("/admin/cadastros", "Seu usuario de professor ainda nao esta vinculado a uma igreja.");
+    errorRedirect("/admin/cadastros", "Seu usuario de conselheiro ainda nao esta vinculado a uma igreja.");
   }
 
   if (scopedChurchId && requestedChurchId && requestedChurchId !== scopedChurchId) {
-    errorRedirect("/admin/cadastros", "Professores so podem cadastrar alunos da propria igreja.");
+    errorRedirect("/admin/cadastros", "Conselheiros so podem cadastrar alunos da propria igreja.");
   }
 
   if (name.length < 3 || !churchId || !categorySchema.safeParse(category).success) {
@@ -499,11 +499,11 @@ export async function updateStudentAction(formData: FormData) {
   const category = String(formData.get("category") || "") as Category;
 
   if (context.role === AdminRole.TEACHER && !scopedChurchId) {
-    errorRedirect("/admin/cadastros", "Seu usuario de professor ainda nao esta vinculado a uma igreja.");
+    errorRedirect("/admin/cadastros", "Seu usuario de conselheiro ainda nao esta vinculado a uma igreja.");
   }
 
   if (scopedChurchId && requestedChurchId && requestedChurchId !== scopedChurchId) {
-    errorRedirect("/admin/cadastros", "Professores so podem editar alunos da propria igreja.");
+    errorRedirect("/admin/cadastros", "Conselheiros so podem editar alunos da propria igreja.");
   }
 
   if (!id || name.length < 3 || !churchId || !categorySchema.safeParse(category).success) {
@@ -780,7 +780,7 @@ export async function deleteExamApplicationAction(formData: FormData) {
 
   if (!hasAdministratorAccess(context)) {
     if (!context.churchId) {
-      errorRedirect("/admin/provas", "Seu usuario de professor ainda nao esta vinculado a uma igreja.");
+      errorRedirect("/admin/provas", "Seu usuario de conselheiro ainda nao esta vinculado a uma igreja.");
     }
 
     const hasOutsideChurch = application.participants.some(
@@ -788,7 +788,7 @@ export async function deleteExamApplicationAction(formData: FormData) {
     );
 
     if (hasOutsideChurch) {
-      errorRedirect("/admin/provas", "Professores so podem excluir provas da propria igreja.");
+      errorRedirect("/admin/provas", "Conselheiros so podem excluir provas da propria igreja.");
     }
   }
 

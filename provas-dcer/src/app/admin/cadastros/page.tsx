@@ -60,12 +60,12 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
   return (
     <AdminShell title="Cadastros" description="Pre-cadastre igrejas e alunos antes de liberar uma prova.">
       {isTeacher && !scopedChurchId ? (
-        <div className="mb-4 rounded-md border border-[#efc2bd] bg-[#fff4f2] px-4 py-3 text-sm text-[#9b2d20]">
-          Seu usuario de professor ainda nao esta vinculado a uma igreja.
+        <div className="mb-4 rounded-md border border-[#f2b8bf] bg-[#fff4f2] px-4 py-3 text-sm text-[#b00018]">
+          Seu usuario de conselheiro ainda nao esta vinculado a uma igreja.
         </div>
       ) : null}
       {params.erro ? (
-        <div className="mb-4 rounded-md border border-[#efc2bd] bg-[#fff4f2] px-4 py-3 text-sm text-[#9b2d20]">
+        <div className="mb-4 rounded-md border border-[#f2b8bf] bg-[#fff4f2] px-4 py-3 text-sm text-[#b00018]">
           {params.erro}
         </div>
       ) : null}
@@ -75,12 +75,12 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
         </div>
       ) : null}
       {params.igreja && !editingChurch && !isTeacher ? (
-        <div className="mb-4 rounded-md border border-[#efc2bd] bg-[#fff4f2] px-4 py-3 text-sm text-[#9b2d20]">
+        <div className="mb-4 rounded-md border border-[#f2b8bf] bg-[#fff4f2] px-4 py-3 text-sm text-[#b00018]">
           Igreja nao encontrada para edicao.
         </div>
       ) : null}
       {params.aluno && !editingStudent ? (
-        <div className="mb-4 rounded-md border border-[#efc2bd] bg-[#fff4f2] px-4 py-3 text-sm text-[#9b2d20]">
+        <div className="mb-4 rounded-md border border-[#f2b8bf] bg-[#fff4f2] px-4 py-3 text-sm text-[#b00018]">
           Aluno nao encontrado para edicao.
         </div>
       ) : null}
@@ -89,7 +89,7 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
         {!isTeacher ? (
           <form
             action={editingChurch ? updateChurchAction : createChurchAction}
-            className="rounded-lg border border-[#dfe6dd] bg-white p-4"
+            className="rounded-lg border border-[#d8def0] bg-white p-4"
           >
             {editingChurch ? <input type="hidden" name="id" value={editingChurch.id} /> : null}
             <h2 className="text-lg font-semibold">{editingChurch ? "Editar igreja" : "Nova igreja"}</h2>
@@ -99,7 +99,7 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
                 <input
                   name="name"
                   defaultValue={editingChurch?.name || ""}
-                  className="mt-1 w-full rounded-md border border-[#cdd8cf] px-3 py-3 outline-none focus:ring-2 focus:ring-[#2c6d49]"
+                  className="mt-1 w-full rounded-md border border-[#c5cce4] px-3 py-3 outline-none focus:ring-2 focus:ring-[#000060]"
                   placeholder="Ex.: Igreja Sede Central"
                 />
               </label>
@@ -108,19 +108,19 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
                 <input
                   name="city"
                   defaultValue={editingChurch?.city || ""}
-                  className="mt-1 w-full rounded-md border border-[#cdd8cf] px-3 py-3 outline-none focus:ring-2 focus:ring-[#2c6d49]"
+                  className="mt-1 w-full rounded-md border border-[#c5cce4] px-3 py-3 outline-none focus:ring-2 focus:ring-[#000060]"
                   placeholder="Ex.: Paulista"
                 />
               </label>
             </div>
             <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-              <button className="rounded-md bg-[#12382a] px-4 py-3 text-sm font-semibold text-white hover:bg-[#1c513d]">
+              <button className="rounded-md bg-[#000060] px-4 py-3 text-sm font-semibold text-white hover:bg-[#000044]">
                 {editingChurch ? "Atualizar igreja" : "Salvar igreja"}
               </button>
               {editingChurch ? (
                 <a
                   href="/admin/cadastros"
-                  className="rounded-md border border-[#dfe6dd] px-4 py-3 text-center text-sm font-semibold text-[#2c6d49] hover:bg-[#f2f7f0]"
+                  className="rounded-md border border-[#d8def0] px-4 py-3 text-center text-sm font-semibold text-[#000060] hover:bg-[#f7f8ff]"
                 >
                   Cancelar
                 </a>
@@ -131,7 +131,7 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
 
         <form
           action={editingStudent ? updateStudentAction : createStudentAction}
-          className="rounded-lg border border-[#dfe6dd] bg-white p-4"
+          className="rounded-lg border border-[#d8def0] bg-white p-4"
         >
           {editingStudent ? <input type="hidden" name="id" value={editingStudent.id} /> : null}
           <h2 className="text-lg font-semibold">{editingStudent ? "Editar aluno" : "Novo aluno"}</h2>
@@ -140,7 +140,7 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
               <label className="block">
                 <span className="text-sm font-medium">Igreja</span>
                 <input type="hidden" name="churchId" value={scopedChurchId || ""} />
-                <div className="mt-1 rounded-md border border-[#cdd8cf] bg-[#f7faf6] px-3 py-3 text-sm">
+                <div className="mt-1 rounded-md border border-[#c5cce4] bg-[#f8faff] px-3 py-3 text-sm">
                   {churches[0]?.name || "Igreja nao vinculada"}
                 </div>
               </label>
@@ -150,7 +150,7 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
                 <select
                   name="churchId"
                   defaultValue={editingStudent?.churchId || ""}
-                  className="mt-1 w-full rounded-md border border-[#cdd8cf] bg-white px-3 py-3 outline-none focus:ring-2 focus:ring-[#2c6d49]"
+                  className="mt-1 w-full rounded-md border border-[#c5cce4] bg-white px-3 py-3 outline-none focus:ring-2 focus:ring-[#000060]"
                 >
                   <option value="">Selecione</option>
                   {churches.map((church) => (
@@ -166,7 +166,7 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
               <select
                 name="category"
                 defaultValue={editingStudent?.category || ""}
-                className="mt-1 w-full rounded-md border border-[#cdd8cf] bg-white px-3 py-3 outline-none focus:ring-2 focus:ring-[#2c6d49]"
+                className="mt-1 w-full rounded-md border border-[#c5cce4] bg-white px-3 py-3 outline-none focus:ring-2 focus:ring-[#000060]"
               >
                 <option value="">Selecione</option>
                 {CATEGORIES.map((category) => (
@@ -181,19 +181,19 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
               <input
                 name="name"
                 defaultValue={editingStudent?.name || ""}
-                className="mt-1 w-full rounded-md border border-[#cdd8cf] px-3 py-3 outline-none focus:ring-2 focus:ring-[#2c6d49]"
+                className="mt-1 w-full rounded-md border border-[#c5cce4] px-3 py-3 outline-none focus:ring-2 focus:ring-[#000060]"
                 placeholder="Nome completo"
               />
             </label>
           </div>
           <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-            <button className="rounded-md bg-[#12382a] px-4 py-3 text-sm font-semibold text-white hover:bg-[#1c513d]">
+            <button className="rounded-md bg-[#000060] px-4 py-3 text-sm font-semibold text-white hover:bg-[#000044]">
               {editingStudent ? "Atualizar aluno" : "Salvar aluno"}
             </button>
             {editingStudent ? (
               <a
                 href="/admin/cadastros"
-                className="rounded-md border border-[#dfe6dd] px-4 py-3 text-center text-sm font-semibold text-[#2c6d49] hover:bg-[#f2f7f0]"
+                className="rounded-md border border-[#d8def0] px-4 py-3 text-center text-sm font-semibold text-[#000060] hover:bg-[#f7f8ff]"
               >
                 Cancelar
               </a>
@@ -203,19 +203,19 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
       </section>
 
       <section className="mt-5 grid gap-4 lg:grid-cols-[320px_1fr]">
-        <div className="rounded-lg border border-[#dfe6dd] bg-white p-4">
+        <div className="rounded-lg border border-[#d8def0] bg-white p-4">
           <h2 className="text-lg font-semibold">Igrejas cadastradas</h2>
           <div className="mt-3 space-y-2">
             {churches.map((church) => (
-              <div key={church.id} className="rounded-md border border-[#edf1eb] px-3 py-2">
+              <div key={church.id} className="rounded-md border border-[#e8ecf8] px-3 py-2">
                 <p className="font-medium">{church.name}</p>
-                <p className="text-xs text-[#66736a]">
+                <p className="text-xs text-[#5d6480]">
                   {church._count.students} aluno(s) {church.city ? `- ${church.city}` : ""}
                 </p>
                 {!isTeacher ? (
                   <a
                     href={`/admin/cadastros?igreja=${church.id}`}
-                    className="mt-2 inline-flex rounded-md border border-[#2c6d49] px-3 py-2 text-sm font-semibold text-[#2c6d49]"
+                    className="mt-2 inline-flex rounded-md border border-[#000060] px-3 py-2 text-sm font-semibold text-[#000060]"
                   >
                     Editar
                   </a>
@@ -225,19 +225,19 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
           </div>
         </div>
 
-        <div className="rounded-lg border border-[#dfe6dd] bg-white p-4">
+        <div className="rounded-lg border border-[#d8def0] bg-white p-4">
           <h2 className="text-lg font-semibold">Alunos cadastrados</h2>
           <div className="mt-3 grid gap-3 md:hidden">
             {students.map((student) => (
-              <div key={student.id} className="rounded-md border border-[#edf1eb] p-3">
+              <div key={student.id} className="rounded-md border border-[#e8ecf8] p-3">
                 <p className="font-medium">{student.name}</p>
-                <p className="mt-1 text-sm text-[#66736a]">{student.church.name}</p>
+                <p className="mt-1 text-sm text-[#5d6480]">{student.church.name}</p>
                 <span className="mt-2 inline-flex rounded-full bg-[#effaf2] px-2 py-1 text-xs font-medium text-[#1f623e]">
                   {getCategoryLabel(student.category)}
                 </span>
                 <a
                   href={`/admin/cadastros?aluno=${student.id}`}
-                  className="mt-3 block rounded-md border border-[#2c6d49] px-3 py-2 text-center text-sm font-semibold text-[#2c6d49]"
+                  className="mt-3 block rounded-md border border-[#000060] px-3 py-2 text-center text-sm font-semibold text-[#000060]"
                 >
                   Editar
                 </a>
@@ -246,7 +246,7 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
           </div>
           <div className="mt-3 hidden overflow-x-auto md:block">
             <table className="w-full min-w-[720px] text-left text-sm">
-              <thead className="border-b border-[#dfe6dd] text-xs uppercase tracking-wide text-[#66736a]">
+              <thead className="border-b border-[#d8def0] text-xs uppercase tracking-wide text-[#5d6480]">
                 <tr>
                   <th className="py-3 pr-4">Nome</th>
                   <th className="py-3 pr-4">Igreja</th>
@@ -256,14 +256,14 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
               </thead>
               <tbody>
                 {students.map((student) => (
-                  <tr key={student.id} className="border-b border-[#edf1eb] last:border-0">
+                  <tr key={student.id} className="border-b border-[#e8ecf8] last:border-0">
                     <td className="py-3 pr-4 font-medium">{student.name}</td>
                     <td className="py-3 pr-4">{student.church.name}</td>
                     <td className="py-3 pr-4">{getCategoryLabel(student.category)}</td>
                     <td className="py-3 pr-4">
                       <a
                         href={`/admin/cadastros?aluno=${student.id}`}
-                        className="rounded-md border border-[#2c6d49] px-3 py-2 text-sm font-semibold text-[#2c6d49] hover:bg-[#effaf2]"
+                        className="rounded-md border border-[#000060] px-3 py-2 text-sm font-semibold text-[#000060] hover:bg-[#effaf2]"
                       >
                         Editar
                       </a>
@@ -272,7 +272,7 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
                 ))}
                 {students.length === 0 ? (
                   <tr>
-                    <td className="py-6 pr-4 text-sm text-[#66736a]" colSpan={4}>
+                    <td className="py-6 pr-4 text-sm text-[#5d6480]" colSpan={4}>
                       Nenhum aluno cadastrado ainda.
                     </td>
                   </tr>
@@ -281,7 +281,7 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
             </table>
           </div>
           {students.length === 0 ? (
-            <div className="mt-3 rounded-md border border-[#edf1eb] bg-[#fbfcfa] p-4 text-sm text-[#66736a] md:hidden">
+            <div className="mt-3 rounded-md border border-[#e8ecf8] bg-[#fbfcff] p-4 text-sm text-[#5d6480] md:hidden">
               Nenhum aluno cadastrado ainda.
             </div>
           ) : null}

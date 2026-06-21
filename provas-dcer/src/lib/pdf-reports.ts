@@ -1,3 +1,5 @@
+import { existsSync } from "fs";
+import { join } from "path";
 import PDFDocument from "pdfkit";
 import type PDFKit from "pdfkit";
 import { getCategoryLabel } from "@/lib/categories";
@@ -60,12 +62,16 @@ export type ApplicationSummaryPdfData = {
 };
 
 const pageMargin = 48;
-const brandColor = "#12382a";
-const mutedColor = "#66736a";
-const borderColor = "#dfe6dd";
-const lightFill = "#f7faf6";
+const brandColor = "#000060";
+const brandYellow = "#fff200";
+const brandRed = "#e00010";
+const mutedColor = "#5d6480";
+const borderColor = "#d8def0";
+const lightFill = "#f8faff";
 const successColor = "#1f623e";
-const dangerColor = "#8d3b2d";
+const dangerColor = "#b00018";
+const dcerLogoPath = join(process.cwd(), "public", "brand", "dcer-paulista-logo.png");
+const erInsigniaPath = join(process.cwd(), "public", "brand", "embaixadores-rei-insignia.png");
 
 export async function createPdfBuffer(build: (doc: PDFKit.PDFDocument) => void) {
   const doc = new PDFDocument({
@@ -221,21 +227,42 @@ function ensureSpace(doc: PDFKit.PDFDocument, height: number) {
 }
 
 function drawHeader(doc: PDFKit.PDFDocument, title: string, subtitle: string) {
+  const headerY = pageMargin;
+  const textX = pageMargin + 168;
+  const textWidth = contentWidth(doc) - 225;
+
+  drawImageIfExists(doc, dcerLogoPath, pageMargin, headerY, { width: 148 });
+  drawImageIfExists(doc, erInsigniaPath, doc.page.width - pageMargin - 42, headerY + 4, { width: 42 });
+
   doc
     .font("Helvetica-Bold")
-    .fontSize(18)
+    .fontSize(16)
     .fillColor(brandColor)
-    .text("Provas DCER Paulista", pageMargin, pageMargin);
-  doc.moveDown(0.3);
-  doc.font("Helvetica-Bold").fontSize(16).fillColor("#111827").text(title);
-  doc.font("Helvetica").fontSize(11).fillColor(mutedColor).text(subtitle);
-  doc
-    .moveTo(pageMargin, doc.y + 14)
-    .lineTo(doc.page.width - pageMargin, doc.y + 14)
-    .lineWidth(1)
-    .strokeColor(borderColor)
-    .stroke();
-  doc.y += 28;
+    .text("Provas DCER Paulista", textX, headerY + 8, { width: textWidth });
+  doc.font("Helvetica-Bold").fontSize(15).fillColor("#111827").text(title, textX, doc.y + 6, { width: textWidth });
+  doc.font("Helvetica").fontSize(10).fillColor(mutedColor).text(subtitle, textX, doc.y + 4, { width: textWidth });
+
+  const dividerY = headerY + 82;
+  doc.rect(pageMargin, dividerY, contentWidth(doc), 3).fill(brandColor);
+  doc.rect(pageMargin, dividerY + 5, contentWidth(doc) * 0.72, 2).fill(brandYellow);
+  doc.rect(pageMargin + contentWidth(doc) * 0.72, dividerY + 5, contentWidth(doc) * 0.28, 2).fill(brandRed);
+  doc.y = dividerY + 24;
+}
+
+function drawImageIfExists(
+  doc: PDFKit.PDFDocument,
+  imagePath: string,
+  x: number,
+  y: number,
+  options: PDFKit.Mixins.ImageOption,
+) {
+  if (!existsSync(imagePath)) return;
+
+  try {
+    doc.image(imagePath, x, y, options);
+  } catch {
+    // PDF generation should continue even if an optional brand asset cannot be read.
+  }
 }
 
 function drawMetaGrid(doc: PDFKit.PDFDocument, entries: Array<[string, string]>) {

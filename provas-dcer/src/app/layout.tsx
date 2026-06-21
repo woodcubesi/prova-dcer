@@ -9,7 +9,7 @@ const geistSans = Geist({
 
 export const metadata: Metadata = {
   title: "Provas DCER Paulista",
-  description: "Aplicacao web para montar, aplicar e corrigir provas.",
+  description: "Aplicacao web do DCER Paulista para avaliacoes dos Embaixadores do Rei.",
 };
 
 export default function RootLayout({
@@ -19,7 +19,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="pt-BR" className={`${geistSans.variable} h-full antialiased`}>
-      <body className="min-h-full bg-[#f6f7f4] text-[#16211c]">{children}</body>
+      <body className="min-h-full bg-[#f4f6fb] text-[#11142f]">{children}</body>
     </html>
   );
 }

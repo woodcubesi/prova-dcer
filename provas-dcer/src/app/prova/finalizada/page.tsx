@@ -18,15 +18,15 @@ export default async function FinishedPage({ searchParams }: FinishedPageProps) 
 
   return (
     <main className="flex min-h-screen items-center justify-center px-4 py-10">
-      <section className="w-full max-w-lg rounded-lg bg-white p-6 text-center shadow-sm ring-1 ring-[#dfe6dd]">
-        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#2c6d49]">Prova finalizada</p>
+      <section className="w-full max-w-lg rounded-lg bg-white p-6 text-center shadow-sm ring-1 ring-[#d8def0]">
+        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#000060]">Prova finalizada</p>
         <h1 className="mt-3 text-3xl font-semibold">{message}</h1>
-        <p className="mt-3 text-sm leading-6 text-[#66736a]">
+        <p className="mt-3 text-sm leading-6 text-[#5d6480]">
           Obrigado. O resultado nao e exibido para o aluno ao final da prova; a equipe responsavel fara a conferencia.
         </p>
         <Link
           href="/"
-          className="mt-6 inline-flex rounded-md bg-[#12382a] px-5 py-3 text-sm font-semibold text-white hover:bg-[#1c513d]"
+          className="mt-6 inline-flex rounded-md bg-[#000060] px-5 py-3 text-sm font-semibold text-white hover:bg-[#000044]"
         >
           Voltar ao inicio
         </Link>

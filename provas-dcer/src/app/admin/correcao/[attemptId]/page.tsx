@@ -83,48 +83,48 @@ export default async function CorrectionDetailPage({ params }: CorrectionDetailP
 
   return (
     <AdminShell title="Conferir prova" description="Revise as respostas de multipla escolha e a pontuacao automatica.">
-      <section className="rounded-lg border border-[#dfe6dd] bg-white p-4">
+      <section className="rounded-lg border border-[#d8def0] bg-white p-4">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <Link href="/admin/correcao" className="text-sm font-semibold text-[#2c6d49]">
+            <Link href="/admin/correcao" className="text-sm font-semibold text-[#000060]">
               Voltar para lista
             </Link>
             <h2 className="mt-2 text-2xl font-semibold">{attempt.application.exam.title}</h2>
-            <p className="mt-1 text-sm text-[#66736a]">
+            <p className="mt-1 text-sm text-[#5d6480]">
               {attempt.student.name} - {attempt.student.church.name} - {getCategoryLabel(attempt.student.category)}
             </p>
             <Link
               href={`/admin/correcao/${attempt.id}/pdf`}
-              className="mt-3 inline-flex rounded-md bg-[#12382a] px-4 py-2 text-sm font-semibold text-white hover:bg-[#1c513d]"
+              className="mt-3 inline-flex rounded-md bg-[#000060] px-4 py-2 text-sm font-semibold text-white hover:bg-[#000044]"
             >
               Baixar correcao em PDF
             </Link>
           </div>
           <div className="grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-5">
             <div className="rounded-md bg-[#effaf2] px-3 py-2">
-              <p className="text-xs text-[#66736a]">Tempo usado</p>
+              <p className="text-xs text-[#5d6480]">Tempo usado</p>
               <p className="font-semibold">{attempt.timeUsedSeconds ? formatDuration(attempt.timeUsedSeconds) : "-"}</p>
             </div>
             <div className="rounded-md bg-[#effaf2] px-3 py-2">
-              <p className="text-xs text-[#66736a]">Status</p>
+              <p className="text-xs text-[#5d6480]">Status</p>
               <p className="font-semibold">{attempt.status === "SUBMITTED" ? "Enviada" : "Expirada"}</p>
             </div>
             <div className="rounded-md bg-[#effaf2] px-3 py-2">
-              <p className="text-xs text-[#66736a]">Pontuacao</p>
+              <p className="text-xs text-[#5d6480]">Pontuacao</p>
               <p className="font-semibold">
                 {formatScore(score)} / {formatScore(totalPoints)}
               </p>
             </div>
             <div className="rounded-md bg-[#effaf2] px-3 py-2">
-              <p className="text-xs text-[#66736a]">Aproveitamento</p>
+              <p className="text-xs text-[#5d6480]">Aproveitamento</p>
               <p className="font-semibold">{formatPercent(scorePercent)}</p>
             </div>
             <div className="rounded-md bg-[#effaf2] px-3 py-2">
-              <p className="text-xs text-[#66736a]">Resultado</p>
-              <p className={`font-semibold ${passed ? "text-[#1f623e]" : "text-[#8d3b2d]"}`}>
+              <p className="text-xs text-[#5d6480]">Resultado</p>
+              <p className={`font-semibold ${passed ? "text-[#1f623e]" : "text-[#b00018]"}`}>
                 {passed ? "Aprovado" : "Reprovado"}
               </p>
-              <p className="text-xs text-[#66736a]">Minimo {formatPercent(passingPercent)}</p>
+              <p className="text-xs text-[#5d6480]">Minimo {formatPercent(passingPercent)}</p>
             </div>
           </div>
         </div>
@@ -136,10 +136,10 @@ export default async function CorrectionDetailPage({ params }: CorrectionDetailP
           const correctOption = question.options.find((option) => option.isCorrect);
 
           return (
-            <section key={question.id} className="rounded-lg border border-[#dfe6dd] bg-white p-4">
+            <section key={question.id} className="rounded-lg border border-[#d8def0] bg-white p-4">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#2c6d49]">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#000060]">
                     Questao {question.position}
                   </p>
                   <h3 className="mt-1 text-lg font-semibold">{question.statement}</h3>
@@ -150,7 +150,7 @@ export default async function CorrectionDetailPage({ params }: CorrectionDetailP
               </div>
 
               <div className="mt-4 grid gap-2">
-                <div className="rounded-md border border-[#edf1eb] bg-[#fbfcfa] px-3 py-2 text-sm">
+                <div className="rounded-md border border-[#e8ecf8] bg-[#fbfcff] px-3 py-2 text-sm">
                   Resposta do aluno:{" "}
                   <strong>
                     {answer?.selectedOption
@@ -158,10 +158,10 @@ export default async function CorrectionDetailPage({ params }: CorrectionDetailP
                       : "Sem resposta"}
                   </strong>
                 </div>
-                <div className="rounded-md border border-[#edf1eb] bg-[#fbfcfa] px-3 py-2 text-sm">
+                <div className="rounded-md border border-[#e8ecf8] bg-[#fbfcff] px-3 py-2 text-sm">
                   Gabarito: <strong>{correctOption ? `${correctOption.label}) ${correctOption.text}` : "-"}</strong>
                 </div>
-                <div className="rounded-md border border-[#edf1eb] bg-[#fbfcfa] px-3 py-2 text-sm">
+                <div className="rounded-md border border-[#e8ecf8] bg-[#fbfcff] px-3 py-2 text-sm">
                   Pontos: <strong>{answer?.pointsAwarded ?? 0}</strong>
                 </div>
               </div>

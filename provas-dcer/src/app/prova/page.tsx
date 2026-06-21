@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BrandLockup } from "@/components/BrandLockup";
 import { StudentEntry } from "@/components/exam/StudentEntry";
 import { prisma } from "@/lib/prisma";
 
@@ -63,18 +64,22 @@ export default async function StudentEntryPage({ searchParams }: StudentEntryPag
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-3xl flex-col px-4 py-5 sm:px-6">
-      <header className="rounded-lg bg-[#12382a] p-5 text-white">
-        <Link href="/" className="text-sm font-semibold text-[#b7e4c7]">
-          Provas DCER Paulista
-        </Link>
-        <h1 className="mt-3 text-3xl font-semibold">Entrada do aluno</h1>
-        <p className="mt-2 text-sm leading-6 text-[#e8f5ee]">
-          Escolha sua igreja e categoria, digite seu nome e depois selecione uma prova disponivel.
-        </p>
+      <header className="overflow-hidden rounded-lg bg-[#000060] text-white shadow-sm">
+        <div className="h-1.5 bg-[#fff200]" />
+        <div className="p-5">
+          <BrandLockup compact />
+          <Link href="/" className="mt-4 inline-flex text-sm font-semibold text-[#fff200]">
+            Provas DCER Paulista
+          </Link>
+          <h1 className="mt-3 text-3xl font-semibold">Entrada do aluno</h1>
+          <p className="mt-2 text-sm leading-6 text-[#f8f9ff]">
+            Escolha sua igreja e categoria, digite seu nome e depois selecione uma prova disponivel.
+          </p>
+        </div>
       </header>
 
       {params.erro ? (
-        <div className="mt-4 rounded-md border border-[#efc2bd] bg-[#fff4f2] px-4 py-3 text-sm text-[#9b2d20]">
+        <div className="mt-4 rounded-md border border-[#f2b8bf] bg-[#fff4f2] px-4 py-3 text-sm text-[#b00018]">
           {params.erro}
         </div>
       ) : null}
@@ -83,7 +88,7 @@ export default async function StudentEntryPage({ searchParams }: StudentEntryPag
         {serializedApplications.length ? (
           <StudentEntry applications={serializedApplications} />
         ) : (
-          <div className="rounded-lg border border-[#dfe6dd] bg-white p-6 text-sm text-[#66736a]">
+          <div className="rounded-lg border border-[#d8def0] bg-white p-6 text-sm text-[#5d6480]">
             Nenhuma prova ativa no momento.
           </div>
         )}

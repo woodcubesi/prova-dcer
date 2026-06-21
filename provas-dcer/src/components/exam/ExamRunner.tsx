@@ -69,24 +69,24 @@ export function ExamRunner({
     >
       <input type="hidden" name="attemptId" value={attemptId} />
 
-      <header className="sticky top-0 z-10 rounded-lg border border-[#dfe6dd] bg-white/95 p-4 shadow-sm backdrop-blur">
+      <header className="sticky top-0 z-10 rounded-lg border border-[#d8def0] bg-white/95 p-4 shadow-sm backdrop-blur">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
-            <p className="text-sm font-semibold text-[#2c6d49]">{applicationTitle}</p>
+            <p className="text-sm font-semibold text-[#000060]">{applicationTitle}</p>
             <h1 className="text-2xl font-semibold">{examTitle}</h1>
-            <p className="mt-1 text-xs text-[#66736a]">
+            <p className="mt-1 text-xs text-[#5d6480]">
               {studentName} - {churchName} - {getCategoryLabel(category)}
             </p>
           </div>
-          <div className="rounded-md bg-[#12382a] px-4 py-3 text-center text-white">
-            <p className="text-xs uppercase tracking-[0.16em] text-[#b7e4c7]">Tempo restante</p>
+          <div className="rounded-md bg-[#000060] px-4 py-3 text-center text-white">
+            <p className="text-xs uppercase tracking-[0.16em] text-[#fff200]">Tempo restante</p>
             <p className="font-mono text-3xl font-semibold">{formatDuration(remainingSeconds)}</p>
           </div>
         </div>
       </header>
 
       {questions.map((question) => (
-        <section key={question.id} className="rounded-lg border border-[#dfe6dd] bg-white p-4 shadow-sm">
+        <section key={question.id} className="rounded-lg border border-[#d8def0] bg-white p-4 shadow-sm">
           <div className="flex items-start justify-between gap-3">
             <h2 className="text-lg font-semibold">
               {question.position}. {question.statement}
@@ -100,13 +100,13 @@ export function ExamRunner({
             {question.options.map((option) => (
               <label
                 key={option.id}
-                className="flex items-start gap-3 rounded-md border border-[#dfe6dd] p-3 transition has-[:checked]:border-[#2c6d49] has-[:checked]:bg-[#effaf2]"
+                className="flex items-start gap-3 rounded-md border border-[#d8def0] p-3 transition has-[:checked]:border-[#000060] has-[:checked]:bg-[#effaf2]"
               >
                 <input
                   type="radio"
                   name={`option_${question.id}`}
                   value={option.id}
-                  className="mt-1 h-5 w-5 accent-[#2c6d49]"
+                  className="mt-1 h-5 w-5 accent-[#000060]"
                 />
                 <span>
                   <span className="font-semibold">{option.label}) </span>
@@ -118,11 +118,11 @@ export function ExamRunner({
         </section>
       ))}
 
-      <div className="rounded-lg border border-[#dfe6dd] bg-white p-4 shadow-sm">
-        <button className="w-full rounded-md bg-[#12382a] px-5 py-3 text-sm font-semibold text-white hover:bg-[#1c513d]">
+      <div className="rounded-lg border border-[#d8def0] bg-white p-4 shadow-sm">
+        <button className="w-full rounded-md bg-[#000060] px-5 py-3 text-sm font-semibold text-white hover:bg-[#000044]">
           Enviar prova
         </button>
-        <p className="mt-2 text-center text-xs text-[#66736a]">
+        <p className="mt-2 text-center text-xs text-[#5d6480]">
           Ao enviar, a prova sera registrada para correcao. O resultado nao sera exibido nesta tela.
         </p>
       </div>

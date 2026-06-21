@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { logoutAdminAction } from "@/app/actions/admin";
+import { BrandLockup } from "@/components/BrandLockup";
 
 type AdminShellProps = {
   title: string;
@@ -9,20 +10,26 @@ type AdminShellProps = {
 
 export function AdminShell({ title, description, children }: AdminShellProps) {
   const navLinkClass =
-    "rounded-md border border-[#dfe6dd] px-3 py-2 text-center hover:bg-[#f2f7f0]";
+    "rounded-md border border-[#d8def0] px-3 py-2 text-center hover:bg-[#f7f8ff]";
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-7xl px-3 py-4 sm:px-6 lg:px-8">
-      <header className="rounded-lg bg-white p-3 shadow-sm ring-1 ring-[#dfe6dd] sm:p-4">
+      <header className="overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-[#d8def0]">
+        <div className="h-1.5 bg-[#000060]" />
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="min-w-0">
-            <Link href="/" className="text-sm font-semibold text-[#2c6d49]">
-              Provas DCER Paulista
+          <div className="flex min-w-0 flex-col gap-3 p-3 sm:flex-row sm:items-center sm:p-4">
+            <Link href="/" aria-label="Inicio">
+              <BrandLockup compact />
             </Link>
-            <h1 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">{title}</h1>
-            {description ? <p className="mt-1 text-sm text-[#66736a]">{description}</p> : null}
+            <div className="min-w-0">
+              <Link href="/" className="text-sm font-semibold text-[#000060]">
+                Provas DCER Paulista
+              </Link>
+              <h1 className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">{title}</h1>
+              {description ? <p className="mt-1 text-sm text-[#5d6480]">{description}</p> : null}
+            </div>
           </div>
-          <nav className="grid grid-cols-2 gap-2 text-sm sm:flex sm:flex-wrap">
+          <nav className="grid grid-cols-2 gap-2 p-3 text-sm sm:flex sm:flex-wrap sm:p-4">
             <Link className={navLinkClass} href="/admin">
               Painel
             </Link>
@@ -39,7 +46,7 @@ export function AdminShell({ title, description, children }: AdminShellProps) {
               Correcao
             </Link>
             <form action={logoutAdminAction} className="col-span-2 sm:col-span-1">
-              <button className="w-full rounded-md bg-[#12382a] px-3 py-2 font-medium text-white hover:bg-[#1c513d]">
+              <button className="w-full rounded-md bg-[#000060] px-3 py-2 font-medium text-white hover:bg-[#000044]">
                 Sair
               </button>
             </form>

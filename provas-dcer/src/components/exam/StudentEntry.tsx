@@ -73,7 +73,7 @@ export function StudentEntry({ applications }: { applications: ApplicationOption
   }
 
   return (
-    <form action={startAttemptAction} className="rounded-lg border border-[#dfe6dd] bg-white p-4 shadow-sm sm:p-6">
+    <form action={startAttemptAction} className="rounded-lg border border-[#d8def0] bg-white p-4 shadow-sm sm:p-6">
       <div className="grid gap-4">
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="block">
@@ -86,7 +86,7 @@ export function StudentEntry({ applications }: { applications: ApplicationOption
                 setStudentName("");
                 resetApplicationSelection();
               }}
-              className="mt-1 w-full rounded-md border border-[#cdd8cf] bg-white px-3 py-3 outline-none focus:ring-2 focus:ring-[#2c6d49]"
+              className="mt-1 w-full rounded-md border border-[#c5cce4] bg-white px-3 py-3 outline-none focus:ring-2 focus:ring-[#000060]"
             >
               <option value="">Selecione sua igreja</option>
               {churches.map((church) => (
@@ -107,7 +107,7 @@ export function StudentEntry({ applications }: { applications: ApplicationOption
                 setStudentName("");
                 resetApplicationSelection();
               }}
-              className="mt-1 w-full rounded-md border border-[#cdd8cf] bg-white px-3 py-3 outline-none focus:ring-2 focus:ring-[#2c6d49]"
+              className="mt-1 w-full rounded-md border border-[#c5cce4] bg-white px-3 py-3 outline-none focus:ring-2 focus:ring-[#000060]"
             >
               <option value="">Selecione sua categoria</option>
               {CATEGORIES.map((item) => (
@@ -129,7 +129,7 @@ export function StudentEntry({ applications }: { applications: ApplicationOption
               resetApplicationSelection();
             }}
             list="student-names"
-            className="mt-1 w-full rounded-md border border-[#cdd8cf] px-3 py-3 outline-none focus:ring-2 focus:ring-[#2c6d49]"
+            className="mt-1 w-full rounded-md border border-[#c5cce4] px-3 py-3 outline-none focus:ring-2 focus:ring-[#000060]"
             placeholder="Digite igual ao cadastro"
             autoComplete="off"
           />
@@ -138,7 +138,7 @@ export function StudentEntry({ applications }: { applications: ApplicationOption
               <option key={name} value={name} />
             ))}
           </datalist>
-          <span className="mt-1 block text-xs text-[#66736a]">
+          <span className="mt-1 block text-xs text-[#5d6480]">
             A lista sugere apenas alunos da igreja e categoria selecionadas.
           </span>
         </label>
@@ -150,7 +150,7 @@ export function StudentEntry({ applications }: { applications: ApplicationOption
             value={selectedApplicationId}
             onChange={(event) => setApplicationId(event.target.value)}
             disabled={!availableApplications.length}
-            className="mt-1 w-full rounded-md border border-[#cdd8cf] bg-white px-3 py-3 outline-none focus:ring-2 focus:ring-[#2c6d49] disabled:bg-[#f2f4ef] disabled:text-[#8a948d]"
+            className="mt-1 w-full rounded-md border border-[#c5cce4] bg-white px-3 py-3 outline-none focus:ring-2 focus:ring-[#000060] disabled:bg-[#f2f4fb] disabled:text-[#888fa8]"
           >
             {!canChooseApplication ? (
               <option value="">Informe igreja, categoria e nome primeiro</option>
@@ -176,7 +176,7 @@ export function StudentEntry({ applications }: { applications: ApplicationOption
 
         <button
           disabled={!selectedApplicationId}
-          className="rounded-md bg-[#12382a] px-5 py-3 text-sm font-semibold text-white hover:bg-[#1c513d] disabled:cursor-not-allowed disabled:bg-[#8a948d]"
+          className="rounded-md bg-[#000060] px-5 py-3 text-sm font-semibold text-white hover:bg-[#000044] disabled:cursor-not-allowed disabled:bg-[#888fa8]"
         >
           Iniciar prova
         </button>
