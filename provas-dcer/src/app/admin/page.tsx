@@ -10,6 +10,7 @@ export const dynamic = "force-dynamic";
 type AdminPageProps = {
   searchParams?: Promise<{
     criada?: string;
+    editada?: string;
     erro?: string;
   }>;
 };
@@ -137,6 +138,11 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           Prova criada com sucesso. Codigo da aplicacao: <strong>{params.criada}</strong>
         </div>
       ) : null}
+      {params.editada ? (
+        <div className="mb-5 rounded-md border border-[#b9dfc7] bg-[#effaf2] px-4 py-3 text-sm text-[#1f623e]">
+          Prova atualizada com sucesso.
+        </div>
+      ) : null}
       {params.erro === "permissao" ? (
         <div className="mb-5 rounded-md border border-[#efc2bd] bg-[#fff4f2] px-4 py-3 text-sm text-[#9b2d20]">
           Acesso restrito para este perfil.
@@ -202,12 +208,18 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                     <p className="font-semibold">{application.attempts.length}</p>
                   </div>
                 </div>
+                <Link
+                  href={`/admin/provas/${application.id}/editar`}
+                  className="mt-3 block rounded-md border border-[#2c6d49] px-3 py-2 text-center text-sm font-semibold text-[#2c6d49]"
+                >
+                  Editar
+                </Link>
               </div>
             ))}
           </div>
 
           <div className="mt-4 hidden overflow-x-auto md:block">
-            <table className="w-full min-w-[720px] text-left text-sm">
+            <table className="w-full min-w-[820px] text-left text-sm">
               <thead className="border-b border-[#dfe6dd] text-xs uppercase tracking-wide text-[#66736a]">
                 <tr>
                   <th className="py-3 pr-4">Aplicacao</th>
@@ -216,6 +228,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   <th className="py-3 pr-4">Participantes</th>
                   <th className="py-3 pr-4">Envios</th>
                   <th className="py-3 pr-4">Status</th>
+                  <th className="py-3 pr-4">Acao</th>
                 </tr>
               </thead>
               <tbody>
@@ -233,6 +246,14 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                       <span className="rounded-full bg-[#effaf2] px-2 py-1 text-xs font-medium text-[#1f623e]">
                         {application.active ? "Ativa" : "Inativa"}
                       </span>
+                    </td>
+                    <td className="py-3 pr-4">
+                      <Link
+                        href={`/admin/provas/${application.id}/editar`}
+                        className="rounded-md border border-[#2c6d49] px-3 py-2 text-sm font-semibold text-[#2c6d49] hover:bg-[#effaf2]"
+                      >
+                        Editar
+                      </Link>
                     </td>
                   </tr>
                 ))}

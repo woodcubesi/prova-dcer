@@ -8,6 +8,32 @@ import { formatDuration } from "@/lib/text";
 
 export const dynamic = "force-dynamic";
 
+function formatScore(value: number) {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}
+
+function formatPercent(value: number) {
+  return `${value.toFixed(1)}%`;
+}
+
+function getAttemptResult(score?: number | null, totalPoints?: number | null, passingPercent = 70) {
+  if (score === null || score === undefined || !totalPoints) {
+    return {
+      label: "Pendente",
+      percent: null,
+      passed: false,
+    };
+  }
+
+  const percent = (score / totalPoints) * 100;
+
+  return {
+    label: percent >= passingPercent ? "Aprovado" : "Reprovado",
+    percent,
+    passed: percent >= passingPercent,
+  };
+}
+
 export default async function CorrectionPage() {
   const context = await requireAdminContext();
   const isTeacher = context.role === AdminRole.TEACHER;
@@ -60,49 +86,69 @@ export default async function CorrectionPage() {
         </div>
 
         <div className="mt-4 grid gap-3 md:hidden">
-          {attempts.map((attempt) => (
-            <div key={attempt.id} className="rounded-md border border-[#edf1eb] p-3">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="font-medium">{attempt.student.name}</p>
-                  <p className="mt-1 text-sm text-[#66736a]">
-                    {attempt.student.church.name} - {getCategoryLabel(attempt.student.category)}
-                  </p>
+          {attempts.map((attempt) => {
+            const passingPercent = attempt.application.exam.passingPercent ?? 70;
+            const result = getAttemptResult(
+              attempt.score,
+              attempt.totalPoints,
+              passingPercent,
+            );
+
+            return (
+              <div key={attempt.id} className="rounded-md border border-[#edf1eb] p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-medium">{attempt.student.name}</p>
+                    <p className="mt-1 text-sm text-[#66736a]">
+                      {attempt.student.church.name} - {getCategoryLabel(attempt.student.category)}
+                    </p>
+                  </div>
+                  <span className="rounded-full bg-[#effaf2] px-2 py-1 text-xs font-medium text-[#1f623e]">
+                    {attempt.status === "SUBMITTED" ? "Enviada" : "Expirada"}
+                  </span>
                 </div>
-                <span className="rounded-full bg-[#effaf2] px-2 py-1 text-xs font-medium text-[#1f623e]">
-                  {attempt.status === "SUBMITTED" ? "Enviada" : "Expirada"}
-                </span>
+                <p className="mt-3 text-sm font-medium">{attempt.application.exam.title}</p>
+                <p className="text-xs text-[#66736a]">{attempt.application.title}</p>
+                <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+                  <div className="rounded-md bg-[#f7faf6] px-3 py-2">
+                    <p className="text-xs text-[#66736a]">Tempo usado</p>
+                    <p className="font-semibold">
+                      {attempt.timeUsedSeconds ? formatDuration(attempt.timeUsedSeconds) : "-"}
+                    </p>
+                  </div>
+                  <div className="rounded-md bg-[#f7faf6] px-3 py-2">
+                    <p className="text-xs text-[#66736a]">Pontuacao</p>
+                    <p className="font-semibold">
+                      {attempt.score === null || attempt.score === undefined
+                        ? "Pendente"
+                        : `${formatScore(attempt.score)} / ${formatScore(attempt.totalPoints ?? 0)}`}
+                    </p>
+                  </div>
+                  <div className="rounded-md bg-[#f7faf6] px-3 py-2">
+                    <p className="text-xs text-[#66736a]">Aprovacao minima</p>
+                    <p className="font-semibold">{formatPercent(passingPercent)}</p>
+                  </div>
+                  <div className="rounded-md bg-[#f7faf6] px-3 py-2">
+                    <p className="text-xs text-[#66736a]">Resultado</p>
+                    <p className={`font-semibold ${result.passed ? "text-[#1f623e]" : "text-[#8d3b2d]"}`}>
+                      {result.label}
+                      {result.percent !== null ? ` (${formatPercent(result.percent)})` : ""}
+                    </p>
+                  </div>
+                </div>
+                <Link
+                  href={`/admin/correcao/${attempt.id}`}
+                  className="mt-3 block rounded-md border border-[#2c6d49] px-3 py-2 text-center text-sm font-semibold text-[#2c6d49]"
+                >
+                  Abrir
+                </Link>
               </div>
-              <p className="mt-3 text-sm font-medium">{attempt.application.exam.title}</p>
-              <p className="text-xs text-[#66736a]">{attempt.application.title}</p>
-              <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
-                <div className="rounded-md bg-[#f7faf6] px-3 py-2">
-                  <p className="text-xs text-[#66736a]">Tempo usado</p>
-                  <p className="font-semibold">
-                    {attempt.timeUsedSeconds ? formatDuration(attempt.timeUsedSeconds) : "-"}
-                  </p>
-                </div>
-                <div className="rounded-md bg-[#f7faf6] px-3 py-2">
-                  <p className="text-xs text-[#66736a]">Pontuacao</p>
-                  <p className="font-semibold">
-                    {attempt.score === null || attempt.score === undefined
-                      ? "Pendente"
-                      : `${attempt.score} / ${attempt.totalPoints ?? "-"}`}
-                  </p>
-                </div>
-              </div>
-              <Link
-                href={`/admin/correcao/${attempt.id}`}
-                className="mt-3 block rounded-md border border-[#2c6d49] px-3 py-2 text-center text-sm font-semibold text-[#2c6d49]"
-              >
-                Abrir
-              </Link>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         <div className="mt-4 hidden overflow-x-auto md:block">
-          <table className="w-full min-w-[860px] text-left text-sm">
+          <table className="w-full min-w-[980px] text-left text-sm">
             <thead className="border-b border-[#dfe6dd] text-xs uppercase tracking-wide text-[#66736a]">
               <tr>
                 <th className="py-3 pr-4">Aluno</th>
@@ -110,45 +156,65 @@ export default async function CorrectionPage() {
                 <th className="py-3 pr-4">Status</th>
                 <th className="py-3 pr-4">Tempo usado</th>
                 <th className="py-3 pr-4">Pontuacao</th>
+                <th className="py-3 pr-4">Resultado</th>
                 <th className="py-3 pr-4">Acao</th>
               </tr>
             </thead>
             <tbody>
-              {attempts.map((attempt) => (
-                <tr key={attempt.id} className="border-b border-[#edf1eb] last:border-0">
-                  <td className="py-3 pr-4">
-                    <p className="font-medium">{attempt.student.name}</p>
-                    <p className="text-xs text-[#66736a]">
-                      {attempt.student.church.name} - {getCategoryLabel(attempt.student.category)}
-                    </p>
-                  </td>
-                  <td className="py-3 pr-4">
-                    <p>{attempt.application.exam.title}</p>
-                    <p className="text-xs text-[#66736a]">{attempt.application.title}</p>
-                  </td>
-                  <td className="py-3 pr-4">
-                    <span className="rounded-full bg-[#effaf2] px-2 py-1 text-xs font-medium text-[#1f623e]">
-                      {attempt.status === "SUBMITTED" ? "Enviada" : "Expirada"}
-                    </span>
-                  </td>
-                  <td className="py-3 pr-4">
-                    {attempt.timeUsedSeconds ? formatDuration(attempt.timeUsedSeconds) : "-"}
-                  </td>
-                  <td className="py-3 pr-4">
-                    {attempt.score === null || attempt.score === undefined
-                      ? "Pendente"
-                      : `${attempt.score} / ${attempt.totalPoints ?? "-"}`}
-                  </td>
-                  <td className="py-3 pr-4">
-                    <Link
-                      href={`/admin/correcao/${attempt.id}`}
-                      className="rounded-md border border-[#2c6d49] px-3 py-2 text-sm font-semibold text-[#2c6d49] hover:bg-[#effaf2]"
-                    >
-                      Abrir
-                    </Link>
-                  </td>
-                </tr>
-              ))}
+              {attempts.map((attempt) => {
+                const passingPercent = attempt.application.exam.passingPercent ?? 70;
+                const result = getAttemptResult(
+                  attempt.score,
+                  attempt.totalPoints,
+                  passingPercent,
+                );
+
+                return (
+                  <tr key={attempt.id} className="border-b border-[#edf1eb] last:border-0">
+                    <td className="py-3 pr-4">
+                      <p className="font-medium">{attempt.student.name}</p>
+                      <p className="text-xs text-[#66736a]">
+                        {attempt.student.church.name} - {getCategoryLabel(attempt.student.category)}
+                      </p>
+                    </td>
+                    <td className="py-3 pr-4">
+                      <p>{attempt.application.exam.title}</p>
+                      <p className="text-xs text-[#66736a]">{attempt.application.title}</p>
+                    </td>
+                    <td className="py-3 pr-4">
+                      <span className="rounded-full bg-[#effaf2] px-2 py-1 text-xs font-medium text-[#1f623e]">
+                        {attempt.status === "SUBMITTED" ? "Enviada" : "Expirada"}
+                      </span>
+                    </td>
+                    <td className="py-3 pr-4">
+                      {attempt.timeUsedSeconds ? formatDuration(attempt.timeUsedSeconds) : "-"}
+                    </td>
+                    <td className="py-3 pr-4">
+                      {attempt.score === null || attempt.score === undefined
+                        ? "Pendente"
+                        : `${formatScore(attempt.score)} / ${formatScore(attempt.totalPoints ?? 0)}`}
+                    </td>
+                    <td className="py-3 pr-4">
+                      <p className={result.passed ? "font-semibold text-[#1f623e]" : "font-semibold text-[#8d3b2d]"}>
+                        {result.label}
+                      </p>
+                      <p className="text-xs text-[#66736a]">
+                        {result.percent !== null
+                          ? `${formatPercent(result.percent)} de ${formatPercent(passingPercent)}`
+                          : `Minimo ${formatPercent(passingPercent)}`}
+                      </p>
+                    </td>
+                    <td className="py-3 pr-4">
+                      <Link
+                        href={`/admin/correcao/${attempt.id}`}
+                        className="rounded-md border border-[#2c6d49] px-3 py-2 text-sm font-semibold text-[#2c6d49] hover:bg-[#effaf2]"
+                      >
+                        Abrir
+                      </Link>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

@@ -32,8 +32,8 @@ export function AdminShell({ title, description, children }: AdminShellProps) {
             <Link className={navLinkClass} href="/admin/equipe">
               Equipe
             </Link>
-            <Link className={navLinkClass} href="/admin/provas/nova">
-              Nova prova
+            <Link className={navLinkClass} href="/admin/provas">
+              Provas
             </Link>
             <Link className={navLinkClass} href="/admin/correcao">
               Correcao

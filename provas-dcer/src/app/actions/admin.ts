@@ -71,6 +71,7 @@ const examPayloadSchema = z.object({
   title: z.string().trim().min(3, "Informe o titulo da prova."),
   description: z.string().trim().optional(),
   durationMinutes: z.coerce.number().int().min(1).max(300),
+  passingPercent: z.coerce.number().min(0, "O percentual minimo nao pode ser negativo.").max(100),
   applicationTitle: z.string().trim().min(3, "Informe o titulo da aplicacao."),
   accessCode: z.string().trim().optional(),
   churchIds: z.array(z.string().min(1)).min(1, "Selecione pelo menos uma igreja."),
@@ -87,6 +88,54 @@ function buildAccessCode(rawCode?: string) {
   if (cleanCode) return cleanCode.slice(0, 16);
 
   return `P${randomInt(100000, 999999)}`;
+}
+
+function parseExamPayload(formData: FormData, errorPath: string) {
+  const rawPayload = String(formData.get("payload") || "");
+  let parsedJson: unknown;
+
+  try {
+    parsedJson = JSON.parse(rawPayload || "{}");
+  } catch {
+    errorRedirect(errorPath, "Revise os dados da prova.");
+  }
+
+  const parsed = examPayloadSchema.safeParse(parsedJson);
+
+  if (!parsed.success) {
+    errorRedirect(errorPath, parsed.error.issues[0]?.message || "Revise os dados da prova.");
+  }
+
+  return parsed.data;
+}
+
+function resolveExamChurchIds(
+  context: Awaited<ReturnType<typeof requireAdminContext>>,
+  churchIds: string[],
+  errorPath: string,
+) {
+  const scopedChurchId = getScopedChurchId(context);
+
+  if (context.role === AdminRole.TEACHER && !scopedChurchId) {
+    errorRedirect(errorPath, "Seu usuario de professor ainda nao esta vinculado a uma igreja.");
+  }
+
+  if (scopedChurchId && churchIds.some((churchId) => churchId !== scopedChurchId)) {
+    errorRedirect(errorPath, "Professores so podem aplicar provas para a propria igreja.");
+  }
+
+  return scopedChurchId ? [scopedChurchId] : churchIds;
+}
+
+async function ensureAccessCodeAvailable(accessCode: string, errorPath: string, ignoredApplicationId?: string) {
+  const existingApplication = await prisma.examApplication.findUnique({
+    where: { accessCode },
+    select: { id: true },
+  });
+
+  if (existingApplication && existingApplication.id !== ignoredApplicationId) {
+    errorRedirect(errorPath, "Este codigo de aplicacao ja esta em uso.");
+  }
 }
 
 function normalizeEmail(email: string) {
@@ -495,28 +544,12 @@ export async function updateStudentAction(formData: FormData) {
 
 export async function createExamAction(formData: FormData) {
   const context = await requireAdminContext();
-  const scopedChurchId = getScopedChurchId(context);
-
-  const rawPayload = String(formData.get("payload") || "");
-  const parsedJson = JSON.parse(rawPayload || "{}") as unknown;
-  const parsed = examPayloadSchema.safeParse(parsedJson);
-
-  if (!parsed.success) {
-    errorRedirect("/admin/provas/nova", parsed.error.issues[0]?.message || "Revise os dados da prova.");
-  }
-
-  const payload = parsed.data;
-  const churchIds = scopedChurchId ? [scopedChurchId] : payload.churchIds;
-
-  if (context.role === AdminRole.TEACHER && !scopedChurchId) {
-    errorRedirect("/admin/provas/nova", "Seu usuario de professor ainda nao esta vinculado a uma igreja.");
-  }
-
-  if (scopedChurchId && payload.churchIds.some((churchId) => churchId !== scopedChurchId)) {
-    errorRedirect("/admin/provas/nova", "Professores so podem aplicar provas para a propria igreja.");
-  }
+  const errorPath = "/admin/provas/nova";
+  const payload = parseExamPayload(formData, errorPath);
+  const churchIds = resolveExamChurchIds(context, payload.churchIds, errorPath);
 
   const accessCode = buildAccessCode(payload.accessCode);
+  await ensureAccessCodeAvailable(accessCode, errorPath);
 
   const students = await prisma.student.findMany({
     where: {
@@ -537,6 +570,7 @@ export async function createExamAction(formData: FormData) {
         title: payload.title,
         description: payload.description || null,
         durationMinutes: payload.durationMinutes,
+        passingPercent: payload.passingPercent,
         status: ExamStatus.PUBLISHED,
         questions: {
           create: payload.questions.map((question, questionIndex) => ({
@@ -574,6 +608,140 @@ export async function createExamAction(formData: FormData) {
   });
 
   revalidatePath("/admin");
+  revalidatePath("/admin/provas");
   revalidatePath("/prova");
   redirect(`/admin?criada=${application.accessCode}`);
+}
+
+export async function updateExamAction(formData: FormData) {
+  const context = await requireAdminContext();
+  const applicationId = String(formData.get("applicationId") || "");
+  const errorPath = applicationId ? `/admin/provas/${applicationId}/editar` : "/admin/provas";
+
+  if (!applicationId) {
+    errorRedirect(errorPath, "Aplicacao de prova nao encontrada.");
+  }
+
+  const payload = parseExamPayload(formData, errorPath);
+  const churchIds = resolveExamChurchIds(context, payload.churchIds, errorPath);
+  const scopedChurchId = getScopedChurchId(context);
+  const accessCode = buildAccessCode(payload.accessCode);
+
+  const application = await prisma.examApplication.findFirst({
+    where: {
+      id: applicationId,
+      ...(scopedChurchId
+        ? {
+            participants: {
+              some: {
+                student: {
+                  churchId: scopedChurchId,
+                },
+              },
+            },
+          }
+        : {}),
+    },
+    include: {
+      exam: {
+        select: { id: true },
+      },
+      attempts: {
+        take: 1,
+        select: { id: true },
+      },
+    },
+  });
+
+  if (!application) {
+    errorRedirect(errorPath, "Aplicacao de prova nao encontrada.");
+  }
+
+  if (application.attempts.length > 0) {
+    errorRedirect(
+      errorPath,
+      "Nao e possivel editar uma prova que ja foi iniciada por alunos. Crie uma nova aplicacao para preservar as respostas.",
+    );
+  }
+
+  await ensureAccessCodeAvailable(accessCode, errorPath, application.id);
+
+  const students = await prisma.student.findMany({
+    where: {
+      active: true,
+      churchId: { in: churchIds },
+      category: { in: payload.categories as Category[] },
+    },
+    select: { id: true },
+  });
+
+  if (students.length === 0) {
+    errorRedirect(errorPath, "Nao ha alunos cadastrados para os filtros escolhidos.");
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.applicationParticipant.deleteMany({
+      where: {
+        applicationId: application.id,
+      },
+    });
+
+    await tx.question.deleteMany({
+      where: {
+        examId: application.exam.id,
+      },
+    });
+
+    await tx.exam.update({
+      where: {
+        id: application.exam.id,
+      },
+      data: {
+        title: payload.title,
+        description: payload.description || null,
+        durationMinutes: payload.durationMinutes,
+        passingPercent: payload.passingPercent,
+        status: ExamStatus.PUBLISHED,
+        questions: {
+          create: payload.questions.map((question, questionIndex) => ({
+            position: questionIndex + 1,
+            statement: question.statement,
+            type: "MULTIPLE_CHOICE",
+            points: question.points,
+            options: {
+              create: question.options.map((option, optionIndex) => ({
+                position: optionIndex + 1,
+                label: option.label,
+                text: option.text,
+                isCorrect: optionIndex === question.correctOptionIndex,
+              })),
+            },
+          })),
+        },
+      },
+    });
+
+    await tx.examApplication.update({
+      where: {
+        id: application.id,
+      },
+      data: {
+        title: payload.applicationTitle,
+        accessCode,
+        active: true,
+        showResultToStudent: false,
+        participants: {
+          create: students.map((student) => ({
+            studentId: student.id,
+          })),
+        },
+      },
+    });
+  });
+
+  revalidatePath("/admin");
+  revalidatePath("/admin/provas");
+  revalidatePath(`/admin/provas/${application.id}/editar`);
+  revalidatePath("/prova");
+  redirect("/admin/provas?ok=editada");
 }

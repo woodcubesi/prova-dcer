@@ -9,6 +9,14 @@ import { formatDuration } from "@/lib/text";
 
 export const dynamic = "force-dynamic";
 
+function formatScore(value: number) {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}
+
+function formatPercent(value: number) {
+  return `${value.toFixed(1)}%`;
+}
+
 type CorrectionDetailPageProps = {
   params: Promise<{
     attemptId: string;
@@ -69,6 +77,9 @@ export default async function CorrectionDetailPage({ params }: CorrectionDetailP
   const answerByQuestion = new Map(attempt.answers.map((answer) => [answer.questionId, answer]));
   const totalPoints = attempt.application.exam.questions.reduce((sum, question) => sum + question.points, 0);
   const score = attempt.answers.reduce((sum, answer) => sum + (answer.pointsAwarded || 0), 0);
+  const passingPercent = attempt.application.exam.passingPercent ?? 70;
+  const scorePercent = totalPoints ? (score / totalPoints) * 100 : 0;
+  const passed = scorePercent >= passingPercent;
 
   return (
     <AdminShell title="Conferir prova" description="Revise as respostas de multipla escolha e a pontuacao automatica.">
@@ -83,7 +94,7 @@ export default async function CorrectionDetailPage({ params }: CorrectionDetailP
               {attempt.student.name} - {attempt.student.church.name} - {getCategoryLabel(attempt.student.category)}
             </p>
           </div>
-          <div className="grid gap-2 text-sm sm:grid-cols-3">
+          <div className="grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-5">
             <div className="rounded-md bg-[#effaf2] px-3 py-2">
               <p className="text-xs text-[#66736a]">Tempo usado</p>
               <p className="font-semibold">{attempt.timeUsedSeconds ? formatDuration(attempt.timeUsedSeconds) : "-"}</p>
@@ -95,8 +106,19 @@ export default async function CorrectionDetailPage({ params }: CorrectionDetailP
             <div className="rounded-md bg-[#effaf2] px-3 py-2">
               <p className="text-xs text-[#66736a]">Pontuacao</p>
               <p className="font-semibold">
-                {score} / {totalPoints}
+                {formatScore(score)} / {formatScore(totalPoints)}
               </p>
+            </div>
+            <div className="rounded-md bg-[#effaf2] px-3 py-2">
+              <p className="text-xs text-[#66736a]">Aproveitamento</p>
+              <p className="font-semibold">{formatPercent(scorePercent)}</p>
+            </div>
+            <div className="rounded-md bg-[#effaf2] px-3 py-2">
+              <p className="text-xs text-[#66736a]">Resultado</p>
+              <p className={`font-semibold ${passed ? "text-[#1f623e]" : "text-[#8d3b2d]"}`}>
+                {passed ? "Aprovado" : "Reprovado"}
+              </p>
+              <p className="text-xs text-[#66736a]">Minimo {formatPercent(passingPercent)}</p>
             </div>
           </div>
         </div>

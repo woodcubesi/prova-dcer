@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { createExamAction } from "@/app/actions/admin";
+import { createExamAction, updateExamAction } from "@/app/actions/admin";
 import { CATEGORIES, type CategoryCode } from "@/lib/categories";
 
 type ChurchOption = {
@@ -16,6 +16,26 @@ type QuestionDraft = {
   points: number;
   options: { label: string; text: string }[];
   correctOptionIndex: number;
+};
+
+export type ExamBuilderInitialData = {
+  applicationId?: string;
+  title: string;
+  description: string;
+  durationMinutes: number;
+  passingPercent: number;
+  applicationTitle: string;
+  accessCode: string;
+  churchIds: string[];
+  categories: CategoryCode[];
+  questions: QuestionDraft[];
+};
+
+type ExamBuilderProps = {
+  churches: ChurchOption[];
+  initialData?: ExamBuilderInitialData;
+  locked?: boolean;
+  mode?: "create" | "edit";
 };
 
 function newQuestion(): QuestionDraft {
@@ -33,15 +53,28 @@ function newQuestion(): QuestionDraft {
   };
 }
 
-export function ExamBuilder({ churches }: { churches: ChurchOption[] }) {
-  const [title, setTitle] = useState("Nova prova");
-  const [description, setDescription] = useState("");
-  const [durationMinutes, setDurationMinutes] = useState(60);
-  const [applicationTitle, setApplicationTitle] = useState("Aplicacao principal");
-  const [accessCode, setAccessCode] = useState("");
-  const [selectedChurchIds, setSelectedChurchIds] = useState(() => churches.map((church) => church.id));
-  const [selectedCategories, setSelectedCategories] = useState(() => CATEGORIES.map((category) => category.value));
-  const [questions, setQuestions] = useState<QuestionDraft[]>(() => [newQuestion()]);
+function getInitialQuestions(initialData?: ExamBuilderInitialData) {
+  return initialData?.questions.length ? initialData.questions : [newQuestion()];
+}
+
+export function ExamBuilder({ churches, initialData, locked = false, mode = "create" }: ExamBuilderProps) {
+  const isEditing = mode === "edit";
+  const [title, setTitle] = useState(initialData?.title || "Nova prova");
+  const [description, setDescription] = useState(initialData?.description || "");
+  const [durationMinutes, setDurationMinutes] = useState(initialData?.durationMinutes || 60);
+  const [passingPercent, setPassingPercent] = useState(initialData?.passingPercent ?? 70);
+  const [applicationTitle, setApplicationTitle] = useState(initialData?.applicationTitle || "Aplicacao principal");
+  const [accessCode, setAccessCode] = useState(initialData?.accessCode || "");
+  const [selectedChurchIds, setSelectedChurchIds] = useState(() =>
+    initialData?.churchIds.length ? initialData.churchIds : churches.map((church) => church.id),
+  );
+  const [selectedCategories, setSelectedCategories] = useState<CategoryCode[]>(() =>
+    initialData?.categories.length ? initialData.categories : CATEGORIES.map((category) => category.value),
+  );
+  const [questions, setQuestions] = useState<QuestionDraft[]>(() => getInitialQuestions(initialData));
+
+  const totalPoints = questions.reduce((sum, question) => sum + Number(question.points || 0), 0);
+  const minimumPoints = (totalPoints * Number(passingPercent || 0)) / 100;
 
   const payload = useMemo(
     () =>
@@ -49,6 +82,7 @@ export function ExamBuilder({ churches }: { churches: ChurchOption[] }) {
         title,
         description,
         durationMinutes,
+        passingPercent,
         applicationTitle,
         accessCode,
         churchIds: selectedChurchIds,
@@ -61,28 +95,46 @@ export function ExamBuilder({ churches }: { churches: ChurchOption[] }) {
           correctOptionIndex: question.correctOptionIndex,
         })),
       }),
-    [accessCode, applicationTitle, description, durationMinutes, questions, selectedCategories, selectedChurchIds, title],
+    [
+      accessCode,
+      applicationTitle,
+      description,
+      durationMinutes,
+      passingPercent,
+      questions,
+      selectedCategories,
+      selectedChurchIds,
+      title,
+    ],
   );
 
   function toggleChurch(churchId: string) {
+    if (locked) return;
+
     setSelectedChurchIds((current) =>
       current.includes(churchId) ? current.filter((id) => id !== churchId) : [...current, churchId],
     );
   }
 
   function toggleCategory(category: CategoryCode) {
+    if (locked) return;
+
     setSelectedCategories((current) =>
       current.includes(category) ? current.filter((item) => item !== category) : [...current, category],
     );
   }
 
   function updateQuestion(id: string, update: Partial<QuestionDraft>) {
+    if (locked) return;
+
     setQuestions((current) =>
       current.map((question) => (question.id === id ? { ...question, ...update } : question)),
     );
   }
 
   function updateOption(questionId: string, optionIndex: number, text: string) {
+    if (locked) return;
+
     setQuestions((current) =>
       current.map((question) =>
         question.id === questionId
@@ -98,8 +150,18 @@ export function ExamBuilder({ churches }: { churches: ChurchOption[] }) {
   }
 
   return (
-    <form action={createExamAction} className="space-y-5">
+    <form action={isEditing ? updateExamAction : createExamAction} className="space-y-5">
       <input type="hidden" name="payload" value={payload} />
+      {initialData?.applicationId ? (
+        <input type="hidden" name="applicationId" value={initialData.applicationId} />
+      ) : null}
+
+      {locked ? (
+        <div className="rounded-lg border border-[#efc2bd] bg-[#fff4f2] p-4 text-sm text-[#9b2d20]">
+          Esta prova ja foi iniciada por alunos. Para preservar respostas e gabaritos, crie uma nova aplicacao se
+          precisar mudar perguntas, alternativas ou participantes.
+        </div>
+      ) : null}
 
       <section className="rounded-lg border border-[#dfe6dd] bg-white p-4">
         <h2 className="text-lg font-semibold">Dados da prova</h2>
@@ -108,17 +170,19 @@ export function ExamBuilder({ churches }: { churches: ChurchOption[] }) {
             <span className="text-sm font-medium">Titulo da prova</span>
             <input
               value={title}
+              disabled={locked}
               onChange={(event) => setTitle(event.target.value)}
-              className="mt-1 w-full rounded-md border border-[#cdd8cf] px-3 py-3 outline-none focus:ring-2 focus:ring-[#2c6d49]"
+              className="mt-1 w-full rounded-md border border-[#cdd8cf] px-3 py-3 outline-none focus:ring-2 focus:ring-[#2c6d49] disabled:bg-[#f7faf6]"
             />
           </label>
           <label className="block lg:col-span-2">
             <span className="text-sm font-medium">Descricao opcional</span>
             <textarea
               value={description}
+              disabled={locked}
               onChange={(event) => setDescription(event.target.value)}
               rows={3}
-              className="mt-1 w-full rounded-md border border-[#cdd8cf] px-3 py-3 outline-none focus:ring-2 focus:ring-[#2c6d49]"
+              className="mt-1 w-full rounded-md border border-[#cdd8cf] px-3 py-3 outline-none focus:ring-2 focus:ring-[#2c6d49] disabled:bg-[#f7faf6]"
             />
           </label>
           <label className="block">
@@ -128,24 +192,48 @@ export function ExamBuilder({ churches }: { churches: ChurchOption[] }) {
               min={1}
               max={300}
               value={durationMinutes}
+              disabled={locked}
               onChange={(event) => setDurationMinutes(Number(event.target.value))}
-              className="mt-1 w-full rounded-md border border-[#cdd8cf] px-3 py-3 outline-none focus:ring-2 focus:ring-[#2c6d49]"
+              className="mt-1 w-full rounded-md border border-[#cdd8cf] px-3 py-3 outline-none focus:ring-2 focus:ring-[#2c6d49] disabled:bg-[#f7faf6]"
             />
+          </label>
+          <label className="block">
+            <span className="text-sm font-medium">Percentual minimo para aprovacao</span>
+            <div className="mt-1 flex rounded-md border border-[#cdd8cf] bg-white focus-within:ring-2 focus-within:ring-[#2c6d49]">
+              <input
+                type="number"
+                min={0}
+                max={100}
+                step={1}
+                value={passingPercent}
+                disabled={locked}
+                onChange={(event) => setPassingPercent(Number(event.target.value))}
+                className="w-full rounded-l-md px-3 py-3 outline-none disabled:bg-[#f7faf6]"
+              />
+              <span className="flex items-center rounded-r-md bg-[#f7faf6] px-3 text-sm font-semibold text-[#66736a]">
+                %
+              </span>
+            </div>
+            <span className="mt-1 block text-xs text-[#66736a]">
+              Com {totalPoints || 0} ponto(s), o minimo sera {minimumPoints.toFixed(1)} ponto(s).
+            </span>
           </label>
           <label className="block">
             <span className="text-sm font-medium">Titulo da aplicacao</span>
             <input
               value={applicationTitle}
+              disabled={locked}
               onChange={(event) => setApplicationTitle(event.target.value)}
-              className="mt-1 w-full rounded-md border border-[#cdd8cf] px-3 py-3 outline-none focus:ring-2 focus:ring-[#2c6d49]"
+              className="mt-1 w-full rounded-md border border-[#cdd8cf] px-3 py-3 outline-none focus:ring-2 focus:ring-[#2c6d49] disabled:bg-[#f7faf6]"
             />
           </label>
           <label className="block lg:col-span-2">
             <span className="text-sm font-medium">Codigo opcional da aplicacao</span>
             <input
               value={accessCode}
+              disabled={locked}
               onChange={(event) => setAccessCode(event.target.value.toUpperCase())}
-              className="mt-1 w-full rounded-md border border-[#cdd8cf] px-3 py-3 font-mono uppercase outline-none focus:ring-2 focus:ring-[#2c6d49]"
+              className="mt-1 w-full rounded-md border border-[#cdd8cf] px-3 py-3 font-mono uppercase outline-none focus:ring-2 focus:ring-[#2c6d49] disabled:bg-[#f7faf6]"
               placeholder="Ex.: PROVA2026"
             />
           </label>
@@ -157,7 +245,10 @@ export function ExamBuilder({ churches }: { churches: ChurchOption[] }) {
           <h2 className="text-lg font-semibold">Igrejas participantes</h2>
           <div className="mt-3 space-y-2">
             {churches.map((church) => (
-              <label key={church.id} className="flex items-center justify-between gap-3 rounded-md border border-[#edf1eb] px-3 py-2">
+              <label
+                key={church.id}
+                className="flex items-center justify-between gap-3 rounded-md border border-[#edf1eb] px-3 py-2"
+              >
                 <span>
                   <span className="block text-sm font-medium">{church.name}</span>
                   <span className="text-xs text-[#66736a]">{church.students} aluno(s)</span>
@@ -165,6 +256,7 @@ export function ExamBuilder({ churches }: { churches: ChurchOption[] }) {
                 <input
                   type="checkbox"
                   checked={selectedChurchIds.includes(church.id)}
+                  disabled={locked}
                   onChange={() => toggleChurch(church.id)}
                   className="h-5 w-5 accent-[#2c6d49]"
                 />
@@ -177,11 +269,15 @@ export function ExamBuilder({ churches }: { churches: ChurchOption[] }) {
           <h2 className="text-lg font-semibold">Categorias participantes</h2>
           <div className="mt-3 grid gap-2 sm:grid-cols-3 lg:grid-cols-1">
             {CATEGORIES.map((category) => (
-              <label key={category.value} className="flex items-center justify-between gap-3 rounded-md border border-[#edf1eb] px-3 py-3">
+              <label
+                key={category.value}
+                className="flex items-center justify-between gap-3 rounded-md border border-[#edf1eb] px-3 py-3"
+              >
                 <span className="text-sm font-medium">{category.label}</span>
                 <input
                   type="checkbox"
                   checked={selectedCategories.includes(category.value)}
+                  disabled={locked}
                   onChange={() => toggleCategory(category.value)}
                   className="h-5 w-5 accent-[#2c6d49]"
                 />
@@ -195,12 +291,15 @@ export function ExamBuilder({ churches }: { churches: ChurchOption[] }) {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-lg font-semibold">Questoes</h2>
-            <p className="text-sm text-[#66736a]">Todas as questoes sao de multipla escolha e corrigidas automaticamente.</p>
+            <p className="text-sm text-[#66736a]">
+              Todas as questoes sao de multipla escolha. Marque uma alternativa correta em cada questao.
+            </p>
           </div>
           <button
             type="button"
+            disabled={locked}
             onClick={() => setQuestions((current) => [...current, newQuestion()])}
-            className="rounded-md border border-[#2c6d49] px-4 py-2 text-sm font-semibold text-[#2c6d49] hover:bg-[#effaf2]"
+            className="rounded-md border border-[#2c6d49] px-4 py-2 text-sm font-semibold text-[#2c6d49] hover:bg-[#effaf2] disabled:cursor-not-allowed disabled:opacity-40"
           >
             Adicionar questao
           </button>
@@ -214,9 +313,10 @@ export function ExamBuilder({ churches }: { churches: ChurchOption[] }) {
                   <span className="text-sm font-medium">Pergunta {questionIndex + 1}</span>
                   <textarea
                     value={question.statement}
+                    disabled={locked}
                     onChange={(event) => updateQuestion(question.id, { statement: event.target.value })}
                     rows={3}
-                    className="mt-1 w-full rounded-md border border-[#cdd8cf] bg-white px-3 py-3 outline-none focus:ring-2 focus:ring-[#2c6d49]"
+                    className="mt-1 w-full rounded-md border border-[#cdd8cf] bg-white px-3 py-3 outline-none focus:ring-2 focus:ring-[#2c6d49] disabled:bg-[#f7faf6]"
                     placeholder="Digite o enunciado"
                   />
                 </label>
@@ -234,40 +334,64 @@ export function ExamBuilder({ churches }: { churches: ChurchOption[] }) {
                       min={0.5}
                       step={0.5}
                       value={question.points}
+                      disabled={locked}
                       onChange={(event) => updateQuestion(question.id, { points: Number(event.target.value) })}
-                      className="mt-1 w-full rounded-md border border-[#cdd8cf] bg-white px-3 py-3 outline-none focus:ring-2 focus:ring-[#2c6d49]"
+                      className="mt-1 w-full rounded-md border border-[#cdd8cf] bg-white px-3 py-3 outline-none focus:ring-2 focus:ring-[#2c6d49] disabled:bg-[#f7faf6]"
                     />
                   </label>
                 </div>
               </div>
 
               <div className="mt-4 grid gap-2 lg:grid-cols-2">
-                {question.options.map((option, optionIndex) => (
-                  <label key={option.label} className="flex gap-3 rounded-md border border-[#dfe6dd] bg-white p-3">
-                    <input
-                      type="radio"
-                      name={`correct-${question.id}`}
-                      checked={question.correctOptionIndex === optionIndex}
-                      onChange={() => updateQuestion(question.id, { correctOptionIndex: optionIndex })}
-                      className="mt-3 h-5 w-5 accent-[#2c6d49]"
-                    />
-                    <span className="flex-1">
-                      <span className="text-xs font-semibold text-[#2c6d49]">Alternativa {option.label}</span>
+                {question.options.map((option, optionIndex) => {
+                  const isCorrect = question.correctOptionIndex === optionIndex;
+
+                  return (
+                    <label
+                      key={option.label}
+                      className={`flex gap-3 rounded-md border p-3 ${
+                        isCorrect ? "border-[#2c6d49] bg-[#effaf2]" : "border-[#dfe6dd] bg-white"
+                      }`}
+                    >
                       <input
-                        value={option.text}
-                        onChange={(event) => updateOption(question.id, optionIndex, event.target.value)}
-                        className="mt-1 w-full rounded-md border border-[#cdd8cf] px-3 py-2 outline-none focus:ring-2 focus:ring-[#2c6d49]"
-                        placeholder={`Texto da alternativa ${option.label}`}
+                        type="radio"
+                        name={`correct-${question.id}`}
+                        checked={isCorrect}
+                        disabled={locked}
+                        onChange={() => updateQuestion(question.id, { correctOptionIndex: optionIndex })}
+                        className="mt-1 h-5 w-5 accent-[#2c6d49]"
+                        aria-label={`Marcar alternativa ${option.label} como correta`}
                       />
-                    </span>
-                  </label>
-                ))}
+                      <span className="flex-1">
+                        <span className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                          <span className="text-xs font-semibold text-[#2c6d49]">
+                            Alternativa {option.label}
+                          </span>
+                          <span
+                            className={`w-fit rounded-full px-2 py-1 text-xs font-semibold ${
+                              isCorrect ? "bg-[#2c6d49] text-white" : "bg-[#f7faf6] text-[#66736a]"
+                            }`}
+                          >
+                            {isCorrect ? "Resposta correta" : "Marcar correta"}
+                          </span>
+                        </span>
+                        <input
+                          value={option.text}
+                          disabled={locked}
+                          onChange={(event) => updateOption(question.id, optionIndex, event.target.value)}
+                          className="mt-2 w-full rounded-md border border-[#cdd8cf] bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-[#2c6d49] disabled:bg-[#f7faf6]"
+                          placeholder={`Texto da alternativa ${option.label}`}
+                        />
+                      </span>
+                    </label>
+                  );
+                })}
               </div>
 
               <div className="mt-4 flex justify-end">
                 <button
                   type="button"
-                  disabled={questions.length === 1}
+                  disabled={locked || questions.length === 1}
                   onClick={() => setQuestions((current) => current.filter((item) => item.id !== question.id))}
                   className="rounded-md border border-[#d7b6ad] px-3 py-2 text-sm font-medium text-[#8d3b2d] disabled:cursor-not-allowed disabled:opacity-40"
                 >
@@ -280,8 +404,11 @@ export function ExamBuilder({ churches }: { churches: ChurchOption[] }) {
       </section>
 
       <div className="sticky bottom-0 rounded-lg border border-[#dfe6dd] bg-white/95 p-4 shadow-lg backdrop-blur">
-        <button className="w-full rounded-md bg-[#12382a] px-5 py-3 text-sm font-semibold text-white hover:bg-[#1c513d] sm:w-auto">
-          Criar prova e liberar aplicacao
+        <button
+          disabled={locked}
+          className="w-full rounded-md bg-[#12382a] px-5 py-3 text-sm font-semibold text-white hover:bg-[#1c513d] disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+        >
+          {isEditing ? "Salvar alteracoes da prova" : "Criar prova e liberar aplicacao"}
         </button>
       </div>
     </form>
