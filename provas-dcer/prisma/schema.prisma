@@ -97,6 +97,7 @@ model Student {
   registrationExpiresAt DateTime?
   birthDate             DateTime?
   embassyAdmissionDate  DateTime?
+  hasMedicalReport      Boolean                  @default(false)
   active                Boolean                  @default(true)
   createdAt             DateTime                 @default(now())
   updatedAt             DateTime                 @updatedAt

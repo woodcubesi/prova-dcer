@@ -14,14 +14,21 @@ export const dynamic = "force-dynamic";
 
 type RegisterPageProps = {
   searchParams?: Promise<{
+    alunosPagina?: string;
+    alunosPorPagina?: string;
     embaixador?: string;
     embaixadorSelecionado?: string;
     erro?: string;
     igreja?: string;
     igrejaResponsavel?: string;
     ok?: string;
+    provasPagina?: string;
+    provasPorPagina?: string;
   }>;
 };
+
+const pageSizeOptions = [5, 10, 50, 100] as const;
+const defaultPageSize = 10;
 
 function formatDateInput(date?: Date | null) {
   return date ? date.toISOString().slice(0, 10) : "";
@@ -29,6 +36,55 @@ function formatDateInput(date?: Date | null) {
 
 function formatDateLabel(date?: Date | null) {
   return date ? date.toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "-";
+}
+
+function parsePositiveInt(value?: string) {
+  const parsed = Number.parseInt(value || "", 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+}
+
+function parsePageSize(value?: string) {
+  const parsed = Number.parseInt(value || "", 10);
+  return pageSizeOptions.includes(parsed as (typeof pageSizeOptions)[number]) ? parsed : defaultPageSize;
+}
+
+function clampPage(page: number, totalItems: number, pageSize: number) {
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  return Math.min(Math.max(1, page), totalPages);
+}
+
+function formatPageRange(page: number, pageSize: number, shownItems: number, totalItems: number) {
+  if (totalItems === 0) return "0 de 0";
+
+  const start = (page - 1) * pageSize + 1;
+  const end = start + shownItems - 1;
+  return `${start}-${end} de ${totalItems}`;
+}
+
+function buildRegistersHref(
+  params: Awaited<NonNullable<RegisterPageProps["searchParams"]>>,
+  overrides: Record<string, string | number | null | undefined>,
+) {
+  const nextParams = new URLSearchParams();
+  const keys = [
+    "igrejaResponsavel",
+    "embaixadorSelecionado",
+    "alunosPagina",
+    "alunosPorPagina",
+    "provasPagina",
+    "provasPorPagina",
+  ] as const;
+
+  keys.forEach((key) => {
+    const value = overrides[key] ?? params[key];
+
+    if (value !== undefined && value !== null && String(value) !== "") {
+      nextParams.set(key, String(value));
+    }
+  });
+
+  const query = nextParams.toString();
+  return query ? `/admin/cadastros?${query}` : "/admin/cadastros";
 }
 
 export default async function RegistersPage({ searchParams }: RegisterPageProps) {
@@ -87,10 +143,27 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
       : editingStudent?.churchId || editingChurch?.id || "");
   const selectedChurch = churchOptions.find((church) => church.id === selectedChurchId) || null;
   const requestedStudentId = String(params.embaixadorSelecionado || "").trim();
-  const studentBaseFilter = {
-    active: true,
-    ...(selectedChurchId ? { churchId: selectedChurchId } : { id: "__missing_student__" }),
-  };
+  const canListAllChurches = !isTeacher;
+  const studentPageSize = parsePageSize(params.alunosPorPagina);
+  const requestedStudentPage = parsePositiveInt(params.alunosPagina);
+  const applicationPageSize = parsePageSize(params.provasPorPagina);
+  const requestedApplicationPage = parsePositiveInt(params.provasPagina);
+  const studentBaseFilter = selectedChurchId
+    ? {
+        active: true,
+        churchId: selectedChurchId,
+      }
+    : canListAllChurches
+      ? {
+          active: true,
+          church: {
+            active: true,
+          },
+        }
+      : {
+          active: true,
+          id: "__missing_student__",
+        };
   const applicationFilter = selectedChurchId
     ? {
         participants: {
@@ -101,13 +174,32 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
           },
         },
       }
-    : {
-        id: "__missing_application__",
-      };
+    : canListAllChurches
+      ? {
+          participants: {
+            some: {
+              student: {
+                church: {
+                  active: true,
+                },
+              },
+            },
+          },
+        }
+      : {
+          id: "__missing_application__",
+        };
 
-  const [studentOptions, applications] = await Promise.all([
+  const [studentOptions, totalStudents, totalApplications] = await Promise.all([
     prisma.student.findMany({
-      where: studentBaseFilter,
+      where: selectedChurchId
+        ? {
+            active: true,
+            churchId: selectedChurchId,
+          }
+        : {
+            id: "__missing_student__",
+          },
       orderBy: [{ category: "asc" }, { name: "asc" }],
       select: {
         id: true,
@@ -116,10 +208,40 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
         externalId: true,
       },
     }),
+    prisma.student.count({
+      where: studentBaseFilter,
+    }),
+    prisma.examApplication.count({
+      where: applicationFilter,
+    }),
+  ]);
+  const studentOptionIds = new Set(studentOptions.map((student) => student.id));
+  const selectedStudentId = requestedStudentId && studentOptionIds.has(requestedStudentId) ? requestedStudentId : "";
+  const studentFilter = {
+    ...studentBaseFilter,
+    ...(selectedStudentId ? { id: selectedStudentId } : {}),
+  };
+  const filteredTotalStudents = selectedStudentId ? 1 : totalStudents;
+  const studentPage = clampPage(requestedStudentPage, filteredTotalStudents, studentPageSize);
+  const studentSkip = (studentPage - 1) * studentPageSize;
+  const applicationPage = clampPage(requestedApplicationPage, totalApplications, applicationPageSize);
+  const applicationSkip = (applicationPage - 1) * applicationPageSize;
+
+  const [students, applications] = await Promise.all([
+    prisma.student.findMany({
+      where: studentFilter,
+      orderBy: [{ church: { name: "asc" } }, { category: "asc" }, { name: "asc" }],
+      skip: studentSkip,
+      take: studentPageSize,
+      include: {
+        church: true,
+      },
+    }),
     prisma.examApplication.findMany({
       where: applicationFilter,
       orderBy: { createdAt: "desc" },
-      take: 20,
+      skip: applicationSkip,
+      take: applicationPageSize,
       include: {
         exam: {
           select: {
@@ -153,25 +275,8 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
       },
     }),
   ]);
-  const studentOptionIds = new Set(studentOptions.map((student) => student.id));
-  const selectedStudentId = requestedStudentId && studentOptionIds.has(requestedStudentId) ? requestedStudentId : "";
-  const studentFilter = {
-    ...studentBaseFilter,
-    ...(selectedStudentId ? { id: selectedStudentId } : {}),
-  };
-
-  const [students, totalStudents] = await Promise.all([
-    prisma.student.findMany({
-      where: studentFilter,
-      orderBy: [{ category: "asc" }, { name: "asc" }],
-      include: {
-        church: true,
-      },
-    }),
-    prisma.student.count({
-      where: studentFilter,
-    }),
-  ]);
+  const totalStudentPages = Math.max(1, Math.ceil(filteredTotalStudents / studentPageSize));
+  const totalApplicationPages = Math.max(1, Math.ceil(totalApplications / applicationPageSize));
 
   const selectedChurchLabel = selectedChurch
     ? selectedChurch.embassyName
@@ -209,6 +314,8 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
 
       <section className="mb-5 rounded-lg border border-[#d8def0] bg-white p-4">
         <form action="/admin/cadastros" className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-end">
+          <input type="hidden" name="alunosPorPagina" value={studentPageSize} />
+          <input type="hidden" name="provasPorPagina" value={applicationPageSize} />
           <label className="block">
             <span className="text-sm font-medium">Igreja responsavel</span>
             <select
@@ -235,7 +342,7 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
           </p>
         ) : !isTeacher && churchOptions.length > 0 ? (
           <p className="mt-3 text-sm text-[#5d6480]">
-            Exibindo todas as igrejas. Selecione uma igreja para carregar os embaixadores e provas dela.
+            Exibindo alunos e provas de todas as igrejas ativas com paginacao.
           </p>
         ) : (
           <p className="mt-3 text-sm text-[#5d6480]">Selecione uma igreja para carregar os cadastros.</p>
@@ -399,6 +506,15 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
                 className="mt-1 w-full rounded-md border border-[#c5cce4] px-3 py-3 outline-none focus:ring-2 focus:ring-[#000060]"
               />
             </label>
+            <label className="flex items-center gap-3 rounded-md border border-[#d8def0] bg-[#fbfcff] px-3 py-3 sm:col-span-2">
+              <input
+                name="hasMedicalReport"
+                type="checkbox"
+                defaultChecked={editingStudent?.hasMedicalReport || false}
+                className="h-4 w-4 rounded border-[#c5cce4]"
+              />
+              <span className="text-sm font-medium">Tem laudo</span>
+            </label>
           </div>
           <div className="mt-4 flex flex-col gap-2 sm:flex-row">
             <button className="rounded-md bg-[#000060] px-4 py-3 text-sm font-semibold text-white hover:bg-[#000044]">
@@ -439,7 +555,7 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
             ) : (
               <div className="mt-3 rounded-md border border-[#e8ecf8] bg-[#fbfcff] p-4 text-sm text-[#5d6480]">
                 {churchOptions.length > 0
-                  ? `${churchOptions.length} igreja(s) cadastrada(s). Escolha uma igreja responsavel acima para ver alunos e provas.`
+                  ? `${churchOptions.length} igreja(s) ativa(s). Abaixo estao todos os alunos e provas paginados.`
                   : "Nenhuma igreja cadastrada."}
               </div>
             )}
@@ -448,11 +564,9 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
           <div className="rounded-lg border border-[#d8def0] bg-white p-4">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h2 className="text-lg font-semibold">Provas da igreja</h2>
+                <h2 className="text-lg font-semibold">{selectedChurchId ? "Provas da igreja" : "Todas as provas"}</h2>
                 <p className="text-sm text-[#5d6480]">
-                  {selectedChurchId
-                    ? `Mostrando ${applications.length} aplicacao(oes).`
-                    : "Selecione uma igreja para listar as provas."}
+                  Mostrando {formatPageRange(applicationPage, applicationPageSize, applications.length, totalApplications)}.
                 </p>
               </div>
               <a
@@ -462,6 +576,30 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
                 Ver todas
               </a>
             </div>
+            <form action="/admin/cadastros" className="mt-3 flex flex-wrap items-end gap-2">
+              <input type="hidden" name="igrejaResponsavel" value={selectedChurchId} />
+              <input type="hidden" name="embaixadorSelecionado" value={selectedStudentId} />
+              <input type="hidden" name="alunosPagina" value={studentPage} />
+              <input type="hidden" name="alunosPorPagina" value={studentPageSize} />
+              <input type="hidden" name="provasPagina" value="1" />
+              <label className="block">
+                <span className="text-xs font-medium text-[#5d6480]">Provas por pagina</span>
+                <select
+                  name="provasPorPagina"
+                  defaultValue={applicationPageSize}
+                  className="mt-1 rounded-md border border-[#c5cce4] bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#000060]"
+                >
+                  {pageSizeOptions.map((pageSize) => (
+                    <option key={pageSize} value={pageSize}>
+                      {pageSize}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button className="rounded-md border border-[#000060] px-3 py-2 text-sm font-semibold text-[#000060]">
+                Atualizar
+              </button>
+            </form>
             <div className="mt-3 space-y-2">
               {applications.map((application) => (
                 <div key={application.id} className="rounded-md border border-[#e8ecf8] px-3 py-2">
@@ -482,9 +620,34 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
                 <div className="rounded-md border border-[#e8ecf8] bg-[#fbfcff] p-4 text-sm text-[#5d6480]">
                   {selectedChurchId
                     ? "Nenhuma prova cadastrada para esta igreja."
-                    : "Escolha uma igreja responsavel para ver as provas cadastradas."}
+                    : "Nenhuma prova cadastrada para as igrejas ativas."}
                 </div>
               ) : null}
+            </div>
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm">
+              {applicationPage > 1 ? (
+                <a
+                  href={buildRegistersHref(params, { provasPagina: applicationPage - 1 })}
+                  className="rounded-md border border-[#d8def0] px-3 py-2 font-semibold text-[#000060]"
+                >
+                  Anterior
+                </a>
+              ) : (
+                <span className="rounded-md border border-[#e8ecf8] px-3 py-2 text-[#9ca3af]">Anterior</span>
+              )}
+              <span className="text-[#5d6480]">
+                Pagina {applicationPage} de {totalApplicationPages}
+              </span>
+              {applicationPage < totalApplicationPages ? (
+                <a
+                  href={buildRegistersHref(params, { provasPagina: applicationPage + 1 })}
+                  className="rounded-md border border-[#d8def0] px-3 py-2 font-semibold text-[#000060]"
+                >
+                  Proxima
+                </a>
+              ) : (
+                <span className="rounded-md border border-[#e8ecf8] px-3 py-2 text-[#9ca3af]">Proxima</span>
+              )}
             </div>
           </div>
         </div>
@@ -492,15 +655,21 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
         <div className="rounded-lg border border-[#d8def0] bg-white p-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
             <div>
-              <h2 className="text-lg font-semibold">Embaixadores da igreja</h2>
+              <h2 className="text-lg font-semibold">
+                {selectedChurchId ? "Embaixadores da igreja" : "Todos os embaixadores"}
+              </h2>
               <p className="text-sm text-[#5d6480]">
-                {selectedChurchId
-                  ? `Mostrando ${students.length} de ${totalStudents}.`
-                  : "Selecione uma igreja para listar os embaixadores."}
+                Mostrando {formatPageRange(studentPage, studentPageSize, students.length, filteredTotalStudents)}.
               </p>
             </div>
-            <form className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto] lg:min-w-[560px]" action="/admin/cadastros">
+            <form
+              className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto_auto] lg:min-w-[680px]"
+              action="/admin/cadastros"
+            >
               <input type="hidden" name="igrejaResponsavel" value={selectedChurchId} />
+              <input type="hidden" name="alunosPagina" value="1" />
+              <input type="hidden" name="provasPagina" value={applicationPage} />
+              <input type="hidden" name="provasPorPagina" value={applicationPageSize} />
               <select
                 name="embaixadorSelecionado"
                 defaultValue={selectedStudentId}
@@ -508,7 +677,7 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
                 className="min-w-0 rounded-md border border-[#c5cce4] bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#000060] disabled:bg-[#f3f4f6] disabled:text-[#6b7280]"
               >
                 <option value="">
-                  {selectedChurchId ? "Todos os embaixadores da igreja" : "Selecione uma igreja primeiro"}
+                  {selectedChurchId ? "Todos os embaixadores da igreja" : "Todas as igrejas selecionadas"}
                 </option>
                 {studentOptions.map((student) => (
                   <option key={student.id} value={student.id}>
@@ -518,15 +687,28 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
                   </option>
                 ))}
               </select>
-              <button
-                disabled={!selectedChurchId}
-                className="rounded-md border border-[#000060] px-3 py-2 text-sm font-semibold text-[#000060] disabled:cursor-not-allowed disabled:border-[#c5cce4] disabled:text-[#6b7280]"
+              <select
+                name="alunosPorPagina"
+                defaultValue={studentPageSize}
+                className="rounded-md border border-[#c5cce4] bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#000060]"
               >
-                Carregar aluno
+                {pageSizeOptions.map((pageSize) => (
+                  <option key={pageSize} value={pageSize}>
+                    {pageSize} por pagina
+                  </option>
+                ))}
+              </select>
+              <button className="rounded-md border border-[#000060] px-3 py-2 text-sm font-semibold text-[#000060]">
+                Carregar lista
               </button>
               {selectedChurchId ? (
                 <a
-                  href={`/admin/cadastros?igrejaResponsavel=${selectedChurchId}`}
+                  href={buildRegistersHref(params, {
+                    igrejaResponsavel: selectedChurchId,
+                    embaixadorSelecionado: "",
+                    alunosPagina: 1,
+                    alunosPorPagina: studentPageSize,
+                  })}
                   className="rounded-md border border-[#000060] px-3 py-2 text-center text-sm font-semibold text-[#000060] hover:bg-[#f7f8ff]"
                 >
                   Ver todos alunos
@@ -558,6 +740,10 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
                     <p className="text-[#5d6480]">Admissao</p>
                     <p className="font-semibold">{formatDateLabel(student.embassyAdmissionDate)}</p>
                   </div>
+                  <div className="rounded-md bg-[#f8faff] px-2 py-2">
+                    <p className="text-[#5d6480]">Laudo</p>
+                    <p className="font-semibold">{student.hasMedicalReport ? "Sim" : "Nao"}</p>
+                  </div>
                 </div>
                 <span className="mt-2 inline-flex rounded-full bg-[#effaf2] px-2 py-1 text-xs font-medium text-[#1f623e]">
                   {getCategoryLabel(student.category)}
@@ -572,7 +758,7 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
             ))}
           </div>
           <div className="mt-3 hidden overflow-x-auto md:block">
-            <table className="w-full min-w-[980px] text-left text-sm">
+            <table className="w-full min-w-[1060px] text-left text-sm">
               <thead className="border-b border-[#d8def0] text-xs uppercase tracking-wide text-[#5d6480]">
                 <tr>
                   <th className="py-3 pr-4">Nome</th>
@@ -582,6 +768,7 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
                   <th className="py-3 pr-4">Categoria</th>
                   <th className="py-3 pr-4">Nascimento</th>
                   <th className="py-3 pr-4">Validade</th>
+                  <th className="py-3 pr-4">Laudo</th>
                   <th className="py-3 pr-4">Acao</th>
                 </tr>
               </thead>
@@ -595,6 +782,7 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
                     <td className="py-3 pr-4">{getCategoryLabel(student.category)}</td>
                     <td className="py-3 pr-4">{formatDateLabel(student.birthDate)}</td>
                     <td className="py-3 pr-4">{formatDateLabel(student.registrationExpiresAt)}</td>
+                    <td className="py-3 pr-4">{student.hasMedicalReport ? "Sim" : "Nao"}</td>
                     <td className="py-3 pr-4">
                       <a
                         href={`/admin/cadastros?embaixador=${student.id}&igrejaResponsavel=${selectedChurchId}&embaixadorSelecionado=${student.id}`}
@@ -607,10 +795,10 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
                 ))}
                 {students.length === 0 ? (
                   <tr>
-                    <td className="py-6 pr-4 text-sm text-[#5d6480]" colSpan={8}>
+                    <td className="py-6 pr-4 text-sm text-[#5d6480]" colSpan={9}>
                       {selectedChurchId
                         ? "Nenhum embaixador encontrado para esta selecao."
-                        : "Escolha uma igreja responsavel para carregar os embaixadores."}
+                        : "Nenhum embaixador cadastrado para as igrejas ativas."}
                     </td>
                   </tr>
                 ) : null}
@@ -621,9 +809,34 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
             <div className="mt-3 rounded-md border border-[#e8ecf8] bg-[#fbfcff] p-4 text-sm text-[#5d6480] md:hidden">
               {selectedChurchId
                 ? "Nenhum embaixador encontrado para esta selecao."
-                : "Escolha uma igreja responsavel para carregar os embaixadores."}
+                : "Nenhum embaixador cadastrado para as igrejas ativas."}
             </div>
           ) : null}
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm">
+            {studentPage > 1 ? (
+              <a
+                href={buildRegistersHref(params, { alunosPagina: studentPage - 1 })}
+                className="rounded-md border border-[#d8def0] px-3 py-2 font-semibold text-[#000060]"
+              >
+                Anterior
+              </a>
+            ) : (
+              <span className="rounded-md border border-[#e8ecf8] px-3 py-2 text-[#9ca3af]">Anterior</span>
+            )}
+            <span className="text-[#5d6480]">
+              Pagina {studentPage} de {totalStudentPages}
+            </span>
+            {studentPage < totalStudentPages ? (
+              <a
+                href={buildRegistersHref(params, { alunosPagina: studentPage + 1 })}
+                className="rounded-md border border-[#d8def0] px-3 py-2 font-semibold text-[#000060]"
+              >
+                Proxima
+              </a>
+            ) : (
+              <span className="rounded-md border border-[#e8ecf8] px-3 py-2 text-[#9ca3af]">Proxima</span>
+            )}
+          </div>
         </div>
       </section>
     </AdminShell>

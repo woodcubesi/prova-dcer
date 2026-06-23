@@ -847,6 +847,7 @@ export async function createStudentAction(formData: FormData) {
   const registrationExpiresAt = parseOptionalDate(formData, "registrationExpiresAt", "validade");
   const birthDate = parseOptionalDate(formData, "birthDate", "nascimento");
   const embassyAdmissionDate = parseOptionalDate(formData, "embassyAdmissionDate", "admissao na embaixada");
+  const hasMedicalReport = formData.get("hasMedicalReport") === "on";
 
   if (context.role === AdminRole.TEACHER && !scopedChurchId) {
     errorRedirect("/admin/cadastros", "Seu usuario de conselheiro ainda nao esta vinculado a uma igreja.");
@@ -879,6 +880,7 @@ export async function createStudentAction(formData: FormData) {
       registrationExpiresAt,
       birthDate,
       embassyAdmissionDate,
+      hasMedicalReport,
       active: true,
     },
     create: {
@@ -890,6 +892,7 @@ export async function createStudentAction(formData: FormData) {
       registrationExpiresAt,
       birthDate,
       embassyAdmissionDate,
+      hasMedicalReport,
       churchId,
     },
   });
@@ -912,6 +915,7 @@ export async function updateStudentAction(formData: FormData) {
   const registrationExpiresAt = parseOptionalDate(formData, "registrationExpiresAt", "validade");
   const birthDate = parseOptionalDate(formData, "birthDate", "nascimento");
   const embassyAdmissionDate = parseOptionalDate(formData, "embassyAdmissionDate", "admissao na embaixada");
+  const hasMedicalReport = formData.get("hasMedicalReport") === "on";
 
   if (context.role === AdminRole.TEACHER && !scopedChurchId) {
     errorRedirect("/admin/cadastros", "Seu usuario de conselheiro ainda nao esta vinculado a uma igreja.");
@@ -953,6 +957,7 @@ export async function updateStudentAction(formData: FormData) {
       registrationExpiresAt,
       birthDate,
       embassyAdmissionDate,
+      hasMedicalReport,
       churchId,
       active: true,
     },
