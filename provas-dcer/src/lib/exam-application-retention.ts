@@ -65,7 +65,17 @@ export async function deleteExamApplicationRecords(
   }
 }
 
+export async function backfillMissingApplicationPurgeDates() {
+  return prisma.$executeRaw`
+    UPDATE "ExamApplication"
+    SET "purgeAt" = COALESCE("endsAt", "startsAt", "createdAt") + interval '1 year'
+    WHERE "purgeAt" IS NULL
+  `;
+}
+
 export async function purgeDueExamApplications(now = new Date()) {
+  await backfillMissingApplicationPurgeDates();
+
   const applications = await prisma.examApplication.findMany({
     where: {
       purgeAt: {
