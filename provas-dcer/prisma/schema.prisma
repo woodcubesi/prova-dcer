@@ -42,20 +42,37 @@ enum AdminRole {
 }
 
 model AdminUser {
-  id           String    @id @default(cuid())
-  name         String
-  email        String    @unique
-  passwordHash String
-  role         AdminRole @default(TEACHER)
-  active       Boolean   @default(true)
-  churchId     String?
-  church       Church?   @relation(fields: [churchId], references: [id], onDelete: SetNull)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id                  String                    @id @default(cuid())
+  name                String
+  email               String                    @unique
+  passwordHash        String
+  sessionVersion      Int                       @default(0)
+  role                AdminRole                 @default(TEACHER)
+  active              Boolean                   @default(true)
+  churchId            String?
+  church              Church?                   @relation(fields: [churchId], references: [id], onDelete: SetNull)
+  passwordResetTokens AdminPasswordResetToken[]
+  createdAt           DateTime                  @default(now())
+  updatedAt           DateTime                  @updatedAt
 
   @@index([role])
   @@index([active])
   @@index([churchId])
+}
+
+model AdminPasswordResetToken {
+  id          String    @id @default(cuid())
+  adminUserId String
+  adminUser   AdminUser @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+  tokenHash   String    @unique
+  requestedIp String?
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([adminUserId])
+  @@index([expiresAt])
+  @@index([usedAt])
 }
 
 model Church {

@@ -99,6 +99,9 @@ Copy-Item .env.example .env
 DATABASE_URL="postgresql://provas_dcer:provas_dcer_dev@localhost:5432/provas_dcer?schema=public"
 ADMIN_PASSWORD="admin123"
 ADMIN_SESSION_SECRET="troque-este-segredo-no-servidor-linux"
+APP_URL="http://localhost:3000"
+MAIL_DRIVER="console"
+MAIL_FROM="Provas DCER Paulista <no-reply@localhost>"
 ```
 
 4. Instale as dependencias:
@@ -137,6 +140,34 @@ Senha: admin123
 ```
 
 Depois de entrar, acesse `Equipe` e cadastre administradores e conselheiros com e-mail e senha proprios.
+
+## Reset de senha por e-mail
+
+O reset de senha administrativa envia um link de uso unico, valido por 30 minutos. A senha nunca e enviada por e-mail.
+
+Em ambiente local, deixe:
+
+```text
+MAIL_DRIVER="console"
+APP_URL="http://localhost:3000"
+```
+
+Assim o link de reset aparece no log do servidor (`pnpm dev` ou `pnpm start`).
+
+Em homologacao/producao com Postfix local encaminhando para o Google Workspace SMTP relay:
+
+```text
+APP_URL="https://seu-dominio"
+MAIL_DRIVER="smtp"
+MAIL_FROM="Provas DCER Paulista <no-reply@seudominio.com.br>"
+SMTP_HOST="127.0.0.1"
+SMTP_PORT="25"
+SMTP_SECURE="false"
+SMTP_REQUIRE_TLS="false"
+SMTP_IGNORE_TLS="true"
+```
+
+Configure o Postfix como relay local, aceitando conexao apenas de `localhost`, e encaminhando para `smtp-relay.gmail.com:587` com TLS.
 
 ## Dados de demonstracao
 
@@ -190,6 +221,14 @@ nano .env
 DATABASE_URL="postgresql://USUARIO:SENHA_FORTE@localhost:5432/provas_dcer?schema=public"
 ADMIN_PASSWORD="SENHA_ADMINISTRATIVA_FORTE"
 ADMIN_SESSION_SECRET="SEGREDO_GRANDE_ALEATORIO"
+APP_URL="https://seu-dominio"
+MAIL_DRIVER="smtp"
+MAIL_FROM="Provas DCER Paulista <no-reply@seudominio.com.br>"
+SMTP_HOST="127.0.0.1"
+SMTP_PORT="25"
+SMTP_SECURE="false"
+SMTP_REQUIRE_TLS="false"
+SMTP_IGNORE_TLS="true"
 ```
 
 4. Instale e prepare:

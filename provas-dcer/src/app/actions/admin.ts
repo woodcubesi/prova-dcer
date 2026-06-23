@@ -1,6 +1,7 @@
 "use server";
 
-import { randomInt } from "crypto";
+import { createHash, randomBytes, randomInt } from "crypto";
+import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -16,6 +17,7 @@ import {
   requireAdminRole,
   verifyPassword,
 } from "@/lib/auth";
+import { getAppUrl, sendAdminPasswordResetEmail } from "@/lib/mail";
 import { prisma } from "@/lib/prisma";
 import {
   findActiveStudentsByRegistrationNumber,
@@ -47,6 +49,22 @@ const staffUpdateSchema = staffUserSchema.extend({
     .refine((password) => !password || password.length >= 6, "A senha precisa ter pelo menos 6 caracteres.")
     .optional(),
 });
+const passwordResetExpirationMinutes = 30;
+const passwordResetMinIntervalSeconds = 60;
+const passwordResetMaxRequestsPerIpHour = 10;
+const passwordResetRequestSchema = z.object({
+  email: z.string().trim().email("Informe um e-mail valido.").transform((email) => email.toLowerCase()),
+});
+const passwordResetSchema = z
+  .object({
+    token: z.string().trim().min(20, "Link de redefinicao invalido."),
+    password: z.string().min(6, "A senha precisa ter pelo menos 6 caracteres.").max(120),
+    confirmPassword: z.string().min(1, "Confirme a nova senha."),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "As senhas nao conferem.",
+    path: ["confirmPassword"],
+  });
 
 const optionSchema = z.object({
   label: z.string().trim().min(1).max(3),
@@ -210,6 +228,38 @@ function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
 }
 
+function hashPasswordResetToken(token: string) {
+  return createHash("sha256").update(token).digest("hex");
+}
+
+function buildPasswordResetUrl(token: string) {
+  const url = new URL("/admin/redefinir-senha", getAppUrl());
+  url.searchParams.set("token", token);
+  return url.toString();
+}
+
+async function getRequestIp() {
+  const requestHeaders = await headers();
+  const forwardedFor = requestHeaders.get("x-forwarded-for")?.split(",")[0]?.trim();
+  return forwardedFor || requestHeaders.get("x-real-ip")?.trim() || null;
+}
+
+function passwordResetDoneRedirect(): never {
+  redirect("/admin/esqueci-senha?ok=1");
+}
+
+function passwordResetErrorRedirect(token: string, message: string): never {
+  const params = new URLSearchParams({
+    erro: message,
+  });
+
+  if (token) {
+    params.set("token", token);
+  }
+
+  redirect(`/admin/redefinir-senha?${params.toString()}`);
+}
+
 async function resolveStaffChurch(role: AdminRole, churchId: string | null) {
   if (role === AdminRole.ADMIN) return null;
 
@@ -342,6 +392,159 @@ export async function logoutAdminAction() {
   redirect("/admin/login");
 }
 
+export async function requestAdminPasswordResetAction(formData: FormData) {
+  const parsed = passwordResetRequestSchema.safeParse({
+    email: String(formData.get("email") || ""),
+  });
+
+  if (!parsed.success) {
+    redirect("/admin/esqueci-senha?erro=email");
+  }
+
+  const email = parsed.data.email;
+  const requestedIp = await getRequestIp();
+  const now = new Date();
+  const recentRequestDate = new Date(now.getTime() - passwordResetMinIntervalSeconds * 1000);
+  const recentIpDate = new Date(now.getTime() - 60 * 60 * 1000);
+
+  const user = await prisma.adminUser.findFirst({
+    where: {
+      email,
+      active: true,
+    },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+    },
+  });
+
+  if (!user) {
+    passwordResetDoneRedirect();
+  }
+
+  await prisma.adminPasswordResetToken.deleteMany({
+    where: {
+      adminUserId: user.id,
+      OR: [{ expiresAt: { lte: now } }, { usedAt: { not: null } }],
+    },
+  });
+
+  const recentRequest = await prisma.adminPasswordResetToken.findFirst({
+    where: {
+      adminUserId: user.id,
+      createdAt: { gte: recentRequestDate },
+      usedAt: null,
+    },
+    select: { id: true },
+  });
+
+  if (recentRequest) {
+    passwordResetDoneRedirect();
+  }
+
+  if (requestedIp) {
+    const recentIpRequests = await prisma.adminPasswordResetToken.count({
+      where: {
+        requestedIp,
+        createdAt: { gte: recentIpDate },
+      },
+    });
+
+    if (recentIpRequests >= passwordResetMaxRequestsPerIpHour) {
+      passwordResetDoneRedirect();
+    }
+  }
+
+  const token = randomBytes(32).toString("base64url");
+  const tokenHash = hashPasswordResetToken(token);
+  const expiresAt = new Date(now.getTime() + passwordResetExpirationMinutes * 60 * 1000);
+
+  await prisma.adminPasswordResetToken.create({
+    data: {
+      adminUserId: user.id,
+      tokenHash,
+      requestedIp,
+      expiresAt,
+    },
+  });
+
+  try {
+    await sendAdminPasswordResetEmail({
+      to: user.email,
+      name: user.name,
+      resetUrl: buildPasswordResetUrl(token),
+      expiresInMinutes: passwordResetExpirationMinutes,
+    });
+  } catch (error) {
+    console.error("Admin password reset email failed", error);
+    await prisma.adminPasswordResetToken.deleteMany({
+      where: {
+        tokenHash,
+        usedAt: null,
+      },
+    });
+  }
+
+  passwordResetDoneRedirect();
+}
+
+export async function resetAdminPasswordAction(formData: FormData) {
+  const rawToken = String(formData.get("token") || "").trim();
+  const parsed = passwordResetSchema.safeParse({
+    token: rawToken,
+    password: String(formData.get("password") || ""),
+    confirmPassword: String(formData.get("confirmPassword") || ""),
+  });
+
+  if (!parsed.success) {
+    passwordResetErrorRedirect(rawToken, parsed.error.issues[0]?.message || "Revise a nova senha.");
+  }
+
+  const tokenHash = hashPasswordResetToken(parsed.data.token);
+  const now = new Date();
+  const resetToken = await prisma.adminPasswordResetToken.findFirst({
+    where: {
+      tokenHash,
+      usedAt: null,
+      expiresAt: { gt: now },
+      adminUser: {
+        active: true,
+      },
+    },
+    select: {
+      id: true,
+      adminUserId: true,
+    },
+  });
+
+  if (!resetToken) {
+    passwordResetErrorRedirect("", "Link de redefinicao invalido ou expirado.");
+  }
+
+  await prisma.$transaction([
+    prisma.adminUser.update({
+      where: { id: resetToken.adminUserId },
+      data: {
+        passwordHash: hashPassword(parsed.data.password),
+        sessionVersion: { increment: 1 },
+      },
+    }),
+    prisma.adminPasswordResetToken.updateMany({
+      where: {
+        adminUserId: resetToken.adminUserId,
+        usedAt: null,
+      },
+      data: {
+        usedAt: now,
+      },
+    }),
+  ]);
+
+  await clearAdminSession();
+  redirect("/admin/login?senha=alterada");
+}
+
 export async function createStaffUserAction(formData: FormData) {
   const context = await requireAdminContext();
 
@@ -461,7 +664,12 @@ export async function updateStaffUserAction(formData: FormData) {
       role,
       churchId,
       active: true,
-      ...(password ? { passwordHash: hashPassword(password) } : {}),
+      ...(password
+        ? {
+            passwordHash: hashPassword(password),
+            sessionVersion: { increment: 1 },
+          }
+        : {}),
     },
   });
 

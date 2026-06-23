@@ -65,9 +65,17 @@ function readSignedValue(token?: string) {
   return null;
 }
 
-function getUserIdFromSessionValue(value: string | null) {
+function getUserSessionIdentity(value: string | null) {
   if (!value?.startsWith(USER_SESSION_PREFIX)) return null;
-  return value.slice(USER_SESSION_PREFIX.length);
+
+  const [id, sessionVersionValue] = value.slice(USER_SESSION_PREFIX.length).split(":");
+  const sessionVersion = Number(sessionVersionValue);
+
+  if (!id || !Number.isInteger(sessionVersion) || sessionVersion < 0) {
+    return null;
+  }
+
+  return { id, sessionVersion };
 }
 
 export function hashPassword(password: string) {
@@ -91,7 +99,20 @@ export function verifyPassword(password: string, storedHash: string) {
 
 export async function createAdminSession(userId?: string) {
   const cookieStore = await cookies();
-  const value = userId ? `${USER_SESSION_PREFIX}${userId}` : LEGACY_SESSION_VALUE;
+  let value = LEGACY_SESSION_VALUE;
+
+  if (userId) {
+    const sessionUser = await prisma.adminUser.findUnique({
+      where: { id: userId },
+      select: { sessionVersion: true },
+    });
+
+    if (!sessionUser) {
+      throw new Error("Admin user not found for session creation.");
+    }
+
+    value = `${USER_SESSION_PREFIX}${userId}:${sessionUser.sessionVersion}`;
+  }
 
   cookieStore.set(COOKIE_NAME, buildToken(value), {
     httpOnly: true,
@@ -114,13 +135,14 @@ export async function getAdminSessionValue() {
 
 export async function getCurrentAdminUser() {
   const sessionValue = await getAdminSessionValue();
-  const userId = getUserIdFromSessionValue(sessionValue);
+  const sessionUser = getUserSessionIdentity(sessionValue);
 
-  if (!userId) return null;
+  if (!sessionUser) return null;
 
   return prisma.adminUser.findFirst({
     where: {
-      id: userId,
+      id: sessionUser.id,
+      sessionVersion: sessionUser.sessionVersion,
       active: true,
     },
     include: {
