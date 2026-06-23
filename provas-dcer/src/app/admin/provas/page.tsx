@@ -3,6 +3,11 @@ import { deleteExamApplicationAction } from "@/app/actions/admin";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { ConfirmSubmitButton } from "@/components/admin/ConfirmSubmitButton";
 import { AdminRole } from "@/generated/prisma/client";
+import {
+  formatAvailabilityWindow,
+  getApplicationStatus,
+  getApplicationStatusLabel,
+} from "@/lib/application-availability";
 import { requireAdminContext } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
@@ -20,6 +25,7 @@ export default async function ExamsPage({ searchParams }: ExamsPageProps) {
   const params = searchParams ? await searchParams : {};
   const isTeacher = context.role === AdminRole.TEACHER;
   const scopedChurchId = isTeacher ? context.churchId : null;
+  const now = new Date();
 
   const applications = await prisma.examApplication.findMany({
     where: isTeacher
@@ -93,7 +99,7 @@ export default async function ExamsPage({ searchParams }: ExamsPageProps) {
                   <p className="mt-1 text-sm text-[#5d6480]">{application.title}</p>
                 </div>
                 <span className="rounded-full bg-[#effaf2] px-2 py-1 text-xs font-medium text-[#1f623e]">
-                  {application.active ? "Ativa" : "Inativa"}
+                  {getApplicationStatusLabel(getApplicationStatus(application, now))}
                 </span>
               </div>
               <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
@@ -112,6 +118,10 @@ export default async function ExamsPage({ searchParams }: ExamsPageProps) {
                 <div className="rounded-md bg-[#f8faff] px-3 py-2">
                   <p className="text-xs text-[#5d6480]">Tentativas</p>
                   <p className="font-semibold">{application._count.attempts}</p>
+                </div>
+                <div className="rounded-md bg-[#f8faff] px-3 py-2 sm:col-span-2">
+                  <p className="text-xs text-[#5d6480]">Disponibilidade</p>
+                  <p className="font-semibold">{formatAvailabilityWindow(application)}</p>
                 </div>
               </div>
               <Link
@@ -140,15 +150,17 @@ export default async function ExamsPage({ searchParams }: ExamsPageProps) {
         </div>
 
         <div className="mt-4 hidden overflow-x-auto md:block">
-          <table className="w-full min-w-[860px] text-left text-sm">
+          <table className="w-full min-w-[1040px] text-left text-sm">
             <thead className="border-b border-[#d8def0] text-xs uppercase tracking-wide text-[#5d6480]">
               <tr>
                 <th className="py-3 pr-4">Prova</th>
                 <th className="py-3 pr-4">Codigo</th>
                 <th className="py-3 pr-4">Tempo</th>
                 <th className="py-3 pr-4">Aprovacao</th>
+                <th className="py-3 pr-4">Expiracao</th>
                 <th className="py-3 pr-4">Participantes</th>
                 <th className="py-3 pr-4">Tentativas</th>
+                <th className="py-3 pr-4">Status</th>
                 <th className="py-3 pr-4">Acoes</th>
               </tr>
             </thead>
@@ -162,8 +174,14 @@ export default async function ExamsPage({ searchParams }: ExamsPageProps) {
                   <td className="py-3 pr-4 font-mono">{application.accessCode}</td>
                   <td className="py-3 pr-4">{application.exam.durationMinutes} min</td>
                   <td className="py-3 pr-4">{application.exam.passingPercent ?? 70}%</td>
+                  <td className="py-3 pr-4">{formatAvailabilityWindow(application)}</td>
                   <td className="py-3 pr-4">{application._count.participants}</td>
                   <td className="py-3 pr-4">{application._count.attempts}</td>
+                  <td className="py-3 pr-4">
+                    <span className="rounded-full bg-[#effaf2] px-2 py-1 text-xs font-medium text-[#1f623e]">
+                      {getApplicationStatusLabel(getApplicationStatus(application, now))}
+                    </span>
+                  </td>
                   <td className="py-3 pr-4">
                     <div className="flex flex-wrap gap-2">
                       <Link
@@ -193,7 +211,7 @@ export default async function ExamsPage({ searchParams }: ExamsPageProps) {
               ))}
               {applications.length === 0 ? (
                 <tr>
-                  <td className="py-6 pr-4 text-sm text-[#5d6480]" colSpan={7}>
+                    <td className="py-6 pr-4 text-sm text-[#5d6480]" colSpan={9}>
                     Nenhuma prova criada ainda.
                   </td>
                 </tr>

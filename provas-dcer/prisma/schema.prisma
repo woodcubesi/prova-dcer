@@ -173,6 +173,10 @@ model ExamApplication {
   updatedAt           DateTime                 @updatedAt
   participants        ApplicationParticipant[]
   attempts            Attempt[]
+
+  @@index([active])
+  @@index([startsAt])
+  @@index([endsAt])
 }
 
 model ApplicationParticipant {

@@ -17,7 +17,9 @@ type RegisterPageProps = {
     embaixador?: string;
     erro?: string;
     igreja?: string;
+    igrejaBusca?: string;
     ok?: string;
+    embaixadorBusca?: string;
   }>;
 };
 
@@ -34,38 +36,101 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
   const params = searchParams ? await searchParams : {};
   const isTeacher = context.role === AdminRole.TEACHER;
   const scopedChurchId = isTeacher ? context.churchId : null;
+  const churchSearch = String(params.igrejaBusca || "").trim();
+  const studentSearch = String(params.embaixadorBusca || "").trim();
+  const maxChurches = 60;
+  const maxStudents = 80;
+  const textFilter = (value: string) => ({
+    contains: value,
+    mode: "insensitive" as const,
+  });
   const churchFilter = {
     active: true,
     ...(isTeacher ? { id: scopedChurchId || "__missing_church__" } : {}),
+    ...(churchSearch
+      ? {
+          OR: [
+            { name: textFilter(churchSearch) },
+            { embassyName: textFilter(churchSearch) },
+            { city: textFilter(churchSearch) },
+          ],
+        }
+      : {}),
+  };
+  const studentFilter = {
+    active: true,
+    ...(isTeacher ? { churchId: scopedChurchId || "__missing_church__" } : {}),
+    ...(studentSearch
+      ? {
+          OR: [
+            { name: textFilter(studentSearch) },
+            { externalId: textFilter(studentSearch) },
+            { church: { name: textFilter(studentSearch) } },
+            { church: { embassyName: textFilter(studentSearch) } },
+          ],
+        }
+      : {}),
   };
 
-  const [churches, students] = await Promise.all([
+  const [churches, totalChurches, students, totalStudents] = await Promise.all([
     prisma.church.findMany({
       where: churchFilter,
       orderBy: { name: "asc" },
+      take: maxChurches,
       include: {
         _count: {
           select: { students: true },
         },
       },
     }),
+    prisma.church.count({
+      where: churchFilter,
+    }),
     prisma.student.findMany({
-      where: {
-        active: true,
-        ...(isTeacher ? { churchId: scopedChurchId || "__missing_church__" } : {}),
-      },
+      where: studentFilter,
       orderBy: [{ church: { name: "asc" } }, { category: "asc" }, { name: "asc" }],
+      take: maxStudents,
       include: {
         church: true,
       },
     }),
+    prisma.student.count({
+      where: studentFilter,
+    }),
   ]);
 
-  const editingChurch =
+  let editingChurch =
     !isTeacher && params.igreja ? churches.find((church) => church.id === params.igreja) || null : null;
-  const editingStudent = params.embaixador
+  let editingStudent = params.embaixador
     ? students.find((student) => student.id === params.embaixador) || null
     : null;
+
+  if (!editingChurch && !isTeacher && params.igreja) {
+    editingChurch = await prisma.church.findFirst({
+      where: {
+        id: params.igreja,
+        active: true,
+      },
+      include: {
+        _count: {
+          select: { students: true },
+        },
+      },
+    });
+  }
+
+  if (!editingStudent && params.embaixador) {
+    editingStudent = await prisma.student.findFirst({
+      where: {
+        id: params.embaixador,
+        active: true,
+        ...(isTeacher ? { churchId: scopedChurchId || "__missing_church__" } : {}),
+      },
+      include: {
+        church: true,
+      },
+    });
+  }
 
   return (
     <AdminShell title="Cadastros" description="Pre-cadastre igrejas e embaixadores antes de liberar uma prova.">
@@ -271,8 +336,26 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
 
       <section className="mt-5 grid gap-4 lg:grid-cols-[320px_1fr]">
         <div className="rounded-lg border border-[#d8def0] bg-white p-4">
-          <h2 className="text-lg font-semibold">Igrejas cadastradas</h2>
-          <div className="mt-3 space-y-2">
+          <div className="flex flex-col gap-3">
+            <div>
+              <h2 className="text-lg font-semibold">Igrejas cadastradas</h2>
+              <p className="text-sm text-[#5d6480]">
+                Mostrando {churches.length} de {totalChurches}.
+              </p>
+            </div>
+            <form className="flex gap-2" action="/admin/cadastros">
+              <input
+                name="igrejaBusca"
+                defaultValue={churchSearch}
+                className="min-w-0 flex-1 rounded-md border border-[#c5cce4] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#000060]"
+                placeholder="Buscar igreja"
+              />
+              <button className="rounded-md border border-[#000060] px-3 py-2 text-sm font-semibold text-[#000060]">
+                Buscar
+              </button>
+            </form>
+          </div>
+          <div className="mt-3 max-h-[520px] space-y-2 overflow-y-auto pr-1">
             {churches.map((church) => (
               <div key={church.id} className="rounded-md border border-[#e8ecf8] px-3 py-2">
                 <p className="font-medium">{church.name}</p>
@@ -290,12 +373,35 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
                 ) : null}
               </div>
             ))}
+            {churches.length === 0 ? (
+              <div className="rounded-md border border-[#e8ecf8] bg-[#fbfcff] p-4 text-sm text-[#5d6480]">
+                Nenhuma igreja encontrada.
+              </div>
+            ) : null}
           </div>
         </div>
 
         <div className="rounded-lg border border-[#d8def0] bg-white p-4">
-          <h2 className="text-lg font-semibold">Embaixadores cadastrados</h2>
-          <div className="mt-3 grid gap-3 md:hidden">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold">Embaixadores cadastrados</h2>
+              <p className="text-sm text-[#5d6480]">
+                Mostrando {students.length} de {totalStudents}.
+              </p>
+            </div>
+            <form className="flex gap-2" action="/admin/cadastros">
+              <input
+                name="embaixadorBusca"
+                defaultValue={studentSearch}
+                className="min-w-0 flex-1 rounded-md border border-[#c5cce4] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#000060] lg:w-72"
+                placeholder="Buscar embaixador"
+              />
+              <button className="rounded-md border border-[#000060] px-3 py-2 text-sm font-semibold text-[#000060]">
+                Buscar
+              </button>
+            </form>
+          </div>
+          <div className="mt-3 grid max-h-[620px] gap-3 overflow-y-auto pr-1 md:hidden">
             {students.map((student) => (
               <div key={student.id} className="rounded-md border border-[#e8ecf8] p-3">
                 <p className="font-medium">{student.name}</p>
@@ -332,7 +438,7 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
               </div>
             ))}
           </div>
-          <div className="mt-3 hidden overflow-x-auto md:block">
+          <div className="mt-3 hidden max-h-[640px] overflow-auto md:block">
             <table className="w-full min-w-[980px] text-left text-sm">
               <thead className="border-b border-[#d8def0] text-xs uppercase tracking-wide text-[#5d6480]">
                 <tr>

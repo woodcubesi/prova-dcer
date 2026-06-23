@@ -25,6 +25,11 @@ type ImportResult = {
   title: string;
   durationMinutes: number;
   passingPercent: number;
+  applicationTitle: string;
+  accessCode: string;
+  startsAt: string;
+  endsAt: string;
+  noExpiration: boolean;
   categories: CategoryCode[];
   questions: ImportQuestion[];
   warnings: string[];
@@ -45,6 +50,14 @@ const fieldAliases = new Map<string, keyof ImportColumns>([
   ["descricao", "explanation"],
   ["tempodaprovaemminutos", "durationMinutes"],
   ["percentualdeaprovacao", "passingPercent"],
+  ["titulodaaplicacao", "applicationTitle"],
+  ["codigodaaplicacao", "accessCode"],
+  ["liberarem", "startsAt"],
+  ["datadeliberacao", "startsAt"],
+  ["expiraem", "endsAt"],
+  ["datadeexpiracao", "endsAt"],
+  ["expiracaoilimitada", "noExpiration"],
+  ["semexpiracao", "noExpiration"],
   ["status", "sourceStatus"],
 ]);
 
@@ -63,6 +76,11 @@ const templateHeaders: string[] = [
   "Descrição",
   "Tempo da Prova em Minutos",
   "Percentual de Aprovação",
+  "Título da Aplicação",
+  "Código da Aplicação",
+  "Liberar em",
+  "Expira em",
+  "Expiração Ilimitada",
   "Status",
 ];
 
@@ -82,6 +100,11 @@ const templateRows = [
     "Marque A, B, C ou D na coluna Resposta Certa.",
     "60",
     "70",
+    "Aplicacao principal",
+    "PROVA2026",
+    "",
+    "31/12/2026",
+    "Nao",
     "Ativa",
   ],
   [
@@ -99,6 +122,11 @@ const templateRows = [
     "A categoria pode ficar em branco quando a pergunta servir para todas.",
     "60",
     "70",
+    "Aplicacao principal",
+    "",
+    "",
+    "",
+    "Sim",
     "Ativa",
   ],
 ] satisfies string[][];
@@ -118,6 +146,11 @@ type ImportColumns = {
   explanation: string;
   durationMinutes: string;
   passingPercent: string;
+  applicationTitle: string;
+  accessCode: string;
+  startsAt: string;
+  endsAt: string;
+  noExpiration: string;
   sourceStatus: string;
 };
 
@@ -178,6 +211,11 @@ async function parseImportFile(file: File): Promise<ImportResult> {
   const warnings: string[] = [];
   const rowDurations: number[] = [];
   const rowPassingPercents: number[] = [];
+  const rowApplicationTitles: string[] = [];
+  const rowAccessCodes: string[] = [];
+  const rowStartDates: string[] = [];
+  const rowEndDates: string[] = [];
+  const rowNoExpirationValues: boolean[] = [];
 
   rows.forEach((rawRow, rowIndex) => {
     const rowNumber = rowIndex + 2;
@@ -201,9 +239,24 @@ async function parseImportFile(file: File): Promise<ImportResult> {
 
     const duration = parseNumber(row.durationMinutes);
     const passingPercent = parseNumber(row.passingPercent);
+    const startsAt = parseDateCell(row.startsAt);
+    const endsAt = parseDateCell(row.endsAt);
 
     if (duration !== null) rowDurations.push(Math.round(duration));
     if (passingPercent !== null) rowPassingPercents.push(normalizePercent(passingPercent));
+    if (row.applicationTitle) rowApplicationTitles.push(row.applicationTitle);
+    if (row.accessCode) rowAccessCodes.push(row.accessCode);
+    if (startsAt) rowStartDates.push(startsAt);
+    if (endsAt) rowEndDates.push(endsAt);
+    if (row.noExpiration) rowNoExpirationValues.push(parseBooleanCell(row.noExpiration));
+
+    if (row.startsAt && !startsAt) {
+      warnings.push(`Linha ${rowNumber}: data de liberacao "${row.startsAt}" nao foi reconhecida.`);
+    }
+
+    if (row.endsAt && !endsAt) {
+      warnings.push(`Linha ${rowNumber}: data de expiracao "${row.endsAt}" nao foi reconhecida.`);
+    }
 
     questions.push({
       id: crypto.randomUUID(),
@@ -228,11 +281,18 @@ async function parseImportFile(file: File): Promise<ImportResult> {
   const themes = uniqueNonEmpty(questions.map((question) => question.theme));
   const categories = uniqueCategories(questions);
   const title = themes.length === 1 ? `Prova - ${themes[0]}` : titleFromFileName(file.name);
+  const endsAt = firstText(rowEndDates, "");
+  const noExpiration = firstBoolean(rowNoExpirationValues, !endsAt);
 
   return {
     title,
     durationMinutes: clamp(firstValue(rowDurations, 60), 1, 300),
     passingPercent: clamp(firstValue(rowPassingPercents, 70), 0, 100),
+    applicationTitle: firstText(rowApplicationTitles, "Aplicacao principal"),
+    accessCode: firstText(rowAccessCodes, ""),
+    startsAt: firstText(rowStartDates, ""),
+    endsAt,
+    noExpiration,
     categories,
     questions,
     warnings,
@@ -255,6 +315,11 @@ function normalizeRow(rawRow: Record<string, unknown>): ImportColumns {
     explanation: "",
     durationMinutes: "",
     passingPercent: "",
+    applicationTitle: "",
+    accessCode: "",
+    startsAt: "",
+    endsAt: "",
+    noExpiration: "",
     sourceStatus: "",
   };
 
@@ -341,6 +406,32 @@ function parseNumber(value: string) {
   return Number.isFinite(number) ? number : null;
 }
 
+function parseDateCell(value: string) {
+  const cleanValue = value.trim();
+  if (!cleanValue) return "";
+
+  const isoMatch = cleanValue.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (isoMatch) {
+    return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
+  }
+
+  const brazilianMatch = cleanValue.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (brazilianMatch) {
+    const day = brazilianMatch[1].padStart(2, "0");
+    const month = brazilianMatch[2].padStart(2, "0");
+    return `${brazilianMatch[3]}-${month}-${day}`;
+  }
+
+  return "";
+}
+
+function parseBooleanCell(value: string) {
+  const cleanValue = normalizeKey(value);
+  if (!cleanValue) return false;
+
+  return ["1", "sim", "s", "true", "verdadeiro", "ilimitada", "ilimitado"].includes(cleanValue);
+}
+
 function normalizePercent(value: number) {
   if (value > 0 && value <= 1) return value * 100;
   return value;
@@ -358,6 +449,14 @@ function uniqueCategories(questions: ImportQuestion[]) {
 
 function firstValue(values: number[], fallback: number) {
   return values.find((value) => Number.isFinite(value)) ?? fallback;
+}
+
+function firstText(values: string[], fallback: string) {
+  return values.find((value) => value.trim()) ?? fallback;
+}
+
+function firstBoolean(values: boolean[], fallback: boolean) {
+  return values.length > 0 ? values[0] : fallback;
 }
 
 function clamp(value: number, min: number, max: number) {
@@ -395,9 +494,14 @@ function buildXlsxTemplateResponse() {
     { wch: 52 },
     { wch: 24 },
     { wch: 24 },
+    { wch: 24 },
+    { wch: 18 },
+    { wch: 14 },
+    { wch: 14 },
+    { wch: 22 },
     { wch: 14 },
   ];
-  worksheet["!autofilter"] = { ref: `A1:O${templateRows.length + 1}` };
+  worksheet["!autofilter"] = { ref: `A1:T${templateRows.length + 1}` };
 
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, "Modelo");

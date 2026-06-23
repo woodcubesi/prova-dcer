@@ -29,6 +29,11 @@ type ImportedExamFile = {
   title?: string;
   durationMinutes?: number;
   passingPercent?: number;
+  applicationTitle?: string;
+  accessCode?: string;
+  startsAt?: string;
+  endsAt?: string;
+  noExpiration?: boolean;
   categories?: CategoryCode[];
   questions?: QuestionDraft[];
   warnings?: string[];
@@ -42,6 +47,8 @@ export type ExamBuilderInitialData = {
   passingPercent: number;
   applicationTitle: string;
   accessCode: string;
+  startsAt: string;
+  endsAt: string;
   churchIds: string[];
   categories: CategoryCode[];
   questions: QuestionDraft[];
@@ -80,6 +87,16 @@ function getInitialQuestions(initialData?: ExamBuilderInitialData) {
   return initialData?.questions.length ? initialData.questions : [newQuestion()];
 }
 
+function getDefaultEndsAtInput() {
+  const date = new Date();
+  date.setDate(date.getDate() + 30);
+  return date.toISOString().slice(0, 10);
+}
+
+function normalizeImportedDate(value?: string) {
+  return value?.trim().slice(0, 10) || "";
+}
+
 export function ExamBuilder({ churches, initialData, locked = false, mode = "create" }: ExamBuilderProps) {
   const isEditing = mode === "edit";
   const [title, setTitle] = useState(initialData?.title || "Nova prova");
@@ -88,6 +105,9 @@ export function ExamBuilder({ churches, initialData, locked = false, mode = "cre
   const [passingPercent, setPassingPercent] = useState(initialData?.passingPercent ?? 70);
   const [applicationTitle, setApplicationTitle] = useState(initialData?.applicationTitle || "Aplicacao principal");
   const [accessCode, setAccessCode] = useState(initialData?.accessCode || "");
+  const [startsAt, setStartsAt] = useState(initialData?.startsAt || "");
+  const [endsAt, setEndsAt] = useState(initialData?.endsAt || getDefaultEndsAtInput());
+  const [noExpiration, setNoExpiration] = useState(() => (initialData ? !initialData.endsAt : false));
   const [selectedChurchIds, setSelectedChurchIds] = useState(() =>
     initialData?.churchIds.length ? initialData.churchIds : churches.map((church) => church.id),
   );
@@ -111,6 +131,9 @@ export function ExamBuilder({ churches, initialData, locked = false, mode = "cre
         passingPercent,
         applicationTitle,
         accessCode,
+        startsAt,
+        endsAt: noExpiration ? "" : endsAt,
+        noExpiration,
         churchIds: selectedChurchIds,
         categories: selectedCategories,
         questions: questions.map((question) => ({
@@ -133,10 +156,13 @@ export function ExamBuilder({ churches, initialData, locked = false, mode = "cre
       applicationTitle,
       description,
       durationMinutes,
+      endsAt,
+      noExpiration,
       passingPercent,
       questions,
       selectedCategories,
       selectedChurchIds,
+      startsAt,
       title,
     ],
   );
@@ -169,6 +195,11 @@ export function ExamBuilder({ churches, initialData, locked = false, mode = "cre
       setTitle(imported.title || title);
       setDurationMinutes(imported.durationMinutes || durationMinutes);
       setPassingPercent(imported.passingPercent ?? passingPercent);
+      setApplicationTitle(imported.applicationTitle || applicationTitle);
+      setAccessCode(imported.accessCode || accessCode);
+      setStartsAt(normalizeImportedDate(imported.startsAt));
+      setEndsAt(normalizeImportedDate(imported.endsAt) || endsAt);
+      setNoExpiration(imported.noExpiration ?? !imported.endsAt);
 
       if (imported.categories?.length) {
         setSelectedCategories(imported.categories);
@@ -362,20 +393,54 @@ export function ExamBuilder({ churches, initialData, locked = false, mode = "cre
             <span className="text-sm font-medium">Titulo da aplicacao</span>
             <input
               value={applicationTitle}
-              disabled={locked}
               onChange={(event) => setApplicationTitle(event.target.value)}
-              className="mt-1 w-full rounded-md border border-[#c5cce4] px-3 py-3 outline-none focus:ring-2 focus:ring-[#000060] disabled:bg-[#f8faff]"
+              className="mt-1 w-full rounded-md border border-[#c5cce4] px-3 py-3 outline-none focus:ring-2 focus:ring-[#000060]"
             />
           </label>
           <label className="block lg:col-span-2">
             <span className="text-sm font-medium">Codigo opcional da aplicacao</span>
             <input
               value={accessCode}
-              disabled={locked}
               onChange={(event) => setAccessCode(event.target.value.toUpperCase())}
-              className="mt-1 w-full rounded-md border border-[#c5cce4] px-3 py-3 font-mono uppercase outline-none focus:ring-2 focus:ring-[#000060] disabled:bg-[#f8faff]"
+              className="mt-1 w-full rounded-md border border-[#c5cce4] px-3 py-3 font-mono uppercase outline-none focus:ring-2 focus:ring-[#000060]"
               placeholder="Ex.: PROVA2026"
             />
+          </label>
+        </div>
+      </section>
+
+      <section className="rounded-lg border border-[#d8def0] bg-white p-4">
+        <h2 className="text-lg font-semibold">Disponibilidade da aplicacao</h2>
+        <div className="mt-4 grid gap-3 lg:grid-cols-3">
+          <label className="block">
+            <span className="text-sm font-medium">Liberar a partir de</span>
+            <input
+              type="date"
+              value={startsAt}
+              onChange={(event) => setStartsAt(event.target.value)}
+              className="mt-1 w-full rounded-md border border-[#c5cce4] px-3 py-3 outline-none focus:ring-2 focus:ring-[#000060]"
+            />
+            <span className="mt-1 block text-xs text-[#5d6480]">Em branco libera imediatamente.</span>
+          </label>
+          <label className="block">
+            <span className="text-sm font-medium">Expira em</span>
+            <input
+              type="date"
+              value={endsAt}
+              disabled={noExpiration}
+              onChange={(event) => setEndsAt(event.target.value)}
+              className="mt-1 w-full rounded-md border border-[#c5cce4] px-3 py-3 outline-none focus:ring-2 focus:ring-[#000060] disabled:bg-[#f8faff] disabled:text-[#8a91aa]"
+            />
+            <span className="mt-1 block text-xs text-[#5d6480]">Depois desta data a prova deixa de aparecer.</span>
+          </label>
+          <label className="flex items-center gap-3 rounded-md border border-[#d8def0] px-3 py-3 text-sm font-medium lg:mt-6">
+            <input
+              type="checkbox"
+              checked={noExpiration}
+              onChange={(event) => setNoExpiration(event.target.checked)}
+              className="h-5 w-5 accent-[#000060]"
+            />
+            Expiracao ilimitada
           </label>
         </div>
       </section>
@@ -624,8 +689,7 @@ export function ExamBuilder({ churches, initialData, locked = false, mode = "cre
 
       <div className="sticky bottom-0 rounded-lg border border-[#d8def0] bg-white/95 p-4 shadow-lg backdrop-blur">
         <button
-          disabled={locked}
-          className="w-full rounded-md bg-[#000060] px-5 py-3 text-sm font-semibold text-white hover:bg-[#000044] disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+          className="w-full rounded-md bg-[#000060] px-5 py-3 text-sm font-semibold text-white hover:bg-[#000044] sm:w-auto"
         >
           {isEditing ? "Salvar alteracoes da prova" : "Criar prova e liberar aplicacao"}
         </button>

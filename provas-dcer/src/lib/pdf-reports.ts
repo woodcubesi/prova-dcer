@@ -4,6 +4,7 @@ import PDFDocument from "pdfkit";
 import type PDFKit from "pdfkit";
 import { getCategoryLabel } from "@/lib/categories";
 import { formatPercent, formatScore, getApprovalResult } from "@/lib/report-metrics";
+import { formatAvailabilityWindow } from "@/lib/application-availability";
 import { formatDuration } from "@/lib/text";
 
 type PdfQuestion = {
@@ -49,6 +50,8 @@ export type ApplicationSummaryPdfData = {
   examTitle: string;
   applicationTitle: string;
   accessCode: string;
+  startsAt?: Date | null;
+  endsAt?: Date | null;
   passingPercent: number;
   rows: Array<{
     studentName: string;
@@ -207,6 +210,7 @@ export function buildApplicationSummaryPdf(data: ApplicationSummaryPdfData) {
     drawMetaGrid(doc, [
       ["Aplicacao", data.applicationTitle],
       ["Codigo", data.accessCode],
+      ["Disponibilidade", formatAvailabilityWindow(data)],
       ["Aprovacao minima", formatPercent(data.passingPercent)],
       ["Inscritos", String(totalParticipants)],
       ["Embaixadores que fizeram", String(finalRows.length)],

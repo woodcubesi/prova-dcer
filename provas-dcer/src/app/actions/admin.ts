@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { AdminRole, Category, ExamStatus } from "@/generated/prisma/client";
+import { parseApplicationDateInput } from "@/lib/application-availability";
 import {
   clearAdminSession,
   createAdminSession,
@@ -108,6 +109,9 @@ const examPayloadSchema = z.object({
   passingPercent: z.coerce.number().min(0, "O percentual minimo nao pode ser negativo.").max(100),
   applicationTitle: z.string().trim().min(3, "Informe o titulo da aplicacao."),
   accessCode: z.string().trim().optional(),
+  startsAt: z.string().trim().optional(),
+  endsAt: z.string().trim().optional(),
+  noExpiration: z.boolean().optional().default(false),
   churchIds: z.array(z.string().min(1)).min(1, "Selecione pelo menos uma igreja."),
   categories: z.array(categorySchema).min(1, "Selecione pelo menos uma categoria."),
   questions: z.array(questionSchema).min(1, "Crie pelo menos uma questao."),
@@ -154,6 +158,41 @@ function parseOptionalDate(formData: FormData, field: string, label: string) {
   }
 
   return date;
+}
+
+function parsePayloadDate(value: string | undefined, label: string, errorPath: string, endOfDay = false) {
+  const cleanValue = value?.trim();
+
+  if (!cleanValue) return null;
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(cleanValue)) {
+    errorRedirect(errorPath, `Informe uma data valida para ${label}.`);
+  }
+
+  const date = parseApplicationDateInput(cleanValue, endOfDay);
+
+  if (!date) {
+    errorRedirect(errorPath, `Informe uma data valida para ${label}.`);
+  }
+
+  return date;
+}
+
+function parseApplicationWindow(payload: z.infer<typeof examPayloadSchema>, errorPath: string) {
+  const startsAt = parsePayloadDate(payload.startsAt, "liberacao da prova", errorPath);
+  const endsAt = payload.noExpiration
+    ? null
+    : parsePayloadDate(payload.endsAt, "expiracao da prova", errorPath, true);
+
+  if (!payload.noExpiration && !endsAt) {
+    errorRedirect(errorPath, "Informe a data de expiracao ou marque expiracao ilimitada.");
+  }
+
+  if (startsAt && endsAt && startsAt > endsAt) {
+    errorRedirect(errorPath, "A data de liberacao nao pode ser depois da expiracao.");
+  }
+
+  return { startsAt, endsAt };
 }
 
 function parseExamPayload(formData: FormData, errorPath: string) {
@@ -886,6 +925,7 @@ export async function createExamAction(formData: FormData) {
   const errorPath = "/admin/provas/nova";
   const payload = parseExamPayload(formData, errorPath);
   validateQuestionAudience(payload, errorPath);
+  const applicationWindow = parseApplicationWindow(payload, errorPath);
   const churchIds = resolveExamChurchIds(context, payload.churchIds, errorPath);
 
   const accessCode = buildAccessCode(payload.accessCode);
@@ -944,6 +984,8 @@ export async function createExamAction(formData: FormData) {
         title: payload.applicationTitle,
         accessCode,
         active: true,
+        startsAt: applicationWindow.startsAt,
+        endsAt: applicationWindow.endsAt,
         showResultToStudent: false,
         participants: {
           create: students.map((student) => ({
@@ -971,6 +1013,7 @@ export async function updateExamAction(formData: FormData) {
 
   const payload = parseExamPayload(formData, errorPath);
   validateQuestionAudience(payload, errorPath);
+  const applicationWindow = parseApplicationWindow(payload, errorPath);
   const churchIds = resolveExamChurchIds(context, payload.churchIds, errorPath);
   const scopedChurchId = getScopedChurchId(context);
   const accessCode = buildAccessCode(payload.accessCode);
@@ -1005,14 +1048,25 @@ export async function updateExamAction(formData: FormData) {
     errorRedirect(errorPath, "Aplicacao de prova nao encontrada.");
   }
 
-  if (application.attempts.length > 0) {
-    errorRedirect(
-      errorPath,
-      "Nao e possivel editar uma prova que ja foi iniciada por embaixadores. Crie uma nova aplicacao para preservar as respostas.",
-    );
-  }
-
   await ensureAccessCodeAvailable(accessCode, errorPath, application.id);
+
+  if (application.attempts.length > 0) {
+    await prisma.examApplication.update({
+      where: { id: application.id },
+      data: {
+        title: payload.applicationTitle,
+        accessCode,
+        startsAt: applicationWindow.startsAt,
+        endsAt: applicationWindow.endsAt,
+      },
+    });
+
+    revalidatePath("/admin");
+    revalidatePath("/admin/provas");
+    revalidatePath(`/admin/provas/${application.id}/editar`);
+    revalidatePath("/prova");
+    redirect("/admin/provas?ok=editada");
+  }
 
   const students = await prisma.student.findMany({
     where: {
@@ -1084,6 +1138,8 @@ export async function updateExamAction(formData: FormData) {
         title: payload.applicationTitle,
         accessCode,
         active: true,
+        startsAt: applicationWindow.startsAt,
+        endsAt: applicationWindow.endsAt,
         showResultToStudent: false,
         participants: {
           create: students.map((student) => ({

@@ -8,6 +8,7 @@ type ApplicationOption = {
   title: string;
   examTitle: string;
   durationMinutes: number;
+  endsAt: string | null;
   alreadyStarted: boolean;
 };
 
@@ -174,6 +175,14 @@ export function StudentEntry() {
             {application ? (
               <div className="rounded-md bg-[#effaf2] px-3 py-2 text-sm text-[#1f623e]">
                 Tempo total: <strong>{application.durationMinutes} minutos</strong>.
+                {" "}
+                {application.endsAt ? (
+                  <>
+                    Disponivel ate <strong>{formatApplicationDate(application.endsAt)}</strong>.
+                  </>
+                ) : (
+                  <strong>Expiracao ilimitada.</strong>
+                )}
                 {application.alreadyStarted ? " Esta prova ja foi iniciada e sera retomada." : ""}
               </div>
             ) : null}
@@ -216,4 +225,10 @@ function formatDate(value: string | null) {
   if (!value) return "-";
 
   return new Intl.DateTimeFormat("pt-BR", { timeZone: "UTC" }).format(new Date(value));
+}
+
+function formatApplicationDate(value: string | null) {
+  if (!value) return "-";
+
+  return new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo" }).format(new Date(value));
 }

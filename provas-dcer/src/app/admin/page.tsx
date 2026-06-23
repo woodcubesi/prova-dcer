@@ -1,6 +1,11 @@
 import Link from "next/link";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { AdminRole } from "@/generated/prisma/client";
+import {
+  formatAvailabilityWindow,
+  getApplicationStatus,
+  getApplicationStatusLabel,
+} from "@/lib/application-availability";
 import { getCategoryLabel } from "@/lib/categories";
 import { requireAdminContext } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -21,6 +26,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const isTeacher = context.role === AdminRole.TEACHER;
   const scopedChurchId = isTeacher ? context.churchId : null;
   const scopedChurchFilter = scopedChurchId || "__missing_church__";
+  const now = new Date();
 
   const [churches, students, exams, submittedAttempts, administrators, teachers, applications] = await Promise.all([
     prisma.church.count({
@@ -187,7 +193,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                     <p className="mt-1 text-sm text-[#5d6480]">{application.exam.title}</p>
                   </div>
                   <span className="rounded-full bg-[#effaf2] px-2 py-1 text-xs font-medium text-[#1f623e]">
-                    {application.active ? "Ativa" : "Inativa"}
+                    {getApplicationStatusLabel(getApplicationStatus(application, now))}
                   </span>
                 </div>
                 <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
@@ -207,6 +213,10 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                     <p className="text-xs text-[#5d6480]">Envios</p>
                     <p className="font-semibold">{application.attempts.length}</p>
                   </div>
+                  <div className="rounded-md bg-[#f8faff] px-3 py-2 sm:col-span-2">
+                    <p className="text-xs text-[#5d6480]">Disponibilidade</p>
+                    <p className="font-semibold">{formatAvailabilityWindow(application)}</p>
+                  </div>
                 </div>
                 <Link
                   href={`/admin/provas/${application.id}/editar`}
@@ -219,12 +229,13 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           </div>
 
           <div className="mt-4 hidden overflow-x-auto md:block">
-            <table className="w-full min-w-[820px] text-left text-sm">
+            <table className="w-full min-w-[960px] text-left text-sm">
               <thead className="border-b border-[#d8def0] text-xs uppercase tracking-wide text-[#5d6480]">
                 <tr>
                   <th className="py-3 pr-4">Aplicacao</th>
                   <th className="py-3 pr-4">Codigo</th>
                   <th className="py-3 pr-4">Tempo</th>
+                  <th className="py-3 pr-4">Disponibilidade</th>
                   <th className="py-3 pr-4">Participantes</th>
                   <th className="py-3 pr-4">Envios</th>
                   <th className="py-3 pr-4">Status</th>
@@ -240,11 +251,12 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                     </td>
                     <td className="py-3 pr-4 font-mono text-sm">{application.accessCode}</td>
                     <td className="py-3 pr-4">{application.exam.durationMinutes} min</td>
+                    <td className="py-3 pr-4">{formatAvailabilityWindow(application)}</td>
                     <td className="py-3 pr-4">{application.participants.length}</td>
                     <td className="py-3 pr-4">{application.attempts.length}</td>
                     <td className="py-3 pr-4">
                       <span className="rounded-full bg-[#effaf2] px-2 py-1 text-xs font-medium text-[#1f623e]">
-                        {application.active ? "Ativa" : "Inativa"}
+                        {getApplicationStatusLabel(getApplicationStatus(application, now))}
                       </span>
                     </td>
                     <td className="py-3 pr-4">

@@ -121,6 +121,7 @@ export async function POST(request: Request) {
       title: application.title,
       examTitle: application.exam.title,
       durationMinutes: application.exam.durationMinutes,
+      endsAt: isoDate(application.endsAt),
       alreadyStarted: application.attempts[0]?.status === AttemptStatus.IN_PROGRESS,
     })),
   });
