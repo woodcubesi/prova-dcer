@@ -87,8 +87,9 @@ export async function POST(request: Request) {
 
 async function parseImportFile(file: File): Promise<ImportResult> {
   const buffer = Buffer.from(await file.arrayBuffer());
-  const workbook = XLSX.read(buffer, {
-    type: "buffer",
+  const isCsv = file.name.toLowerCase().endsWith(".csv") || file.type === "text/csv";
+  const workbook = XLSX.read(isCsv ? buffer.toString("utf8") : buffer, {
+    type: isCsv ? "string" : "buffer",
     cellDates: false,
     raw: false,
   });
