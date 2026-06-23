@@ -107,6 +107,28 @@ function optionalText(value?: string | null) {
   return text || null;
 }
 
+function optionalFormText(formData: FormData, field: string) {
+  return optionalText(String(formData.get(field) || ""));
+}
+
+function parseOptionalDate(formData: FormData, field: string, label: string) {
+  const value = String(formData.get(field) || "").trim();
+
+  if (!value) return null;
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    errorRedirect("/admin/cadastros", `Informe uma data valida para ${label}.`);
+  }
+
+  const date = new Date(`${value}T00:00:00.000Z`);
+
+  if (Number.isNaN(date.getTime())) {
+    errorRedirect("/admin/cadastros", `Informe uma data valida para ${label}.`);
+  }
+
+  return date;
+}
+
 function parseExamPayload(formData: FormData, errorPath: string) {
   const rawPayload = String(formData.get("payload") || "");
   let parsedJson: unknown;
@@ -255,6 +277,19 @@ async function ensureUniqueStudent(
 
   if (existingStudent && existingStudent.id !== ignoredId) {
     errorRedirect("/admin/cadastros", "Ja existe embaixador com este nome, igreja e categoria.");
+  }
+}
+
+async function ensureUniqueStudentExternalId(externalId: string | null, ignoredId?: string) {
+  if (!externalId) return;
+
+  const existingStudent = await prisma.student.findFirst({
+    where: { externalId },
+    select: { id: true },
+  });
+
+  if (existingStudent && existingStudent.id !== ignoredId) {
+    errorRedirect("/admin/cadastros", "Ja existe embaixador com este numero de inscricao.");
   }
 }
 
@@ -432,20 +467,27 @@ export async function createChurchAction(formData: FormData) {
   await requireAdminRole([AdminRole.ADMIN, AdminRole.ADMIN_TEACHER]);
 
   const name = String(formData.get("name") || "").trim();
+  const embassyName = optionalFormText(formData, "embassyName");
   const city = String(formData.get("city") || "").trim();
 
   if (name.length < 3) {
     errorRedirect("/admin/cadastros", "Informe o nome da igreja.");
   }
 
+  if (!embassyName || embassyName.length < 3) {
+    errorRedirect("/admin/cadastros", "Informe o nome da embaixada.");
+  }
+
   await prisma.church.upsert({
     where: { name },
     update: {
+      embassyName,
       city: city || null,
       active: true,
     },
     create: {
       name,
+      embassyName,
       city: city || null,
     },
   });
@@ -460,10 +502,15 @@ export async function updateChurchAction(formData: FormData) {
 
   const id = String(formData.get("id") || "");
   const name = String(formData.get("name") || "").trim();
+  const embassyName = optionalFormText(formData, "embassyName");
   const city = String(formData.get("city") || "").trim();
 
   if (!id || name.length < 3) {
     errorRedirect("/admin/cadastros", "Informe o nome da igreja.");
+  }
+
+  if (!embassyName || embassyName.length < 3) {
+    errorRedirect("/admin/cadastros", "Informe o nome da embaixada.");
   }
 
   const duplicate = await prisma.church.findUnique({
@@ -479,6 +526,7 @@ export async function updateChurchAction(formData: FormData) {
     where: { id },
     data: {
       name,
+      embassyName,
       city: city || null,
       active: true,
     },
@@ -497,6 +545,11 @@ export async function createStudentAction(formData: FormData) {
   const requestedChurchId = String(formData.get("churchId") || "");
   const churchId = scopedChurchId || requestedChurchId;
   const category = String(formData.get("category") || "") as Category;
+  const externalId = optionalFormText(formData, "externalId");
+  const registrationIssuedAt = parseOptionalDate(formData, "registrationIssuedAt", "emissao");
+  const registrationExpiresAt = parseOptionalDate(formData, "registrationExpiresAt", "validade");
+  const birthDate = parseOptionalDate(formData, "birthDate", "nascimento");
+  const embassyAdmissionDate = parseOptionalDate(formData, "embassyAdmissionDate", "admissao na embaixada");
 
   if (context.role === AdminRole.TEACHER && !scopedChurchId) {
     errorRedirect("/admin/cadastros", "Seu usuario de conselheiro ainda nao esta vinculado a uma igreja.");
@@ -512,6 +565,7 @@ export async function createStudentAction(formData: FormData) {
 
   const normalizedName = normalizeName(name);
   await ensureUniqueStudent(churchId, category, normalizedName);
+  await ensureUniqueStudentExternalId(externalId);
 
   await prisma.student.upsert({
     where: {
@@ -523,12 +577,22 @@ export async function createStudentAction(formData: FormData) {
     },
     update: {
       name,
+      externalId,
+      registrationIssuedAt,
+      registrationExpiresAt,
+      birthDate,
+      embassyAdmissionDate,
       active: true,
     },
     create: {
       name,
       normalizedName,
       category,
+      externalId,
+      registrationIssuedAt,
+      registrationExpiresAt,
+      birthDate,
+      embassyAdmissionDate,
       churchId,
     },
   });
@@ -546,6 +610,11 @@ export async function updateStudentAction(formData: FormData) {
   const requestedChurchId = String(formData.get("churchId") || "");
   const churchId = scopedChurchId || requestedChurchId;
   const category = String(formData.get("category") || "") as Category;
+  const externalId = optionalFormText(formData, "externalId");
+  const registrationIssuedAt = parseOptionalDate(formData, "registrationIssuedAt", "emissao");
+  const registrationExpiresAt = parseOptionalDate(formData, "registrationExpiresAt", "validade");
+  const birthDate = parseOptionalDate(formData, "birthDate", "nascimento");
+  const embassyAdmissionDate = parseOptionalDate(formData, "embassyAdmissionDate", "admissao na embaixada");
 
   if (context.role === AdminRole.TEACHER && !scopedChurchId) {
     errorRedirect("/admin/cadastros", "Seu usuario de conselheiro ainda nao esta vinculado a uma igreja.");
@@ -574,6 +643,7 @@ export async function updateStudentAction(formData: FormData) {
 
   const normalizedName = normalizeName(name);
   await ensureUniqueStudent(churchId, category, normalizedName, id);
+  await ensureUniqueStudentExternalId(externalId, id);
 
   await prisma.student.update({
     where: { id },
@@ -581,6 +651,11 @@ export async function updateStudentAction(formData: FormData) {
       name,
       normalizedName,
       category,
+      externalId,
+      registrationIssuedAt,
+      registrationExpiresAt,
+      birthDate,
+      embassyAdmissionDate,
       churchId,
       active: true,
     },

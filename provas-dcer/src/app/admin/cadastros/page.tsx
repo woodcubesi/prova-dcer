@@ -21,6 +21,14 @@ type RegisterPageProps = {
   }>;
 };
 
+function formatDateInput(date?: Date | null) {
+  return date ? date.toISOString().slice(0, 10) : "";
+}
+
+function formatDateLabel(date?: Date | null) {
+  return date ? date.toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "-";
+}
+
 export default async function RegistersPage({ searchParams }: RegisterPageProps) {
   const context = await requireAdminContext();
   const params = searchParams ? await searchParams : {};
@@ -102,7 +110,16 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
                   name="name"
                   defaultValue={editingChurch?.name || ""}
                   className="mt-1 w-full rounded-md border border-[#c5cce4] px-3 py-3 outline-none focus:ring-2 focus:ring-[#000060]"
-                  placeholder="Ex.: Igreja Sede Central"
+                  placeholder="Ex.: Batista em Vila Iorio"
+                />
+              </label>
+              <label className="block sm:col-span-2">
+                <span className="text-sm font-medium">Nome da embaixada</span>
+                <input
+                  name="embassyName"
+                  defaultValue={editingChurch?.embassyName || ""}
+                  className="mt-1 w-full rounded-md border border-[#c5cce4] px-3 py-3 outline-none focus:ring-2 focus:ring-[#000060]"
+                  placeholder="Ex.: Pastor Sergio Medeiros"
                 />
               </label>
               <label className="block sm:col-span-2">
@@ -143,7 +160,10 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
                 <span className="text-sm font-medium">Igreja</span>
                 <input type="hidden" name="churchId" value={scopedChurchId || ""} />
                 <div className="mt-1 rounded-md border border-[#c5cce4] bg-[#f8faff] px-3 py-3 text-sm">
-                  {churches[0]?.name || "Igreja nao vinculada"}
+                  <p>{churches[0]?.name || "Igreja nao vinculada"}</p>
+                  {churches[0]?.embassyName ? (
+                    <p className="mt-1 text-xs text-[#5d6480]">Embaixada: {churches[0].embassyName}</p>
+                  ) : null}
                 </div>
               </label>
             ) : (
@@ -157,7 +177,7 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
                   <option value="">Selecione</option>
                   {churches.map((church) => (
                     <option key={church.id} value={church.id}>
-                      {church.name}
+                      {church.embassyName ? `${church.name} - ${church.embassyName}` : church.name}
                     </option>
                   ))}
                 </select>
@@ -187,6 +207,51 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
                 placeholder="Nome completo"
               />
             </label>
+            <label className="block">
+              <span className="text-sm font-medium">Numero da inscricao</span>
+              <input
+                name="externalId"
+                defaultValue={editingStudent?.externalId || ""}
+                className="mt-1 w-full rounded-md border border-[#c5cce4] px-3 py-3 outline-none focus:ring-2 focus:ring-[#000060]"
+                placeholder="Ex.: 210300100049"
+              />
+            </label>
+            <label className="block">
+              <span className="text-sm font-medium">Emissao</span>
+              <input
+                name="registrationIssuedAt"
+                type="date"
+                defaultValue={formatDateInput(editingStudent?.registrationIssuedAt)}
+                className="mt-1 w-full rounded-md border border-[#c5cce4] px-3 py-3 outline-none focus:ring-2 focus:ring-[#000060]"
+              />
+            </label>
+            <label className="block">
+              <span className="text-sm font-medium">Validade</span>
+              <input
+                name="registrationExpiresAt"
+                type="date"
+                defaultValue={formatDateInput(editingStudent?.registrationExpiresAt)}
+                className="mt-1 w-full rounded-md border border-[#c5cce4] px-3 py-3 outline-none focus:ring-2 focus:ring-[#000060]"
+              />
+            </label>
+            <label className="block">
+              <span className="text-sm font-medium">Nascimento</span>
+              <input
+                name="birthDate"
+                type="date"
+                defaultValue={formatDateInput(editingStudent?.birthDate)}
+                className="mt-1 w-full rounded-md border border-[#c5cce4] px-3 py-3 outline-none focus:ring-2 focus:ring-[#000060]"
+              />
+            </label>
+            <label className="block sm:col-span-2">
+              <span className="text-sm font-medium">Admissao na embaixada</span>
+              <input
+                name="embassyAdmissionDate"
+                type="date"
+                defaultValue={formatDateInput(editingStudent?.embassyAdmissionDate)}
+                className="mt-1 w-full rounded-md border border-[#c5cce4] px-3 py-3 outline-none focus:ring-2 focus:ring-[#000060]"
+              />
+            </label>
           </div>
           <div className="mt-4 flex flex-col gap-2 sm:flex-row">
             <button className="rounded-md bg-[#000060] px-4 py-3 text-sm font-semibold text-white hover:bg-[#000044]">
@@ -211,6 +276,7 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
             {churches.map((church) => (
               <div key={church.id} className="rounded-md border border-[#e8ecf8] px-3 py-2">
                 <p className="font-medium">{church.name}</p>
+                <p className="text-sm text-[#111827]">{church.embassyName || "Embaixada nao informada"}</p>
                 <p className="text-xs text-[#5d6480]">
                   {church._count.students} embaixador(es) {church.city ? `- ${church.city}` : ""}
                 </p>
@@ -233,7 +299,27 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
             {students.map((student) => (
               <div key={student.id} className="rounded-md border border-[#e8ecf8] p-3">
                 <p className="font-medium">{student.name}</p>
-                <p className="mt-1 text-sm text-[#5d6480]">{student.church.name}</p>
+                <p className="mt-1 text-sm text-[#5d6480]">
+                  {student.church.embassyName || "Embaixada nao informada"} - {student.church.name}
+                </p>
+                <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                  <div className="rounded-md bg-[#f8faff] px-2 py-2">
+                    <p className="text-[#5d6480]">Inscricao</p>
+                    <p className="font-semibold">{student.externalId || "-"}</p>
+                  </div>
+                  <div className="rounded-md bg-[#f8faff] px-2 py-2">
+                    <p className="text-[#5d6480]">Validade</p>
+                    <p className="font-semibold">{formatDateLabel(student.registrationExpiresAt)}</p>
+                  </div>
+                  <div className="rounded-md bg-[#f8faff] px-2 py-2">
+                    <p className="text-[#5d6480]">Nascimento</p>
+                    <p className="font-semibold">{formatDateLabel(student.birthDate)}</p>
+                  </div>
+                  <div className="rounded-md bg-[#f8faff] px-2 py-2">
+                    <p className="text-[#5d6480]">Admissao</p>
+                    <p className="font-semibold">{formatDateLabel(student.embassyAdmissionDate)}</p>
+                  </div>
+                </div>
                 <span className="mt-2 inline-flex rounded-full bg-[#effaf2] px-2 py-1 text-xs font-medium text-[#1f623e]">
                   {getCategoryLabel(student.category)}
                 </span>
@@ -247,12 +333,16 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
             ))}
           </div>
           <div className="mt-3 hidden overflow-x-auto md:block">
-            <table className="w-full min-w-[720px] text-left text-sm">
+            <table className="w-full min-w-[980px] text-left text-sm">
               <thead className="border-b border-[#d8def0] text-xs uppercase tracking-wide text-[#5d6480]">
                 <tr>
                   <th className="py-3 pr-4">Nome</th>
+                  <th className="py-3 pr-4">Inscricao</th>
+                  <th className="py-3 pr-4">Embaixada</th>
                   <th className="py-3 pr-4">Igreja</th>
                   <th className="py-3 pr-4">Categoria</th>
+                  <th className="py-3 pr-4">Nascimento</th>
+                  <th className="py-3 pr-4">Validade</th>
                   <th className="py-3 pr-4">Acao</th>
                 </tr>
               </thead>
@@ -260,8 +350,12 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
                 {students.map((student) => (
                   <tr key={student.id} className="border-b border-[#e8ecf8] last:border-0">
                     <td className="py-3 pr-4 font-medium">{student.name}</td>
+                    <td className="py-3 pr-4 font-mono">{student.externalId || "-"}</td>
+                    <td className="py-3 pr-4">{student.church.embassyName || "-"}</td>
                     <td className="py-3 pr-4">{student.church.name}</td>
                     <td className="py-3 pr-4">{getCategoryLabel(student.category)}</td>
+                    <td className="py-3 pr-4">{formatDateLabel(student.birthDate)}</td>
+                    <td className="py-3 pr-4">{formatDateLabel(student.registrationExpiresAt)}</td>
                     <td className="py-3 pr-4">
                       <a
                         href={`/admin/cadastros?embaixador=${student.id}`}
@@ -274,7 +368,7 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
                 ))}
                 {students.length === 0 ? (
                   <tr>
-                    <td className="py-6 pr-4 text-sm text-[#5d6480]" colSpan={4}>
+                    <td className="py-6 pr-4 text-sm text-[#5d6480]" colSpan={8}>
                       Nenhum embaixador cadastrado ainda.
                     </td>
                   </tr>

@@ -59,32 +59,38 @@ model AdminUser {
 }
 
 model Church {
-  id        String    @id @default(cuid())
-  name      String    @unique
-  city      String?
-  active    Boolean   @default(true)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  students  Student[]
-  staffUsers AdminUser[]
+  id          String      @id @default(cuid())
+  name        String      @unique
+  embassyName String?
+  city        String?
+  active      Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  students    Student[]
+  staffUsers  AdminUser[]
 }
 
 model Student {
-  id             String                   @id @default(cuid())
-  name           String
-  normalizedName String
-  category       Category
-  externalId     String?
-  active         Boolean                  @default(true)
-  createdAt      DateTime                 @default(now())
-  updatedAt      DateTime                 @updatedAt
-  churchId       String
-  church         Church                   @relation(fields: [churchId], references: [id], onDelete: Cascade)
-  participants   ApplicationParticipant[]
-  attempts       Attempt[]
+  id                    String                   @id @default(cuid())
+  name                  String
+  normalizedName        String
+  category              Category
+  externalId            String?
+  registrationIssuedAt  DateTime?
+  registrationExpiresAt DateTime?
+  birthDate             DateTime?
+  embassyAdmissionDate  DateTime?
+  active                Boolean                  @default(true)
+  createdAt             DateTime                 @default(now())
+  updatedAt             DateTime                 @updatedAt
+  churchId              String
+  church                Church                   @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  participants          ApplicationParticipant[]
+  attempts              Attempt[]
 
   @@unique([churchId, category, normalizedName])
   @@index([category])
+  @@index([externalId])
 }
 
 model Exam {
@@ -93,9 +99,9 @@ model Exam {
   description     String?
   durationMinutes Int               @default(60)
   passingPercent  Float             @default(70)
-  status          ExamStatus         @default(DRAFT)
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
+  status          ExamStatus        @default(DRAFT)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
   questions       Question[]
   applications    ExamApplication[]
 }
@@ -183,19 +189,19 @@ model Attempt {
 }
 
 model Answer {
-  id               String    @id @default(cuid())
+  id               String   @id @default(cuid())
   attemptId        String
-  attempt          Attempt   @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  attempt          Attempt  @relation(fields: [attemptId], references: [id], onDelete: Cascade)
   questionId       String
-  question         Question  @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  question         Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
   selectedOptionId String?
-  selectedOption   Option?   @relation(fields: [selectedOptionId], references: [id], onDelete: SetNull)
+  selectedOption   Option?  @relation(fields: [selectedOptionId], references: [id], onDelete: SetNull)
   textAnswer       String?
   isCorrect        Boolean?
   pointsAwarded    Float?
   manualComment    String?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   @@unique([attemptId, questionId])
 }

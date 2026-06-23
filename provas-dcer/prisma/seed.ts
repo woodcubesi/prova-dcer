@@ -12,31 +12,42 @@ const prisma = new PrismaClient({ adapter });
 const churches = [
   {
     name: "Igreja Sede Central",
+    embassyName: "Pastor Sergio Medeiros",
     city: "Paulista",
     students: [
-      { name: "Ana Clara Souza", category: Category.JUNIOR },
-      { name: "Lucas Gabriel Lima", category: Category.JUNIOR },
-      { name: "Beatriz Santos", category: Category.ADOLESCENTES },
-      { name: "Mateus Oliveira", category: Category.JUVENIL },
+      {
+        name: "Ana Clara Souza",
+        category: Category.JUNIOR,
+        externalId: "210300100049",
+        registrationIssuedAt: new Date("2019-03-25T00:00:00.000Z"),
+        registrationExpiresAt: new Date("2028-12-05T00:00:00.000Z"),
+        birthDate: new Date("2010-12-06T00:00:00.000Z"),
+        embassyAdmissionDate: new Date("2018-12-06T00:00:00.000Z"),
+      },
+      { name: "Lucas Gabriel Lima", category: Category.JUNIOR, externalId: "210300100050" },
+      { name: "Beatriz Santos", category: Category.ADOLESCENTES, externalId: "210300100051" },
+      { name: "Mateus Oliveira", category: Category.JUVENIL, externalId: "210300100052" },
     ],
   },
   {
     name: "Igreja Jardim Paulista",
+    embassyName: "Embaixada Jardim Paulista",
     city: "Paulista",
     students: [
-      { name: "Maria Eduarda Silva", category: Category.JUNIOR },
-      { name: "Pedro Henrique Costa", category: Category.ADOLESCENTES },
-      { name: "Julia Ferreira", category: Category.ADOLESCENTES },
-      { name: "Rafael Almeida", category: Category.JUVENIL },
+      { name: "Maria Eduarda Silva", category: Category.JUNIOR, externalId: "210300100053" },
+      { name: "Pedro Henrique Costa", category: Category.ADOLESCENTES, externalId: "210300100054" },
+      { name: "Julia Ferreira", category: Category.ADOLESCENTES, externalId: "210300100055" },
+      { name: "Rafael Almeida", category: Category.JUVENIL, externalId: "210300100056" },
     ],
   },
   {
     name: "Igreja Vila Esperanca",
+    embassyName: "Embaixada Vila Esperanca",
     city: "Paulista",
     students: [
-      { name: "Davi Rocha", category: Category.JUNIOR },
-      { name: "Sofia Martins", category: Category.ADOLESCENTES },
-      { name: "Gabriel Nascimento", category: Category.JUVENIL },
+      { name: "Davi Rocha", category: Category.JUNIOR, externalId: "210300100057" },
+      { name: "Sofia Martins", category: Category.ADOLESCENTES, externalId: "210300100058" },
+      { name: "Gabriel Nascimento", category: Category.JUVENIL, externalId: "210300100059" },
     ],
   },
 ];
@@ -58,12 +69,18 @@ async function main() {
     const createdChurch = await prisma.church.create({
       data: {
         name: church.name,
+        embassyName: church.embassyName,
         city: church.city,
         students: {
           create: church.students.map((student) => ({
             name: student.name,
             normalizedName: normalizeName(student.name),
             category: student.category,
+            externalId: student.externalId,
+            registrationIssuedAt: student.registrationIssuedAt,
+            registrationExpiresAt: student.registrationExpiresAt,
+            birthDate: student.birthDate,
+            embassyAdmissionDate: student.embassyAdmissionDate,
           })),
         },
       },
