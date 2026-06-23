@@ -55,8 +55,8 @@ export type ApplicationSummaryPdfData = {
     churchName: string;
     category: string;
     status: string;
-    score: number;
-    totalPoints: number;
+    score?: number | null;
+    totalPoints?: number | null;
     timeUsedSeconds?: number | null;
   }>;
 };
@@ -178,34 +178,54 @@ export function buildApplicationSummaryPdf(data: ApplicationSummaryPdfData) {
   return createPdfBuffer((doc) => {
     doc.info.Title = `Relatorio - ${data.examTitle}`;
     drawHeader(doc, "Relatorio da prova", data.examTitle);
+    const rowResults = data.rows.map((row) => {
+      if (!hasFinalResult(row.status)) {
+        return {
+          ...row,
+          percent: null,
+          errorPercent: null,
+          passed: false,
+          label: getStatusLabel(row.status),
+        };
+      }
+
+      const result = getApprovalResult(row.score ?? 0, row.totalPoints ?? 0, data.passingPercent);
+      return { ...row, ...result };
+    });
+    const finalRows = rowResults.filter((row) => hasFinalResult(row.status));
+    const totalParticipants = rowResults.length;
+    const notFinished = totalParticipants - finalRows.length;
+    const overallAverage = totalParticipants
+      ? rowResults.reduce((sum, row) => sum + (row.percent ?? 0), 0) / totalParticipants
+      : 0;
+    const finishedAverage = finalRows.length
+      ? finalRows.reduce((sum, row) => sum + (row.percent ?? 0), 0) / finalRows.length
+      : 0;
+    const approved = finalRows.filter((row) => row.passed).length;
+    const failed = finalRows.length - approved;
+
     drawMetaGrid(doc, [
       ["Aplicacao", data.applicationTitle],
       ["Codigo", data.accessCode],
       ["Aprovacao minima", formatPercent(data.passingPercent)],
-      ["Embaixadores que fizeram", String(data.rows.length)],
+      ["Inscritos", String(totalParticipants)],
+      ["Embaixadores que fizeram", String(finalRows.length)],
+      ["Nao fizeram", String(notFinished)],
     ]);
 
-    const rowResults = data.rows.map((row) => {
-      const result = getApprovalResult(row.score, row.totalPoints, data.passingPercent);
-      return { ...row, ...result };
-    });
-    const average = rowResults.length
-      ? rowResults.reduce((sum, row) => sum + row.percent, 0) / rowResults.length
-      : 0;
-    const approved = rowResults.filter((row) => row.passed).length;
-    const failed = rowResults.length - approved;
-
     drawSummaryCards(doc, [
-      ["Media geral", formatPercent(average)],
+      ["Media geral", formatPercent(overallAverage)],
+      ["Media dos que fizeram", formatPercent(finishedAverage)],
       ["Aprovados", String(approved)],
       ["Reprovados", String(failed)],
-      ["Total", String(rowResults.length)],
+      ["Nao fizeram", String(notFinished)],
+      ["Total inscritos", String(totalParticipants)],
     ]);
 
     sectionTitle(doc, "Embaixadores");
 
     if (rowResults.length === 0) {
-      doc.font("Helvetica").fontSize(10).fillColor(mutedColor).text("Nenhum embaixador concluiu ou expirou esta prova.");
+      doc.font("Helvetica").fontSize(10).fillColor(mutedColor).text("Nenhum embaixador esta inscrito nesta aplicacao.");
       return;
     }
 
@@ -342,7 +362,7 @@ function drawTableHeader(doc: PDFKit.PDFDocument) {
 function drawStudentRow(
   doc: PDFKit.PDFDocument,
   row: ApplicationSummaryPdfData["rows"][number] & {
-    percent: number;
+    percent: number | null;
     passed: boolean;
     label: string;
   },
@@ -355,8 +375,8 @@ function drawStudentRow(
   doc.text(row.studentName, pageMargin + 8, y + 7, { width: 142, ellipsis: true });
   doc.text(row.churchName, pageMargin + 154, y + 7, { width: 112, ellipsis: true });
   doc.text(getCategoryLabel(row.category), pageMargin + 272, y + 7, { width: 70, ellipsis: true });
-  doc.text(formatPercent(row.percent), pageMargin + 348, y + 7, { width: 58 });
-  doc.font("Helvetica-Bold").fillColor(row.passed ? successColor : dangerColor);
+  doc.text(row.percent === null ? "-" : formatPercent(row.percent), pageMargin + 348, y + 7, { width: 58 });
+  doc.font("Helvetica-Bold").fillColor(getResultColor(row));
   doc.text(row.label, pageMargin + 414, y + 7, { width: 72 });
   doc.y = y + 34;
 }
@@ -378,5 +398,16 @@ function addPageNumbers(doc: PDFKit.PDFDocument) {
 function getStatusLabel(status: string) {
   if (status === "SUBMITTED") return "Enviada";
   if (status === "EXPIRED") return "Expirada";
+  if (status === "IN_PROGRESS") return "Em andamento";
+  if (status === "NOT_STARTED") return "Nao fez";
   return status;
+}
+
+function hasFinalResult(status: string) {
+  return status === "SUBMITTED" || status === "EXPIRED";
+}
+
+function getResultColor(row: { passed: boolean; percent: number | null }) {
+  if (row.percent === null) return mutedColor;
+  return row.passed ? successColor : dangerColor;
 }

@@ -46,7 +46,17 @@ export async function GET(_request: Request, { params }: ApplicationReportRouteC
       },
       attempts: {
         where: {
-          status: { in: ["SUBMITTED", "EXPIRED"] },
+          ...(isTeacher
+            ? {
+                student: {
+                  churchId: scopedChurchId || "__missing_church__",
+                },
+              }
+            : {}),
+        },
+      },
+      participants: {
+        where: {
           ...(isTeacher
             ? {
                 student: {
@@ -72,20 +82,28 @@ export async function GET(_request: Request, { params }: ApplicationReportRouteC
   }
 
   const fallbackTotalPoints = application.exam.questions.reduce((sum, question) => sum + question.points, 0);
+  const generatedAt = new Date();
+  const attemptsByStudentId = new Map(application.attempts.map((attempt) => [attempt.studentId, attempt]));
   const pdf = await buildApplicationSummaryPdf({
     examTitle: application.exam.title,
     applicationTitle: application.title,
     accessCode: application.accessCode,
     passingPercent: application.exam.passingPercent ?? 70,
-    rows: application.attempts.map((attempt) => ({
-      studentName: attempt.student.name,
-      churchName: attempt.student.church.name,
-      category: attempt.student.category,
-      status: attempt.status,
-      score: attempt.score ?? 0,
-      totalPoints: attempt.totalPoints || fallbackTotalPoints,
-      timeUsedSeconds: attempt.timeUsedSeconds,
-    })),
+    rows: application.participants.map((participant) => {
+      const attempt = attemptsByStudentId.get(participant.studentId);
+      const status = getReportStatus(attempt, generatedAt);
+      const hasResult = status === "SUBMITTED" || status === "EXPIRED";
+
+      return {
+        studentName: participant.student.name,
+        churchName: participant.student.church.name,
+        category: participant.student.category,
+        status,
+        score: hasResult ? attempt?.score ?? 0 : null,
+        totalPoints: attempt?.totalPoints || fallbackTotalPoints,
+        timeUsedSeconds: attempt?.timeUsedSeconds,
+      };
+    }),
   });
 
   const filename = makePdfFilename(`relatorio-${application.exam.title}-${application.title}`);
@@ -97,4 +115,18 @@ export async function GET(_request: Request, { params }: ApplicationReportRouteC
       "Cache-Control": "no-store",
     },
   });
+}
+
+function getReportStatus(
+  attempt:
+    | {
+        status: string;
+        expiresAt: Date;
+      }
+    | undefined,
+  generatedAt: Date,
+) {
+  if (!attempt) return "NOT_STARTED";
+  if (attempt.status === "IN_PROGRESS" && generatedAt > attempt.expiresAt) return "EXPIRED";
+  return attempt.status;
 }
