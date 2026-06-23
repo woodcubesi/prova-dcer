@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { ExamRunner } from "@/components/exam/ExamRunner";
 import { prisma } from "@/lib/prisma";
+import { filterQuestionsForCategory } from "@/lib/questions";
 
 export const dynamic = "force-dynamic";
 
@@ -55,6 +56,15 @@ export default async function ExamPage({ params }: ExamPageProps) {
     redirect("/prova/finalizada?status=expirada");
   }
 
+  const questions = filterQuestionsForCategory(
+    attempt.application.exam.questions,
+    attempt.student.category,
+  );
+
+  if (questions.length === 0) {
+    redirect("/prova?erro=Esta prova nao possui questoes ativas para sua categoria.");
+  }
+
   return (
     <main className="mx-auto min-h-screen w-full max-w-4xl px-4 py-4 sm:px-6">
       <ExamRunner
@@ -65,9 +75,9 @@ export default async function ExamPage({ params }: ExamPageProps) {
         applicationTitle={attempt.application.title}
         examTitle={attempt.application.exam.title}
         expiresAt={attempt.expiresAt.toISOString()}
-        questions={attempt.application.exam.questions.map((question) => ({
+        questions={questions.map((question, questionIndex) => ({
           id: question.id,
-          position: question.position,
+          position: questionIndex + 1,
           statement: question.statement,
           points: question.points,
           options: question.options.map((option) => ({

@@ -3,6 +3,7 @@ import { AdminRole } from "@/generated/prisma/client";
 import { requireAdminContext } from "@/lib/auth";
 import { buildStudentCorrectionPdf, makePdfFilename } from "@/lib/pdf-reports";
 import { prisma } from "@/lib/prisma";
+import { filterQuestionsForCategory } from "@/lib/questions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -65,9 +66,8 @@ export async function GET(_request: Request, { params }: CorrectionPdfRouteConte
     notFound();
   }
 
-  const totalPoints =
-    attempt.totalPoints ??
-    attempt.application.exam.questions.reduce((sum, question) => sum + question.points, 0);
+  const questions = filterQuestionsForCategory(attempt.application.exam.questions, attempt.student.category);
+  const totalPoints = attempt.totalPoints ?? questions.reduce((sum, question) => sum + question.points, 0);
   const score =
     attempt.score ?? attempt.answers.reduce((sum, answer) => sum + (answer.pointsAwarded || 0), 0);
 
@@ -83,9 +83,9 @@ export async function GET(_request: Request, { params }: CorrectionPdfRouteConte
     score,
     totalPoints,
     passingPercent: attempt.application.exam.passingPercent ?? 70,
-    questions: attempt.application.exam.questions.map((question) => ({
+    questions: questions.map((question, questionIndex) => ({
       id: question.id,
-      position: question.position,
+      position: questionIndex + 1,
       statement: question.statement,
       points: question.points,
       options: question.options.map((option) => ({

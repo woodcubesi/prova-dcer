@@ -21,6 +21,11 @@ import { normalizeName } from "@/lib/text";
 
 const categorySchema = z.enum(["JUNIOR", "ADOLESCENTES", "JUVENIL"]);
 const staffRoleSchema = z.enum(["ADMIN", "TEACHER", "ADMIN_TEACHER"]);
+const categoryLabels: Record<Category, string> = {
+  JUNIOR: "Junior",
+  ADOLESCENTES: "Adolescentes",
+  JUVENIL: "Juvenil",
+};
 
 const staffUserSchema = z.object({
   name: z.string().trim().min(3, "Informe o nome completo.").max(120),
@@ -51,6 +56,13 @@ const questionSchema = z
     }),
     statement: z.string().trim().min(5, "A pergunta precisa ter pelo menos 5 caracteres."),
     points: z.coerce.number().positive("A pontuacao precisa ser maior que zero.").max(100),
+    category: categorySchema.nullish(),
+    theme: z.string().trim().max(120, "O tema da questao esta muito longo.").optional(),
+    difficulty: z.string().trim().max(40, "O nivel da questao esta muito longo.").optional(),
+    bibleReference: z.string().trim().max(120, "A referencia biblica esta muito longa.").optional(),
+    explanation: z.string().trim().max(1000, "A descricao da questao esta muito longa.").optional(),
+    sourceStatus: z.string().trim().max(40, "O status da questao esta muito longo.").optional(),
+    active: z.boolean().optional().default(true),
     options: z.array(optionSchema).min(2, "Questao de multipla escolha precisa ter pelo menos duas alternativas."),
     correctOptionIndex: z.coerce.number().int(),
   })
@@ -90,6 +102,11 @@ function buildAccessCode(rawCode?: string) {
   return `P${randomInt(100000, 999999)}`;
 }
 
+function optionalText(value?: string | null) {
+  const text = value?.trim();
+  return text || null;
+}
+
 function parseExamPayload(formData: FormData, errorPath: string) {
   const rawPayload = String(formData.get("payload") || "");
   let parsedJson: unknown;
@@ -107,6 +124,26 @@ function parseExamPayload(formData: FormData, errorPath: string) {
   }
 
   return parsed.data;
+}
+
+function validateQuestionAudience(payload: z.infer<typeof examPayloadSchema>, errorPath: string) {
+  const activeQuestions = payload.questions.filter((question) => question.active);
+
+  if (activeQuestions.length === 0) {
+    errorRedirect(errorPath, "A prova precisa ter pelo menos uma questao ativa.");
+  }
+
+  const missingCategory = payload.categories.find(
+    (category) =>
+      !activeQuestions.some((question) => !question.category || question.category === category),
+  );
+
+  if (missingCategory) {
+    errorRedirect(
+      errorPath,
+      `A categoria ${categoryLabels[missingCategory as Category]} nao possui questoes ativas.`,
+    );
+  }
 }
 
 function resolveExamChurchIds(
@@ -558,6 +595,7 @@ export async function createExamAction(formData: FormData) {
   const context = await requireAdminContext();
   const errorPath = "/admin/provas/nova";
   const payload = parseExamPayload(formData, errorPath);
+  validateQuestionAudience(payload, errorPath);
   const churchIds = resolveExamChurchIds(context, payload.churchIds, errorPath);
 
   const accessCode = buildAccessCode(payload.accessCode);
@@ -590,6 +628,13 @@ export async function createExamAction(formData: FormData) {
             statement: question.statement,
             type: "MULTIPLE_CHOICE",
             points: question.points,
+            category: question.category ? (question.category as Category) : null,
+            theme: optionalText(question.theme),
+            difficulty: optionalText(question.difficulty),
+            bibleReference: optionalText(question.bibleReference),
+            explanation: optionalText(question.explanation),
+            sourceStatus: optionalText(question.sourceStatus),
+            active: question.active,
             options: {
               create: question.options.map((option, optionIndex) => ({
                 position: optionIndex + 1,
@@ -635,6 +680,7 @@ export async function updateExamAction(formData: FormData) {
   }
 
   const payload = parseExamPayload(formData, errorPath);
+  validateQuestionAudience(payload, errorPath);
   const churchIds = resolveExamChurchIds(context, payload.churchIds, errorPath);
   const scopedChurchId = getScopedChurchId(context);
   const accessCode = buildAccessCode(payload.accessCode);
@@ -720,6 +766,13 @@ export async function updateExamAction(formData: FormData) {
             statement: question.statement,
             type: "MULTIPLE_CHOICE",
             points: question.points,
+            category: question.category ? (question.category as Category) : null,
+            theme: optionalText(question.theme),
+            difficulty: optionalText(question.difficulty),
+            bibleReference: optionalText(question.bibleReference),
+            explanation: optionalText(question.explanation),
+            sourceStatus: optionalText(question.sourceStatus),
+            active: question.active,
             options: {
               create: question.options.map((option, optionIndex) => ({
                 position: optionIndex + 1,

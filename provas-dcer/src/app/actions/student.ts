@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { AttemptStatus, Category } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
+import { filterQuestionsForCategory } from "@/lib/questions";
 import { normalizeName } from "@/lib/text";
 
 const categories = ["JUNIOR", "ADOLESCENTES", "JUVENIL"];
@@ -104,6 +105,11 @@ export async function submitAttemptAction(formData: FormData) {
   const attempt = await prisma.attempt.findUnique({
     where: { id: attemptId },
     include: {
+      student: {
+        select: {
+          category: true,
+        },
+      },
       application: {
         include: {
           exam: {
@@ -132,7 +138,13 @@ export async function submitAttemptAction(formData: FormData) {
   }
 
   const now = new Date();
-  const answers = attempt.application.exam.questions.map((question) => {
+  const questions = filterQuestionsForCategory(attempt.application.exam.questions, attempt.student.category);
+
+  if (questions.length === 0) {
+    redirect("/prova?erro=Esta prova nao possui questoes ativas para sua categoria.");
+  }
+
+  const answers = questions.map((question) => {
     const selectedOptionId = String(formData.get(`option_${question.id}`) || "");
     const selectedOption = question.options.find((option) => option.id === selectedOptionId);
 
@@ -147,7 +159,7 @@ export async function submitAttemptAction(formData: FormData) {
   });
 
   const score = answers.reduce((sum, answer) => sum + (answer.pointsAwarded || 0), 0);
-  const totalPoints = attempt.application.exam.questions.reduce((sum, question) => sum + question.points, 0);
+  const totalPoints = questions.reduce((sum, question) => sum + question.points, 0);
   const timeUsedSeconds = Math.max(0, Math.round((now.getTime() - attempt.startedAt.getTime()) / 1000));
 
   await prisma.$transaction(async (tx) => {

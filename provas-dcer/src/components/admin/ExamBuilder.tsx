@@ -14,8 +14,24 @@ type QuestionDraft = {
   id: string;
   statement: string;
   points: number;
+  category?: CategoryCode;
+  theme: string;
+  difficulty: string;
+  bibleReference: string;
+  explanation: string;
+  sourceStatus: string;
+  active: boolean;
   options: { label: string; text: string }[];
   correctOptionIndex: number;
+};
+
+type ImportedExamFile = {
+  title?: string;
+  durationMinutes?: number;
+  passingPercent?: number;
+  categories?: CategoryCode[];
+  questions?: QuestionDraft[];
+  warnings?: string[];
 };
 
 export type ExamBuilderInitialData = {
@@ -43,6 +59,13 @@ function newQuestion(): QuestionDraft {
     id: crypto.randomUUID(),
     statement: "",
     points: 1,
+    category: undefined,
+    theme: "",
+    difficulty: "",
+    bibleReference: "",
+    explanation: "",
+    sourceStatus: "",
+    active: true,
     correctOptionIndex: 0,
     options: [
       { label: "A", text: "" },
@@ -72,6 +95,9 @@ export function ExamBuilder({ churches, initialData, locked = false, mode = "cre
     initialData?.categories.length ? initialData.categories : CATEGORIES.map((category) => category.value),
   );
   const [questions, setQuestions] = useState<QuestionDraft[]>(() => getInitialQuestions(initialData));
+  const [isImporting, setIsImporting] = useState(false);
+  const [importError, setImportError] = useState("");
+  const [importWarnings, setImportWarnings] = useState<string[]>([]);
 
   const totalPoints = questions.reduce((sum, question) => sum + Number(question.points || 0), 0);
   const minimumPoints = (totalPoints * Number(passingPercent || 0)) / 100;
@@ -91,6 +117,13 @@ export function ExamBuilder({ churches, initialData, locked = false, mode = "cre
           type: "MULTIPLE_CHOICE",
           statement: question.statement,
           points: question.points,
+          category: question.category || undefined,
+          theme: question.theme,
+          difficulty: question.difficulty,
+          bibleReference: question.bibleReference,
+          explanation: question.explanation,
+          sourceStatus: question.sourceStatus,
+          active: question.active,
           options: question.options,
           correctOptionIndex: question.correctOptionIndex,
         })),
@@ -107,6 +140,62 @@ export function ExamBuilder({ churches, initialData, locked = false, mode = "cre
       title,
     ],
   );
+
+  async function importExamFile(file: File) {
+    if (locked) return;
+
+    setIsImporting(true);
+    setImportError("");
+    setImportWarnings([]);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await fetch("/admin/provas/importar", {
+        method: "POST",
+        body: formData,
+      });
+      const imported = (await response.json()) as ImportedExamFile & { error?: string };
+
+      if (!response.ok) {
+        throw new Error(imported.error || "Nao foi possivel importar o arquivo.");
+      }
+
+      if (!imported.questions?.length) {
+        throw new Error("O arquivo nao possui questoes validas.");
+      }
+
+      setTitle(imported.title || title);
+      setDurationMinutes(imported.durationMinutes || durationMinutes);
+      setPassingPercent(imported.passingPercent ?? passingPercent);
+
+      if (imported.categories?.length) {
+        setSelectedCategories(imported.categories);
+      }
+
+      setQuestions(
+        imported.questions.map((question) => ({
+          ...question,
+          id: question.id || crypto.randomUUID(),
+          active: question.active ?? true,
+          options: question.options?.length
+            ? question.options
+            : [
+                { label: "A", text: "" },
+                { label: "B", text: "" },
+                { label: "C", text: "" },
+                { label: "D", text: "" },
+              ],
+        })),
+      );
+      setImportWarnings(imported.warnings || []);
+    } catch (error) {
+      setImportError(error instanceof Error ? error.message : "Nao foi possivel importar o arquivo.");
+    } finally {
+      setIsImporting(false);
+    }
+  }
 
   function toggleChurch(churchId: string) {
     if (locked) return;
@@ -161,6 +250,43 @@ export function ExamBuilder({ churches, initialData, locked = false, mode = "cre
           Esta prova ja foi iniciada por embaixadores. Para preservar respostas e gabaritos, crie uma nova aplicacao se
           precisar mudar perguntas, alternativas ou participantes.
         </div>
+      ) : null}
+
+      {!locked ? (
+        <section className="rounded-lg border border-[#d8def0] bg-white p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold">Importar prova</h2>
+              <p className="text-sm text-[#5d6480]">
+                Use um arquivo .xlsx ou .csv com as colunas do modelo de importacao.
+              </p>
+            </div>
+            <label className="inline-flex cursor-pointer items-center justify-center rounded-md border border-[#000060] px-4 py-2 text-sm font-semibold text-[#000060] hover:bg-[#effaf2]">
+              {isImporting ? "Importando..." : "Selecionar arquivo"}
+              <input
+                type="file"
+                accept=".xlsx,.xls,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+                disabled={isImporting}
+                onChange={(event) => {
+                  const file = event.currentTarget.files?.[0];
+                  event.currentTarget.value = "";
+                  if (file) void importExamFile(file);
+                }}
+                className="sr-only"
+              />
+            </label>
+          </div>
+          {importError ? (
+            <div className="mt-3 rounded-md border border-[#f2b8bf] bg-[#fff4f2] px-3 py-2 text-sm text-[#b00018]">
+              {importError}
+            </div>
+          ) : null}
+          {importWarnings.length > 0 ? (
+            <div className="mt-3 rounded-md border border-[#f5d58c] bg-[#fff9e6] px-3 py-2 text-sm text-[#73510a]">
+              {importWarnings.join(" ")}
+            </div>
+          ) : null}
+        </section>
       ) : null}
 
       <section className="rounded-lg border border-[#d8def0] bg-white p-4">
@@ -340,6 +466,85 @@ export function ExamBuilder({ churches, initialData, locked = false, mode = "cre
                     />
                   </label>
                 </div>
+              </div>
+
+              <div className="mt-4 grid gap-3 rounded-md border border-[#e8ecf8] bg-white p-3 lg:grid-cols-3">
+                <label className="block">
+                  <span className="text-sm font-medium">Categoria da questao</span>
+                  <select
+                    value={question.category || ""}
+                    disabled={locked}
+                    onChange={(event) =>
+                      updateQuestion(question.id, {
+                        category: event.target.value ? (event.target.value as CategoryCode) : undefined,
+                      })
+                    }
+                    className="mt-1 w-full rounded-md border border-[#c5cce4] bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-[#000060] disabled:bg-[#f8faff]"
+                  >
+                    <option value="">Todas as categorias</option>
+                    {CATEGORIES.map((category) => (
+                      <option key={category.value} value={category.value}>
+                        {category.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block">
+                  <span className="text-sm font-medium">Tema</span>
+                  <input
+                    value={question.theme}
+                    disabled={locked}
+                    onChange={(event) => updateQuestion(question.id, { theme: event.target.value })}
+                    className="mt-1 w-full rounded-md border border-[#c5cce4] bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-[#000060] disabled:bg-[#f8faff]"
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-sm font-medium">Nivel</span>
+                  <input
+                    value={question.difficulty}
+                    disabled={locked}
+                    onChange={(event) => updateQuestion(question.id, { difficulty: event.target.value })}
+                    className="mt-1 w-full rounded-md border border-[#c5cce4] bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-[#000060] disabled:bg-[#f8faff]"
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-sm font-medium">Referencia biblica</span>
+                  <input
+                    value={question.bibleReference}
+                    disabled={locked}
+                    onChange={(event) => updateQuestion(question.id, { bibleReference: event.target.value })}
+                    className="mt-1 w-full rounded-md border border-[#c5cce4] bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-[#000060] disabled:bg-[#f8faff]"
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-sm font-medium">Status importado</span>
+                  <input
+                    value={question.sourceStatus}
+                    disabled={locked}
+                    onChange={(event) => updateQuestion(question.id, { sourceStatus: event.target.value })}
+                    className="mt-1 w-full rounded-md border border-[#c5cce4] bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-[#000060] disabled:bg-[#f8faff]"
+                  />
+                </label>
+                <label className="flex items-center gap-2 rounded-md border border-[#d8def0] px-3 py-2 text-sm font-medium">
+                  <input
+                    type="checkbox"
+                    checked={question.active}
+                    disabled={locked}
+                    onChange={(event) => updateQuestion(question.id, { active: event.target.checked })}
+                    className="h-5 w-5 accent-[#000060]"
+                  />
+                  Questao ativa
+                </label>
+                <label className="block lg:col-span-3">
+                  <span className="text-sm font-medium">Descricao</span>
+                  <textarea
+                    value={question.explanation}
+                    disabled={locked}
+                    onChange={(event) => updateQuestion(question.id, { explanation: event.target.value })}
+                    rows={2}
+                    className="mt-1 w-full rounded-md border border-[#c5cce4] bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-[#000060] disabled:bg-[#f8faff]"
+                  />
+                </label>
               </div>
 
               <div className="mt-4 grid gap-2 lg:grid-cols-2">

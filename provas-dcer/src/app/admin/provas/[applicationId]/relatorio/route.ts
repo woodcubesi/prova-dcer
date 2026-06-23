@@ -3,6 +3,7 @@ import { AdminRole } from "@/generated/prisma/client";
 import { requireAdminContext } from "@/lib/auth";
 import { buildApplicationSummaryPdf, makePdfFilename } from "@/lib/pdf-reports";
 import { prisma } from "@/lib/prisma";
+import { totalQuestionPointsForCategory } from "@/lib/questions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -40,6 +41,8 @@ export async function GET(_request: Request, { params }: ApplicationReportRouteC
           questions: {
             select: {
               points: true,
+              category: true,
+              active: true,
             },
           },
         },
@@ -81,7 +84,6 @@ export async function GET(_request: Request, { params }: ApplicationReportRouteC
     notFound();
   }
 
-  const fallbackTotalPoints = application.exam.questions.reduce((sum, question) => sum + question.points, 0);
   const generatedAt = new Date();
   const attemptsByStudentId = new Map(application.attempts.map((attempt) => [attempt.studentId, attempt]));
   const pdf = await buildApplicationSummaryPdf({
@@ -100,7 +102,9 @@ export async function GET(_request: Request, { params }: ApplicationReportRouteC
         category: participant.student.category,
         status,
         score: hasResult ? attempt?.score ?? 0 : null,
-        totalPoints: attempt?.totalPoints || fallbackTotalPoints,
+        totalPoints:
+          attempt?.totalPoints ??
+          totalQuestionPointsForCategory(application.exam.questions, participant.student.category),
         timeUsedSeconds: attempt?.timeUsedSeconds,
       };
     }),

@@ -5,6 +5,7 @@ import { AdminRole } from "@/generated/prisma/client";
 import { getCategoryLabel } from "@/lib/categories";
 import { requireAdminContext } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { filterQuestionsForCategory } from "@/lib/questions";
 import { formatDuration } from "@/lib/text";
 
 export const dynamic = "force-dynamic";
@@ -75,7 +76,8 @@ export default async function CorrectionDetailPage({ params }: CorrectionDetailP
   }
 
   const answerByQuestion = new Map(attempt.answers.map((answer) => [answer.questionId, answer]));
-  const totalPoints = attempt.application.exam.questions.reduce((sum, question) => sum + question.points, 0);
+  const questions = filterQuestionsForCategory(attempt.application.exam.questions, attempt.student.category);
+  const totalPoints = questions.reduce((sum, question) => sum + question.points, 0);
   const score = attempt.answers.reduce((sum, answer) => sum + (answer.pointsAwarded || 0), 0);
   const passingPercent = attempt.application.exam.passingPercent ?? 70;
   const scorePercent = totalPoints ? (score / totalPoints) * 100 : 0;
@@ -131,7 +133,7 @@ export default async function CorrectionDetailPage({ params }: CorrectionDetailP
       </section>
 
       <div className="mt-5 space-y-4">
-        {attempt.application.exam.questions.map((question) => {
+        {questions.map((question, questionIndex) => {
           const answer = answerByQuestion.get(question.id);
           const correctOption = question.options.find((option) => option.isCorrect);
 
@@ -140,7 +142,7 @@ export default async function CorrectionDetailPage({ params }: CorrectionDetailP
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#000060]">
-                    Questao {question.position}
+                    Questao {questionIndex + 1}
                   </p>
                   <h3 className="mt-1 text-lg font-semibold">{question.statement}</h3>
                 </div>

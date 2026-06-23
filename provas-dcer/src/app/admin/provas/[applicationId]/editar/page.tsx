@@ -119,6 +119,13 @@ export default async function EditExamPage({ params, searchParams }: EditExamPag
         id: question.id,
         statement: question.statement,
         points: question.points,
+        category: question.category ? (question.category as CategoryCode) : undefined,
+        theme: question.theme || "",
+        difficulty: question.difficulty || "",
+        bibleReference: question.bibleReference || "",
+        explanation: question.explanation || "",
+        sourceStatus: question.sourceStatus || "",
+        active: question.active,
         correctOptionIndex: correctOptionIndex >= 0 ? correctOptionIndex : 0,
         options: question.options.map((option) => ({
           label: option.label,

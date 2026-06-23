@@ -101,17 +101,26 @@ model Exam {
 }
 
 model Question {
-  id        String       @id @default(cuid())
-  examId    String
-  exam      Exam         @relation(fields: [examId], references: [id], onDelete: Cascade)
-  position  Int
-  statement String
-  type      QuestionType @default(MULTIPLE_CHOICE)
-  points    Float        @default(1)
-  options   Option[]
-  answers   Answer[]
+  id             String       @id @default(cuid())
+  examId         String
+  exam           Exam         @relation(fields: [examId], references: [id], onDelete: Cascade)
+  position       Int
+  statement      String
+  type           QuestionType @default(MULTIPLE_CHOICE)
+  points         Float        @default(1)
+  category       Category?
+  theme          String?
+  difficulty     String?
+  bibleReference String?
+  explanation    String?
+  sourceStatus   String?
+  active         Boolean      @default(true)
+  options        Option[]
+  answers        Answer[]
 
   @@unique([examId, position])
+  @@index([category])
+  @@index([active])
 }
 
 model Option {
