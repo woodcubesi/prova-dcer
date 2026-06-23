@@ -261,20 +261,34 @@ export function ExamBuilder({ churches, initialData, locked = false, mode = "cre
                 Use um arquivo .xlsx ou .csv com as colunas do modelo de importacao.
               </p>
             </div>
-            <label className="inline-flex cursor-pointer items-center justify-center rounded-md border border-[#000060] px-4 py-2 text-sm font-semibold text-[#000060] hover:bg-[#effaf2]">
-              {isImporting ? "Importando..." : "Selecionar arquivo"}
-              <input
-                type="file"
-                accept=".xlsx,.xls,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
-                disabled={isImporting}
-                onChange={(event) => {
-                  const file = event.currentTarget.files?.[0];
-                  event.currentTarget.value = "";
-                  if (file) void importExamFile(file);
-                }}
-                className="sr-only"
-              />
-            </label>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <a
+                href="/admin/provas/importar?formato=xlsx"
+                className="inline-flex items-center justify-center rounded-md border border-[#d8def0] px-4 py-2 text-sm font-semibold text-[#000060] hover:bg-[#f7f8ff]"
+              >
+                Baixar modelo Excel
+              </a>
+              <a
+                href="/admin/provas/importar?formato=csv"
+                className="inline-flex items-center justify-center rounded-md border border-[#d8def0] px-4 py-2 text-sm font-semibold text-[#000060] hover:bg-[#f7f8ff]"
+              >
+                Baixar modelo CSV
+              </a>
+              <label className="inline-flex cursor-pointer items-center justify-center rounded-md border border-[#000060] px-4 py-2 text-sm font-semibold text-[#000060] hover:bg-[#effaf2]">
+                {isImporting ? "Importando..." : "Selecionar arquivo"}
+                <input
+                  type="file"
+                  accept=".xlsx,.xls,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+                  disabled={isImporting}
+                  onChange={(event) => {
+                    const file = event.currentTarget.files?.[0];
+                    event.currentTarget.value = "";
+                    if (file) void importExamFile(file);
+                  }}
+                  className="sr-only"
+                />
+              </label>
+            </div>
           </div>
           {importError ? (
             <div className="mt-3 rounded-md border border-[#f2b8bf] bg-[#fff4f2] px-3 py-2 text-sm text-[#b00018]">

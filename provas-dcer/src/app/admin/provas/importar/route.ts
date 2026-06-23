@@ -48,6 +48,61 @@ const fieldAliases = new Map<string, keyof ImportColumns>([
   ["status", "sourceStatus"],
 ]);
 
+const templateHeaders: string[] = [
+  "ID",
+  "Categoria",
+  "Tema",
+  "Nível",
+  "Pergunta",
+  "Alternativa A",
+  "Alternativa B",
+  "Alternativa C",
+  "Alternativa D",
+  "Resposta Certa",
+  "Referência Bíblica",
+  "Descrição",
+  "Tempo da Prova em Minutos",
+  "Percentual de Aprovação",
+  "Status",
+];
+
+const templateRows = [
+  [
+    "1",
+    "Junior",
+    "Plano da salvação",
+    "Fácil",
+    "Qual alternativa completa corretamente João 3:16?",
+    "Porque Deus amou o mundo",
+    "Porque Deus esqueceu o mundo",
+    "Porque Deus condenou o mundo",
+    "Porque Deus abandonou o mundo",
+    "A",
+    "João 3:16",
+    "Marque A, B, C ou D na coluna Resposta Certa.",
+    "60",
+    "70",
+    "Ativa",
+  ],
+  [
+    "2",
+    "Adolescentes",
+    "Embaixadores do Rei",
+    "Médio",
+    "O que deve ser informado na coluna Categoria?",
+    "Junior, Adolescentes ou Juvenil",
+    "O nome da igreja",
+    "O nome do conselheiro",
+    "O número da carteirinha",
+    "A",
+    "",
+    "A categoria pode ficar em branco quando a pergunta servir para todas.",
+    "60",
+    "70",
+    "Ativa",
+  ],
+] satisfies string[][];
+
 type ImportColumns = {
   id: string;
   category: string;
@@ -65,6 +120,15 @@ type ImportColumns = {
   passingPercent: string;
   sourceStatus: string;
 };
+
+export async function GET(request: Request) {
+  await requireAdminContext();
+
+  const url = new URL(request.url);
+  const format = url.searchParams.get("formato")?.toLowerCase() === "csv" ? "csv" : "xlsx";
+
+  return format === "csv" ? buildCsvTemplateResponse() : buildXlsxTemplateResponse();
+}
 
 export async function POST(request: Request) {
   await requireAdminContext();
@@ -312,4 +376,63 @@ function titleFromFileName(fileName: string) {
 
 function importError(message: string) {
   return NextResponse.json({ error: message }, { status: 400 });
+}
+
+function buildXlsxTemplateResponse() {
+  const worksheet = XLSX.utils.aoa_to_sheet([templateHeaders, ...templateRows]);
+  worksheet["!cols"] = [
+    { wch: 8 },
+    { wch: 16 },
+    { wch: 24 },
+    { wch: 12 },
+    { wch: 48 },
+    { wch: 28 },
+    { wch: 28 },
+    { wch: 28 },
+    { wch: 28 },
+    { wch: 16 },
+    { wch: 22 },
+    { wch: 52 },
+    { wch: 24 },
+    { wch: 24 },
+    { wch: 14 },
+  ];
+  worksheet["!autofilter"] = { ref: `A1:O${templateRows.length + 1}` };
+
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Modelo");
+
+  const buffer = XLSX.write(workbook, {
+    bookType: "xlsx",
+    type: "buffer",
+  });
+
+  return new NextResponse(buffer, {
+    headers: {
+      "Content-Disposition": 'attachment; filename="modelo-importacao-provas.xlsx"',
+      "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "Cache-Control": "no-store",
+    },
+  });
+}
+
+function buildCsvTemplateResponse() {
+  const csvRows = [templateHeaders, ...templateRows].map((row) => row.map(escapeCsvValue).join(";"));
+  const csv = `\uFEFF${csvRows.join("\r\n")}\r\n`;
+
+  return new NextResponse(csv, {
+    headers: {
+      "Content-Disposition": 'attachment; filename="modelo-importacao-provas.csv"',
+      "Content-Type": "text/csv; charset=utf-8",
+      "Cache-Control": "no-store",
+    },
+  });
+}
+
+function escapeCsvValue(value: string) {
+  if (/[;"\r\n]/.test(value)) {
+    return `"${value.replace(/"/g, '""')}"`;
+  }
+
+  return value;
 }
