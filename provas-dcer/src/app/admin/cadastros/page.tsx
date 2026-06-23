@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
 type RegisterPageProps = {
   searchParams?: Promise<{
     embaixador?: string;
-    embaixadorBusca?: string;
+    embaixadorSelecionado?: string;
     erro?: string;
     igreja?: string;
     igrejaResponsavel?: string;
@@ -36,11 +36,6 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
   const params = searchParams ? await searchParams : {};
   const isTeacher = context.role === AdminRole.TEACHER;
   const scopedChurchId = isTeacher ? context.churchId : null;
-  const studentSearch = String(params.embaixadorBusca || "").trim();
-  const textFilter = (value: string) => ({
-    contains: value,
-    mode: "insensitive" as const,
-  });
 
   const churchOptions = await prisma.church.findMany({
     where: {
@@ -89,16 +84,12 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
     scopedChurchId ||
     (requestedChurchId && churchIds.has(requestedChurchId)
       ? requestedChurchId
-      : editingStudent?.churchId || editingChurch?.id || churchOptions[0]?.id || "");
+      : editingStudent?.churchId || editingChurch?.id || "");
   const selectedChurch = churchOptions.find((church) => church.id === selectedChurchId) || null;
-  const studentFilter = {
+  const requestedStudentId = String(params.embaixadorSelecionado || "").trim();
+  const studentBaseFilter = {
     active: true,
-    churchId: selectedChurchId || "__missing_church__",
-    ...(studentSearch
-      ? {
-          OR: [{ name: textFilter(studentSearch) }, { externalId: textFilter(studentSearch) }],
-        }
-      : {}),
+    ...(selectedChurchId ? { churchId: selectedChurchId } : { id: "__missing_student__" }),
   };
   const applicationFilter = selectedChurchId
     ? {
@@ -114,16 +105,16 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
         id: "__missing_application__",
       };
 
-  const [students, totalStudents, applications] = await Promise.all([
+  const [studentOptions, applications] = await Promise.all([
     prisma.student.findMany({
-      where: studentFilter,
+      where: studentBaseFilter,
       orderBy: [{ category: "asc" }, { name: "asc" }],
-      include: {
-        church: true,
+      select: {
+        id: true,
+        name: true,
+        category: true,
+        externalId: true,
       },
-    }),
-    prisma.student.count({
-      where: studentFilter,
     }),
     prisma.examApplication.findMany({
       where: applicationFilter,
@@ -160,6 +151,25 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
           },
         },
       },
+    }),
+  ]);
+  const studentOptionIds = new Set(studentOptions.map((student) => student.id));
+  const selectedStudentId = requestedStudentId && studentOptionIds.has(requestedStudentId) ? requestedStudentId : "";
+  const studentFilter = {
+    ...studentBaseFilter,
+    ...(selectedStudentId ? { id: selectedStudentId } : {}),
+  };
+
+  const [students, totalStudents] = await Promise.all([
+    prisma.student.findMany({
+      where: studentFilter,
+      orderBy: [{ category: "asc" }, { name: "asc" }],
+      include: {
+        church: true,
+      },
+    }),
+    prisma.student.count({
+      where: studentFilter,
     }),
   ]);
 
@@ -207,6 +217,7 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
               className="mt-1 w-full rounded-md border border-[#c5cce4] bg-white px-3 py-3 outline-none focus:ring-2 focus:ring-[#000060]"
             >
               {churchOptions.length === 0 ? <option value="">Nenhuma igreja cadastrada</option> : null}
+              {!isTeacher && churchOptions.length > 0 ? <option value="">Todas as igrejas</option> : null}
               {churchOptions.map((church) => (
                 <option key={church.id} value={church.id}>
                   {church.embassyName ? `${church.name} - ${church.embassyName}` : church.name}
@@ -221,6 +232,10 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
         {selectedChurch ? (
           <p className="mt-3 text-sm text-[#5d6480]">
             Exibindo embaixadores e provas vinculados a <strong>{selectedChurchLabel}</strong>.
+          </p>
+        ) : !isTeacher && churchOptions.length > 0 ? (
+          <p className="mt-3 text-sm text-[#5d6480]">
+            Exibindo todas as igrejas. Selecione uma igreja para carregar os embaixadores e provas dela.
           </p>
         ) : (
           <p className="mt-3 text-sm text-[#5d6480]">Selecione uma igreja para carregar os cadastros.</p>
@@ -303,7 +318,7 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
                 <span className="text-sm font-medium">Igreja</span>
                 <select
                   name="churchId"
-                  defaultValue={editingStudent?.churchId || ""}
+                  defaultValue={editingStudent?.churchId || selectedChurchId || ""}
                   className="mt-1 w-full rounded-md border border-[#c5cce4] bg-white px-3 py-3 outline-none focus:ring-2 focus:ring-[#000060]"
                 >
                   <option value="">Selecione</option>
@@ -423,7 +438,9 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
               </div>
             ) : (
               <div className="mt-3 rounded-md border border-[#e8ecf8] bg-[#fbfcff] p-4 text-sm text-[#5d6480]">
-                Nenhuma igreja selecionada.
+                {churchOptions.length > 0
+                  ? `${churchOptions.length} igreja(s) cadastrada(s). Escolha uma igreja responsavel acima para ver alunos e provas.`
+                  : "Nenhuma igreja cadastrada."}
               </div>
             )}
           </div>
@@ -432,10 +449,14 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h2 className="text-lg font-semibold">Provas da igreja</h2>
-                <p className="text-sm text-[#5d6480]">Mostrando {applications.length} aplicacao(oes).</p>
+                <p className="text-sm text-[#5d6480]">
+                  {selectedChurchId
+                    ? `Mostrando ${applications.length} aplicacao(oes).`
+                    : "Selecione uma igreja para listar as provas."}
+                </p>
               </div>
               <a
-                href={`/admin/provas?igrejaResponsavel=${selectedChurchId}`}
+                href={selectedChurchId ? `/admin/provas?igrejaResponsavel=${selectedChurchId}` : "/admin/provas"}
                 className="rounded-md border border-[#000060] px-3 py-2 text-sm font-semibold text-[#000060]"
               >
                 Ver todas
@@ -459,7 +480,9 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
               ))}
               {applications.length === 0 ? (
                 <div className="rounded-md border border-[#e8ecf8] bg-[#fbfcff] p-4 text-sm text-[#5d6480]">
-                  Nenhuma prova cadastrada para esta igreja.
+                  {selectedChurchId
+                    ? "Nenhuma prova cadastrada para esta igreja."
+                    : "Escolha uma igreja responsavel para ver as provas cadastradas."}
                 </div>
               ) : null}
             </div>
@@ -471,20 +494,44 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
             <div>
               <h2 className="text-lg font-semibold">Embaixadores da igreja</h2>
               <p className="text-sm text-[#5d6480]">
-                Mostrando {students.length} de {totalStudents}.
+                {selectedChurchId
+                  ? `Mostrando ${students.length} de ${totalStudents}.`
+                  : "Selecione uma igreja para listar os embaixadores."}
               </p>
             </div>
-            <form className="flex gap-2" action="/admin/cadastros">
+            <form className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto] lg:min-w-[560px]" action="/admin/cadastros">
               <input type="hidden" name="igrejaResponsavel" value={selectedChurchId} />
-              <input
-                name="embaixadorBusca"
-                defaultValue={studentSearch}
-                className="min-w-0 flex-1 rounded-md border border-[#c5cce4] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#000060] lg:w-72"
-                placeholder="Buscar embaixador"
-              />
-              <button className="rounded-md border border-[#000060] px-3 py-2 text-sm font-semibold text-[#000060]">
-                Buscar
+              <select
+                name="embaixadorSelecionado"
+                defaultValue={selectedStudentId}
+                disabled={!selectedChurchId}
+                className="min-w-0 rounded-md border border-[#c5cce4] bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#000060] disabled:bg-[#f3f4f6] disabled:text-[#6b7280]"
+              >
+                <option value="">
+                  {selectedChurchId ? "Todos os embaixadores da igreja" : "Selecione uma igreja primeiro"}
+                </option>
+                {studentOptions.map((student) => (
+                  <option key={student.id} value={student.id}>
+                    {student.externalId
+                      ? `${student.name} - ${student.externalId} - ${getCategoryLabel(student.category)}`
+                      : `${student.name} - ${getCategoryLabel(student.category)}`}
+                  </option>
+                ))}
+              </select>
+              <button
+                disabled={!selectedChurchId}
+                className="rounded-md border border-[#000060] px-3 py-2 text-sm font-semibold text-[#000060] disabled:cursor-not-allowed disabled:border-[#c5cce4] disabled:text-[#6b7280]"
+              >
+                Carregar aluno
               </button>
+              {selectedChurchId ? (
+                <a
+                  href={`/admin/cadastros?igrejaResponsavel=${selectedChurchId}`}
+                  className="rounded-md border border-[#000060] px-3 py-2 text-center text-sm font-semibold text-[#000060] hover:bg-[#f7f8ff]"
+                >
+                  Ver todos alunos
+                </a>
+              ) : null}
             </form>
           </div>
           <div className="mt-3 grid gap-3 md:hidden">
@@ -516,7 +563,7 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
                   {getCategoryLabel(student.category)}
                 </span>
                 <a
-                  href={`/admin/cadastros?embaixador=${student.id}&igrejaResponsavel=${selectedChurchId}`}
+                  href={`/admin/cadastros?embaixador=${student.id}&igrejaResponsavel=${selectedChurchId}&embaixadorSelecionado=${student.id}`}
                   className="mt-3 block rounded-md border border-[#000060] px-3 py-2 text-center text-sm font-semibold text-[#000060]"
                 >
                   Editar
@@ -550,7 +597,7 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
                     <td className="py-3 pr-4">{formatDateLabel(student.registrationExpiresAt)}</td>
                     <td className="py-3 pr-4">
                       <a
-                        href={`/admin/cadastros?embaixador=${student.id}&igrejaResponsavel=${selectedChurchId}`}
+                        href={`/admin/cadastros?embaixador=${student.id}&igrejaResponsavel=${selectedChurchId}&embaixadorSelecionado=${student.id}`}
                         className="rounded-md border border-[#000060] px-3 py-2 text-sm font-semibold text-[#000060] hover:bg-[#effaf2]"
                       >
                         Editar
@@ -561,7 +608,9 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
                 {students.length === 0 ? (
                   <tr>
                     <td className="py-6 pr-4 text-sm text-[#5d6480]" colSpan={8}>
-                      Nenhum embaixador cadastrado ainda.
+                      {selectedChurchId
+                        ? "Nenhum embaixador encontrado para esta selecao."
+                        : "Escolha uma igreja responsavel para carregar os embaixadores."}
                     </td>
                   </tr>
                 ) : null}
@@ -570,7 +619,9 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
           </div>
           {students.length === 0 ? (
             <div className="mt-3 rounded-md border border-[#e8ecf8] bg-[#fbfcff] p-4 text-sm text-[#5d6480] md:hidden">
-              Nenhum embaixador cadastrado ainda.
+              {selectedChurchId
+                ? "Nenhum embaixador encontrado para esta selecao."
+                : "Escolha uma igreja responsavel para carregar os embaixadores."}
             </div>
           ) : null}
         </div>
