@@ -17,6 +17,7 @@ export const dynamic = "force-dynamic";
 type ExamsPageProps = {
   searchParams?: Promise<{
     erro?: string;
+    igrejaResponsavel?: string;
     ok?: string;
   }>;
 };
@@ -28,25 +29,66 @@ export default async function ExamsPage({ searchParams }: ExamsPageProps) {
   const scopedChurchId = isTeacher ? context.churchId : null;
   const now = new Date();
 
-  const applications = await prisma.examApplication.findMany({
-    where: isTeacher
+  const churchOptions = await prisma.church.findMany({
+    where: {
+      active: true,
+      ...(isTeacher ? { id: scopedChurchId || "__missing_church__" } : {}),
+    },
+    orderBy: { name: "asc" },
+  });
+  const churchIds = new Set(churchOptions.map((church) => church.id));
+  const requestedChurchId = String(params.igrejaResponsavel || "").trim();
+  const selectedChurchId =
+    scopedChurchId ||
+    (requestedChurchId && churchIds.has(requestedChurchId) ? requestedChurchId : churchOptions[0]?.id || "");
+  const selectedChurch = churchOptions.find((church) => church.id === selectedChurchId) || null;
+  const churchFilter = selectedChurchId
+    ? {
+        participants: {
+          some: {
+            student: {
+              churchId: selectedChurchId,
+            },
+          },
+        },
+      }
+    : isTeacher
       ? {
           participants: {
             some: {
               student: {
-                churchId: scopedChurchId || "__missing_church__",
+                churchId: "__missing_church__",
               },
             },
           },
         }
-      : {},
+      : { id: "__missing_application__" };
+
+  const applications = await prisma.examApplication.findMany({
+    where: churchFilter,
     orderBy: { createdAt: "desc" },
     include: {
       exam: true,
       _count: {
         select: {
-          attempts: true,
-          participants: true,
+          attempts: selectedChurchId
+            ? {
+                where: {
+                  student: {
+                    churchId: selectedChurchId,
+                  },
+                },
+              }
+            : true,
+          participants: selectedChurchId
+            ? {
+                where: {
+                  student: {
+                    churchId: selectedChurchId,
+                  },
+                },
+              }
+            : true,
         },
       },
     },
@@ -74,6 +116,36 @@ export default async function ExamsPage({ searchParams }: ExamsPageProps) {
           Prova excluida com sucesso.
         </div>
       ) : null}
+
+      <section className="mb-5 rounded-lg border border-[#d8def0] bg-white p-4">
+        <form action="/admin/provas" className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-end">
+          <label className="block">
+            <span className="text-sm font-medium">Igreja responsavel</span>
+            <select
+              name="igrejaResponsavel"
+              defaultValue={selectedChurchId}
+              className="mt-1 w-full rounded-md border border-[#c5cce4] bg-white px-3 py-3 outline-none focus:ring-2 focus:ring-[#000060]"
+            >
+              {churchOptions.length === 0 ? <option value="">Nenhuma igreja cadastrada</option> : null}
+              {churchOptions.map((church) => (
+                <option key={church.id} value={church.id}>
+                  {church.embassyName ? `${church.name} - ${church.embassyName}` : church.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button className="rounded-md bg-[#000060] px-4 py-3 text-sm font-semibold text-white hover:bg-[#000044]">
+            Carregar provas
+          </button>
+        </form>
+        {selectedChurch ? (
+          <p className="mt-3 text-sm text-[#5d6480]">
+            Exibindo provas vinculadas a <strong>{selectedChurch.name}</strong>.
+          </p>
+        ) : (
+          <p className="mt-3 text-sm text-[#5d6480]">Selecione uma igreja para listar as provas.</p>
+        )}
+      </section>
 
       <section className="rounded-lg border border-[#d8def0] bg-white p-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

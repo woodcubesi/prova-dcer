@@ -128,6 +128,11 @@ function errorRedirect(path: string, message: string): never {
   redirect(`${path}?erro=${encodeURIComponent(message)}`);
 }
 
+function registersRedirect(ok: string, churchId?: string | null): never {
+  const churchParam = churchId ? `&igrejaResponsavel=${encodeURIComponent(churchId)}` : "";
+  redirect(`/admin/cadastros?ok=${encodeURIComponent(ok)}${churchParam}`);
+}
+
 function buildAccessCode(rawCode?: string) {
   const cleanCode = rawCode?.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
   if (cleanCode) return cleanCode.slice(0, 16);
@@ -770,7 +775,7 @@ export async function createChurchAction(formData: FormData) {
     errorRedirect("/admin/cadastros", "Informe o nome da embaixada.");
   }
 
-  await prisma.church.upsert({
+  const church = await prisma.church.upsert({
     where: { name },
     update: {
       embassyName,
@@ -786,7 +791,7 @@ export async function createChurchAction(formData: FormData) {
 
   revalidatePath("/admin");
   revalidatePath("/admin/cadastros");
-  redirect("/admin/cadastros?ok=igreja");
+  registersRedirect("igreja", church.id);
 }
 
 export async function updateChurchAction(formData: FormData) {
@@ -826,7 +831,7 @@ export async function updateChurchAction(formData: FormData) {
 
   revalidatePath("/admin");
   revalidatePath("/admin/cadastros");
-  redirect("/admin/cadastros?ok=igreja");
+  registersRedirect("igreja", id);
 }
 
 export async function createStudentAction(formData: FormData) {
@@ -891,7 +896,7 @@ export async function createStudentAction(formData: FormData) {
 
   revalidatePath("/admin");
   revalidatePath("/admin/cadastros");
-  redirect("/admin/cadastros?ok=embaixador");
+  registersRedirect("embaixador", churchId);
 }
 
 export async function updateStudentAction(formData: FormData) {
@@ -955,7 +960,7 @@ export async function updateStudentAction(formData: FormData) {
 
   revalidatePath("/admin");
   revalidatePath("/admin/cadastros");
-  redirect("/admin/cadastros?ok=embaixador");
+  registersRedirect("embaixador", churchId);
 }
 
 export async function createExamAction(formData: FormData) {
