@@ -1086,6 +1086,15 @@ export async function updateExamAction(formData: FormData) {
       exam: {
         select: { id: true },
       },
+      participants: {
+        select: {
+          student: {
+            select: {
+              churchId: true,
+            },
+          },
+        },
+      },
       attempts: {
         take: 1,
         select: { id: true },
@@ -1095,6 +1104,20 @@ export async function updateExamAction(formData: FormData) {
 
   if (!application) {
     errorRedirect(errorPath, "Aplicacao de prova nao encontrada.");
+  }
+
+  if (!hasAdministratorAccess(context)) {
+    if (!context.churchId) {
+      errorRedirect(errorPath, "Seu usuario de conselheiro ainda nao esta vinculado a uma igreja.");
+    }
+
+    const hasOutsideChurch = application.participants.some(
+      (participant) => participant.student.churchId !== context.churchId,
+    );
+
+    if (hasOutsideChurch) {
+      errorRedirect(errorPath, "Conselheiros so podem editar provas exclusivas da propria igreja.");
+    }
   }
 
   await ensureAccessCodeAvailable(accessCode, errorPath, application.id);

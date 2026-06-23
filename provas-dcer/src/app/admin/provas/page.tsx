@@ -40,7 +40,7 @@ export default async function ExamsPage({ searchParams }: ExamsPageProps) {
   const requestedChurchId = String(params.igrejaResponsavel || "").trim();
   const selectedChurchId =
     scopedChurchId ||
-    (requestedChurchId && churchIds.has(requestedChurchId) ? requestedChurchId : churchOptions[0]?.id || "");
+    (requestedChurchId && churchIds.has(requestedChurchId) ? requestedChurchId : "");
   const selectedChurch = churchOptions.find((church) => church.id === selectedChurchId) || null;
   const churchFilter = selectedChurchId
     ? {
@@ -62,7 +62,8 @@ export default async function ExamsPage({ searchParams }: ExamsPageProps) {
             },
           },
         }
-      : { id: "__missing_application__" };
+      : {};
+  const showingAllChurches = !isTeacher && !selectedChurchId;
 
   const applications = await prisma.examApplication.findMany({
     where: churchFilter,
@@ -127,6 +128,7 @@ export default async function ExamsPage({ searchParams }: ExamsPageProps) {
               className="mt-1 w-full rounded-md border border-[#c5cce4] bg-white px-3 py-3 outline-none focus:ring-2 focus:ring-[#000060]"
             >
               {churchOptions.length === 0 ? <option value="">Nenhuma igreja cadastrada</option> : null}
+              {!isTeacher && churchOptions.length > 0 ? <option value="">Todas as igrejas</option> : null}
               {churchOptions.map((church) => (
                 <option key={church.id} value={church.id}>
                   {church.embassyName ? `${church.name} - ${church.embassyName}` : church.name}
@@ -143,7 +145,11 @@ export default async function ExamsPage({ searchParams }: ExamsPageProps) {
             Exibindo provas vinculadas a <strong>{selectedChurch.name}</strong>.
           </p>
         ) : (
-          <p className="mt-3 text-sm text-[#5d6480]">Selecione uma igreja para listar as provas.</p>
+          <p className="mt-3 text-sm text-[#5d6480]">
+            {showingAllChurches
+              ? "Exibindo provas vinculadas a todas as igrejas."
+              : "Selecione uma igreja para listar as provas."}
+          </p>
         )}
       </section>
 
