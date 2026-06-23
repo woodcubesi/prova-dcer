@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { AdminShell } from "@/components/admin/AdminShell";
-import { AdminRole } from "@/generated/prisma/client";
+import { AdminRole, AttemptStatus } from "@/generated/prisma/client";
 import { getCategoryLabel } from "@/lib/categories";
 import { requireAdminContext } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -11,6 +11,7 @@ export const dynamic = "force-dynamic";
 type CorrectionPageProps = {
   searchParams?: Promise<{
     igreja?: string;
+    prova?: string;
   }>;
 };
 
@@ -47,8 +48,28 @@ export default async function CorrectionPage({ searchParams }: CorrectionPagePro
   const scopedChurchId = isTeacher ? context.churchId : null;
   const selectedChurchId = isTeacher ? scopedChurchId || "" : params.igreja || "";
   const churchFilterId = selectedChurchId || undefined;
+  const selectedApplicationId = String(params.prova || "").trim();
+  const finalStatuses = [AttemptStatus.SUBMITTED, AttemptStatus.EXPIRED];
+  const applicationChurchFilter = churchFilterId
+    ? {
+        attempts: {
+          some: {
+            status: { in: finalStatuses },
+            student: {
+              churchId: churchFilterId,
+            },
+          },
+        },
+      }
+    : {
+        attempts: {
+          some: {
+            status: { in: finalStatuses },
+          },
+        },
+      };
 
-  const [churches, attempts] = await Promise.all([
+  const [churches, applications, attempts] = await Promise.all([
     prisma.church.findMany({
       where: {
         active: true,
@@ -60,9 +81,23 @@ export default async function CorrectionPage({ searchParams }: CorrectionPagePro
         name: true,
       },
     }),
+    prisma.examApplication.findMany({
+      where: applicationChurchFilter,
+      orderBy: [{ exam: { title: "asc" } }, { title: "asc" }],
+      select: {
+        id: true,
+        title: true,
+        exam: {
+          select: {
+            title: true,
+          },
+        },
+      },
+    }),
     prisma.attempt.findMany({
       where: {
-        status: { in: ["SUBMITTED", "EXPIRED"] },
+        status: { in: finalStatuses },
+        ...(selectedApplicationId ? { applicationId: selectedApplicationId } : {}),
         ...(churchFilterId
           ? {
               student: {
@@ -87,6 +122,7 @@ export default async function CorrectionPage({ searchParams }: CorrectionPagePro
       },
     }),
   ]);
+  const selectedApplication = applications.find((application) => application.id === selectedApplicationId) || null;
 
   return (
     <AdminShell title="Correcao" description="Confira respostas enviadas e a pontuacao automatica.">
@@ -109,7 +145,7 @@ export default async function CorrectionPage({ searchParams }: CorrectionPagePro
 
         <form
           action="/admin/correcao"
-          className="mt-4 grid gap-3 rounded-md border border-[#e8ecf8] bg-[#fbfcff] p-3 sm:grid-cols-[1fr_auto] sm:items-end"
+          className="mt-4 grid gap-3 rounded-md border border-[#e8ecf8] bg-[#fbfcff] p-3 lg:grid-cols-[1fr_1fr_auto] lg:items-end"
         >
           <label className="block">
             <span className="text-sm font-medium">Filtrar por igreja</span>
@@ -135,12 +171,41 @@ export default async function CorrectionPage({ searchParams }: CorrectionPagePro
               </select>
             )}
           </label>
-          {!isTeacher ? (
-            <button className="rounded-md bg-[#000060] px-4 py-3 text-sm font-semibold text-white hover:bg-[#000044]">
-              Filtrar
-            </button>
-          ) : null}
+          <label className="block">
+            <span className="text-sm font-medium">Filtrar por prova</span>
+            <select
+              name="prova"
+              defaultValue={selectedApplicationId}
+              className="mt-1 w-full rounded-md border border-[#c5cce4] bg-white px-3 py-3 outline-none focus:ring-2 focus:ring-[#000060]"
+            >
+              <option value="">Todas as provas</option>
+              {applications.map((application) => (
+                <option key={application.id} value={application.id}>
+                  {application.exam.title} - {application.title}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button className="rounded-md bg-[#000060] px-4 py-3 text-sm font-semibold text-white hover:bg-[#000044]">
+            Filtrar
+          </button>
         </form>
+        {selectedApplication ? (
+          <div className="mt-3 flex flex-col gap-2 rounded-md border border-[#e8ecf8] bg-white px-3 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+            <span>
+              Relatorio da prova selecionada:{" "}
+              <strong>
+                {selectedApplication.exam.title} - {selectedApplication.title}
+              </strong>
+            </span>
+            <Link
+              href={`/admin/provas/${selectedApplication.id}/relatorio`}
+              className="rounded-md bg-[#000060] px-3 py-2 text-center text-sm font-semibold text-white hover:bg-[#000044]"
+            >
+              Baixar relatorio
+            </Link>
+          </div>
+        ) : null}
 
         <div className="mt-4 grid gap-3 md:hidden">
           {attempts.map((attempt) => {
