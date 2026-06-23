@@ -6,7 +6,12 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { AdminRole, Category, ExamStatus } from "@/generated/prisma/client";
-import { parseApplicationDateInput } from "@/lib/application-availability";
+import {
+  addYearsToDateInput,
+  formatDateInput,
+  maximumApplicationRetentionYears,
+  parseApplicationDateInput,
+} from "@/lib/application-availability";
 import {
   clearAdminSession,
   createAdminSession,
@@ -19,6 +24,7 @@ import {
   verifyPassword,
 } from "@/lib/auth";
 import { getAppUrl, sendAdminPasswordResetEmail } from "@/lib/mail";
+import { deleteExamApplicationRecords } from "@/lib/exam-application-retention";
 import { prisma } from "@/lib/prisma";
 import {
   findActiveStudentsByRegistrationNumber,
@@ -112,6 +118,7 @@ const examPayloadSchema = z.object({
   startsAt: z.string().trim().optional(),
   endsAt: z.string().trim().optional(),
   noExpiration: z.boolean().optional().default(false),
+  purgeAt: z.string().trim().optional(),
   churchIds: z.array(z.string().min(1)).min(1, "Selecione pelo menos uma igreja."),
   categories: z.array(categorySchema).min(1, "Selecione pelo menos uma categoria."),
   questions: z.array(questionSchema).min(1, "Crie pelo menos uma questao."),
@@ -183,16 +190,47 @@ function parseApplicationWindow(payload: z.infer<typeof examPayloadSchema>, erro
   const endsAt = payload.noExpiration
     ? null
     : parsePayloadDate(payload.endsAt, "expiracao da prova", errorPath, true);
+  const purgeAt = parsePayloadDate(payload.purgeAt, "eliminacao da prova", errorPath, true);
 
   if (!payload.noExpiration && !endsAt) {
     errorRedirect(errorPath, "Informe a data de expiracao ou marque expiracao ilimitada.");
+  }
+
+  if (!purgeAt) {
+    errorRedirect(errorPath, "Informe a data de eliminacao da prova.");
   }
 
   if (startsAt && endsAt && startsAt > endsAt) {
     errorRedirect(errorPath, "A data de liberacao nao pode ser depois da expiracao.");
   }
 
-  return { startsAt, endsAt };
+  const todayInput = formatDateInput(new Date());
+  const purgeInput = payload.purgeAt?.trim() || "";
+  const startsInput = payload.startsAt?.trim() || "";
+  const endsInput = payload.endsAt?.trim() || "";
+  const retentionBaseInput = payload.noExpiration ? startsInput || todayInput : endsInput || startsInput || todayInput;
+  const maxPurgeInput = addYearsToDateInput(retentionBaseInput);
+
+  if (purgeInput < todayInput) {
+    errorRedirect(errorPath, "A data de eliminacao nao pode ficar no passado.");
+  }
+
+  if (startsInput && purgeInput < startsInput) {
+    errorRedirect(errorPath, "A data de eliminacao nao pode ser antes da liberacao da prova.");
+  }
+
+  if (!payload.noExpiration && endsInput && purgeInput < endsInput) {
+    errorRedirect(errorPath, "A data de eliminacao nao pode ser antes da expiracao da prova.");
+  }
+
+  if (!maxPurgeInput || purgeInput > maxPurgeInput) {
+    errorRedirect(
+      errorPath,
+      `A data de eliminacao nao pode ultrapassar ${maximumApplicationRetentionYears} ano apos a data base da prova.`,
+    );
+  }
+
+  return { startsAt, endsAt, purgeAt };
 }
 
 function parseExamPayload(formData: FormData, errorPath: string) {
@@ -986,6 +1024,7 @@ export async function createExamAction(formData: FormData) {
         active: true,
         startsAt: applicationWindow.startsAt,
         endsAt: applicationWindow.endsAt,
+        purgeAt: applicationWindow.purgeAt,
         showResultToStudent: false,
         participants: {
           create: students.map((student) => ({
@@ -1058,6 +1097,7 @@ export async function updateExamAction(formData: FormData) {
         accessCode,
         startsAt: applicationWindow.startsAt,
         endsAt: applicationWindow.endsAt,
+        purgeAt: applicationWindow.purgeAt,
       },
     });
 
@@ -1140,6 +1180,7 @@ export async function updateExamAction(formData: FormData) {
         active: true,
         startsAt: applicationWindow.startsAt,
         endsAt: applicationWindow.endsAt,
+        purgeAt: applicationWindow.purgeAt,
         showResultToStudent: false,
         participants: {
           create: students.map((student) => ({
@@ -1204,55 +1245,10 @@ export async function deleteExamApplicationAction(formData: FormData) {
   }
 
   await prisma.$transaction(async (tx) => {
-    const attempts = await tx.attempt.findMany({
-      where: {
-        applicationId: application.id,
-      },
-      select: {
-        id: true,
-      },
+    await deleteExamApplicationRecords(tx, {
+      id: application.id,
+      examId: application.exam.id,
     });
-    const attemptIds = attempts.map((attempt) => attempt.id);
-
-    if (attemptIds.length > 0) {
-      await tx.answer.deleteMany({
-        where: {
-          attemptId: { in: attemptIds },
-        },
-      });
-    }
-
-    await tx.attempt.deleteMany({
-      where: {
-        applicationId: application.id,
-      },
-    });
-
-    await tx.applicationParticipant.deleteMany({
-      where: {
-        applicationId: application.id,
-      },
-    });
-
-    await tx.examApplication.delete({
-      where: {
-        id: application.id,
-      },
-    });
-
-    const remainingApplications = await tx.examApplication.count({
-      where: {
-        examId: application.exam.id,
-      },
-    });
-
-    if (remainingApplications === 0) {
-      await tx.exam.delete({
-        where: {
-          id: application.exam.id,
-        },
-      });
-    }
   });
 
   revalidatePath("/admin");

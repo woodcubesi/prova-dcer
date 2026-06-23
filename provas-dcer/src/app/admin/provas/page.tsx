@@ -5,6 +5,7 @@ import { ConfirmSubmitButton } from "@/components/admin/ConfirmSubmitButton";
 import { AdminRole } from "@/generated/prisma/client";
 import {
   formatAvailabilityWindow,
+  formatPurgeDate,
   getApplicationStatus,
   getApplicationStatusLabel,
 } from "@/lib/application-availability";
@@ -123,6 +124,10 @@ export default async function ExamsPage({ searchParams }: ExamsPageProps) {
                   <p className="text-xs text-[#5d6480]">Disponibilidade</p>
                   <p className="font-semibold">{formatAvailabilityWindow(application)}</p>
                 </div>
+                <div className="rounded-md bg-[#fff9e6] px-3 py-2 sm:col-span-2">
+                  <p className="text-xs text-[#5d6480]">Eliminar do sistema em</p>
+                  <p className="font-semibold">{formatPurgeDate(application)}</p>
+                </div>
               </div>
               <Link
                 href={`/admin/provas/${application.id}/editar`}
@@ -150,7 +155,7 @@ export default async function ExamsPage({ searchParams }: ExamsPageProps) {
         </div>
 
         <div className="mt-4 hidden overflow-x-auto md:block">
-          <table className="w-full min-w-[1040px] text-left text-sm">
+          <table className="w-full min-w-[1160px] text-left text-sm">
             <thead className="border-b border-[#d8def0] text-xs uppercase tracking-wide text-[#5d6480]">
               <tr>
                 <th className="py-3 pr-4">Prova</th>
@@ -158,6 +163,7 @@ export default async function ExamsPage({ searchParams }: ExamsPageProps) {
                 <th className="py-3 pr-4">Tempo</th>
                 <th className="py-3 pr-4">Aprovacao</th>
                 <th className="py-3 pr-4">Expiracao</th>
+                <th className="py-3 pr-4">Eliminacao</th>
                 <th className="py-3 pr-4">Participantes</th>
                 <th className="py-3 pr-4">Tentativas</th>
                 <th className="py-3 pr-4">Status</th>
@@ -175,6 +181,7 @@ export default async function ExamsPage({ searchParams }: ExamsPageProps) {
                   <td className="py-3 pr-4">{application.exam.durationMinutes} min</td>
                   <td className="py-3 pr-4">{application.exam.passingPercent ?? 70}%</td>
                   <td className="py-3 pr-4">{formatAvailabilityWindow(application)}</td>
+                  <td className="py-3 pr-4">{formatPurgeDate(application)}</td>
                   <td className="py-3 pr-4">{application._count.participants}</td>
                   <td className="py-3 pr-4">{application._count.attempts}</td>
                   <td className="py-3 pr-4">
@@ -211,7 +218,7 @@ export default async function ExamsPage({ searchParams }: ExamsPageProps) {
               ))}
               {applications.length === 0 ? (
                 <tr>
-                    <td className="py-6 pr-4 text-sm text-[#5d6480]" colSpan={9}>
+                  <td className="py-6 pr-4 text-sm text-[#5d6480]" colSpan={10}>
                     Nenhuma prova criada ainda.
                   </td>
                 </tr>

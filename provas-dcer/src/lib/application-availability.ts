@@ -2,10 +2,12 @@ type ApplicationAvailabilityInput = {
   active: boolean;
   startsAt?: Date | null;
   endsAt?: Date | null;
+  purgeAt?: Date | null;
 };
 
 const applicationTimeZone = "America/Sao_Paulo";
 const applicationDateOffset = "-03:00";
+export const maximumApplicationRetentionYears = 1;
 const dateInputFormatter = new Intl.DateTimeFormat("en-US", {
   timeZone: applicationTimeZone,
   year: "numeric",
@@ -35,6 +37,19 @@ export function parseApplicationDateInput(value: string, endOfDay = false) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
+export function addYearsToDateInput(value: string, years = maximumApplicationRetentionYears) {
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return "";
+
+  const year = Number(match[1]);
+  const monthIndex = Number(match[2]) - 1;
+  const day = Number(match[3]);
+  const date = new Date(Date.UTC(year, monthIndex, day));
+  date.setUTCFullYear(date.getUTCFullYear() + years);
+
+  return date.toISOString().slice(0, 10);
+}
+
 export function getApplicationStatus(application: ApplicationAvailabilityInput, now = new Date()) {
   if (!application.active) return "inactive";
   if (application.startsAt && now < application.startsAt) return "scheduled";
@@ -54,4 +69,8 @@ export function formatAvailabilityWindow(application: Pick<ApplicationAvailabili
   const endsAt = formatDateLabel(application.endsAt, "Ilimitada");
 
   return `${startsAt} ate ${endsAt}`;
+}
+
+export function formatPurgeDate(application: Pick<ApplicationAvailabilityInput, "purgeAt">) {
+  return formatDateLabel(application.purgeAt, "Nao definida");
 }

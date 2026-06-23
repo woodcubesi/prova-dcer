@@ -4,7 +4,7 @@ import PDFDocument from "pdfkit";
 import type PDFKit from "pdfkit";
 import { getCategoryLabel } from "@/lib/categories";
 import { formatPercent, formatScore, getApprovalResult } from "@/lib/report-metrics";
-import { formatAvailabilityWindow } from "@/lib/application-availability";
+import { formatAvailabilityWindow, formatPurgeDate } from "@/lib/application-availability";
 import { formatDuration } from "@/lib/text";
 
 type PdfQuestion = {
@@ -52,6 +52,7 @@ export type ApplicationSummaryPdfData = {
   accessCode: string;
   startsAt?: Date | null;
   endsAt?: Date | null;
+  purgeAt?: Date | null;
   passingPercent: number;
   rows: Array<{
     studentName: string;
@@ -211,6 +212,7 @@ export function buildApplicationSummaryPdf(data: ApplicationSummaryPdfData) {
       ["Aplicacao", data.applicationTitle],
       ["Codigo", data.accessCode],
       ["Disponibilidade", formatAvailabilityWindow(data)],
+      ["Eliminar em", formatPurgeDate(data)],
       ["Aprovacao minima", formatPercent(data.passingPercent)],
       ["Inscritos", String(totalParticipants)],
       ["Embaixadores que fizeram", String(finalRows.length)],

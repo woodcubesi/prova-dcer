@@ -12,6 +12,7 @@
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
     "db:reset": "prisma db push --force-reset && pnpm db:seed",
+    "purge:applications": "tsx scripts/purge-exam-applications.ts",
     "prisma:generate": "prisma generate",
     "setup": "pnpm db:up && pnpm prisma:generate && pnpm db:push && pnpm db:seed"
   },

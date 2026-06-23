@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { createExamAction, updateExamAction } from "@/app/actions/admin";
+import { addYearsToDateInput, formatDateInput } from "@/lib/application-availability";
 import { CATEGORIES, type CategoryCode } from "@/lib/categories";
 
 type ChurchOption = {
@@ -34,6 +35,7 @@ type ImportedExamFile = {
   startsAt?: string;
   endsAt?: string;
   noExpiration?: boolean;
+  purgeAt?: string;
   categories?: CategoryCode[];
   questions?: QuestionDraft[];
   warnings?: string[];
@@ -49,6 +51,7 @@ export type ExamBuilderInitialData = {
   accessCode: string;
   startsAt: string;
   endsAt: string;
+  purgeAt: string;
   churchIds: string[];
   categories: CategoryCode[];
   questions: QuestionDraft[];
@@ -90,11 +93,34 @@ function getInitialQuestions(initialData?: ExamBuilderInitialData) {
 function getDefaultEndsAtInput() {
   const date = new Date();
   date.setDate(date.getDate() + 30);
-  return date.toISOString().slice(0, 10);
+  return formatDateInput(date);
 }
 
 function normalizeImportedDate(value?: string) {
   return value?.trim().slice(0, 10) || "";
+}
+
+function getTodayInput() {
+  return formatDateInput(new Date());
+}
+
+function getRetentionBaseInput(startsAt: string, endsAt: string, noExpiration: boolean) {
+  return noExpiration ? startsAt || getTodayInput() : endsAt || startsAt || getTodayInput();
+}
+
+function getPurgeLimitInput(startsAt: string, endsAt: string, noExpiration: boolean) {
+  return addYearsToDateInput(getRetentionBaseInput(startsAt, endsAt, noExpiration));
+}
+
+function normalizePurgeInput(value: string, startsAt: string, endsAt: string, noExpiration: boolean) {
+  const minPurgeAt = getRetentionBaseInput(startsAt, endsAt, noExpiration);
+  const maxPurgeAt = getPurgeLimitInput(startsAt, endsAt, noExpiration);
+
+  if (!value) return maxPurgeAt || minPurgeAt;
+  if (value < minPurgeAt) return minPurgeAt;
+  if (maxPurgeAt && value > maxPurgeAt) return maxPurgeAt;
+
+  return value;
 }
 
 export function ExamBuilder({ churches, initialData, locked = false, mode = "create" }: ExamBuilderProps) {
@@ -108,6 +134,14 @@ export function ExamBuilder({ churches, initialData, locked = false, mode = "cre
   const [startsAt, setStartsAt] = useState(initialData?.startsAt || "");
   const [endsAt, setEndsAt] = useState(initialData?.endsAt || getDefaultEndsAtInput());
   const [noExpiration, setNoExpiration] = useState(() => (initialData ? !initialData.endsAt : false));
+  const [purgeAt, setPurgeAt] = useState(() =>
+    normalizePurgeInput(
+      initialData?.purgeAt || "",
+      initialData?.startsAt || "",
+      initialData?.endsAt || getDefaultEndsAtInput(),
+      initialData ? !initialData.endsAt : false,
+    ),
+  );
   const [selectedChurchIds, setSelectedChurchIds] = useState(() =>
     initialData?.churchIds.length ? initialData.churchIds : churches.map((church) => church.id),
   );
@@ -134,6 +168,7 @@ export function ExamBuilder({ churches, initialData, locked = false, mode = "cre
         startsAt,
         endsAt: noExpiration ? "" : endsAt,
         noExpiration,
+        purgeAt,
         churchIds: selectedChurchIds,
         categories: selectedCategories,
         questions: questions.map((question) => ({
@@ -159,6 +194,7 @@ export function ExamBuilder({ churches, initialData, locked = false, mode = "cre
       endsAt,
       noExpiration,
       passingPercent,
+      purgeAt,
       questions,
       selectedCategories,
       selectedChurchIds,
@@ -198,8 +234,18 @@ export function ExamBuilder({ churches, initialData, locked = false, mode = "cre
       setApplicationTitle(imported.applicationTitle || applicationTitle);
       setAccessCode(imported.accessCode || accessCode);
       setStartsAt(normalizeImportedDate(imported.startsAt));
-      setEndsAt(normalizeImportedDate(imported.endsAt) || endsAt);
-      setNoExpiration(imported.noExpiration ?? !imported.endsAt);
+      const importedEndsAt = normalizeImportedDate(imported.endsAt) || endsAt;
+      const importedNoExpiration = imported.noExpiration ?? !imported.endsAt;
+      setEndsAt(importedEndsAt);
+      setNoExpiration(importedNoExpiration);
+      setPurgeAt(
+        normalizePurgeInput(
+          normalizeImportedDate(imported.purgeAt),
+          normalizeImportedDate(imported.startsAt),
+          importedEndsAt,
+          importedNoExpiration,
+        ),
+      );
 
       if (imported.categories?.length) {
         setSelectedCategories(imported.categories);
@@ -268,6 +314,9 @@ export function ExamBuilder({ churches, initialData, locked = false, mode = "cre
       ),
     );
   }
+
+  const minPurgeAt = getRetentionBaseInput(startsAt, endsAt, noExpiration);
+  const maxPurgeAt = getPurgeLimitInput(startsAt, endsAt, noExpiration);
 
   return (
     <form action={isEditing ? updateExamAction : createExamAction} className="space-y-5">
@@ -411,13 +460,17 @@ export function ExamBuilder({ churches, initialData, locked = false, mode = "cre
 
       <section className="rounded-lg border border-[#d8def0] bg-white p-4">
         <h2 className="text-lg font-semibold">Disponibilidade da aplicacao</h2>
-        <div className="mt-4 grid gap-3 lg:grid-cols-3">
+        <div className="mt-4 grid gap-3 lg:grid-cols-4">
           <label className="block">
             <span className="text-sm font-medium">Liberar a partir de</span>
             <input
               type="date"
               value={startsAt}
-              onChange={(event) => setStartsAt(event.target.value)}
+              onChange={(event) => {
+                const value = event.target.value;
+                setStartsAt(value);
+                setPurgeAt((current) => normalizePurgeInput(current, value, endsAt, noExpiration));
+              }}
               className="mt-1 w-full rounded-md border border-[#c5cce4] px-3 py-3 outline-none focus:ring-2 focus:ring-[#000060]"
             />
             <span className="mt-1 block text-xs text-[#5d6480]">Em branco libera imediatamente.</span>
@@ -428,19 +481,43 @@ export function ExamBuilder({ churches, initialData, locked = false, mode = "cre
               type="date"
               value={endsAt}
               disabled={noExpiration}
-              onChange={(event) => setEndsAt(event.target.value)}
+              onChange={(event) => {
+                const value = event.target.value;
+                setEndsAt(value);
+                setPurgeAt((current) => normalizePurgeInput(current, startsAt, value, noExpiration));
+              }}
               className="mt-1 w-full rounded-md border border-[#c5cce4] px-3 py-3 outline-none focus:ring-2 focus:ring-[#000060] disabled:bg-[#f8faff] disabled:text-[#8a91aa]"
             />
-            <span className="mt-1 block text-xs text-[#5d6480]">Depois desta data a prova deixa de aparecer.</span>
+            <span className="mt-1 block text-xs text-[#5d6480]">Prazo final para o embaixador fazer a prova.</span>
           </label>
           <label className="flex items-center gap-3 rounded-md border border-[#d8def0] px-3 py-3 text-sm font-medium lg:mt-6">
             <input
               type="checkbox"
               checked={noExpiration}
-              onChange={(event) => setNoExpiration(event.target.checked)}
+              onChange={(event) => {
+                const checked = event.target.checked;
+                setNoExpiration(checked);
+                setPurgeAt((current) => normalizePurgeInput(current, startsAt, endsAt, checked));
+              }}
               className="h-5 w-5 accent-[#000060]"
             />
             Expiracao ilimitada
+          </label>
+          <label className="block">
+            <span className="text-sm font-medium">Eliminar do sistema em</span>
+            <input
+              type="date"
+              value={purgeAt}
+              min={minPurgeAt}
+              max={maxPurgeAt}
+              onChange={(event) =>
+                setPurgeAt(normalizePurgeInput(event.target.value, startsAt, endsAt, noExpiration))
+              }
+              className="mt-1 w-full rounded-md border border-[#c5cce4] px-3 py-3 outline-none focus:ring-2 focus:ring-[#000060]"
+            />
+            <span className="mt-1 block text-xs text-[#5d6480]">
+              Remove prova, respostas e relatorios. Maximo: {maxPurgeAt || "1 ano"}.
+            </span>
           </label>
         </div>
       </section>

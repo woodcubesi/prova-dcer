@@ -3,6 +3,7 @@ import { AdminShell } from "@/components/admin/AdminShell";
 import { AdminRole } from "@/generated/prisma/client";
 import {
   formatAvailabilityWindow,
+  formatPurgeDate,
   getApplicationStatus,
   getApplicationStatusLabel,
 } from "@/lib/application-availability";
@@ -217,6 +218,10 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                     <p className="text-xs text-[#5d6480]">Disponibilidade</p>
                     <p className="font-semibold">{formatAvailabilityWindow(application)}</p>
                   </div>
+                  <div className="rounded-md bg-[#fff9e6] px-3 py-2 sm:col-span-2">
+                    <p className="text-xs text-[#5d6480]">Eliminar do sistema em</p>
+                    <p className="font-semibold">{formatPurgeDate(application)}</p>
+                  </div>
                 </div>
                 <Link
                   href={`/admin/provas/${application.id}/editar`}
@@ -229,13 +234,14 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           </div>
 
           <div className="mt-4 hidden overflow-x-auto md:block">
-            <table className="w-full min-w-[960px] text-left text-sm">
+            <table className="w-full min-w-[1080px] text-left text-sm">
               <thead className="border-b border-[#d8def0] text-xs uppercase tracking-wide text-[#5d6480]">
                 <tr>
                   <th className="py-3 pr-4">Aplicacao</th>
                   <th className="py-3 pr-4">Codigo</th>
                   <th className="py-3 pr-4">Tempo</th>
                   <th className="py-3 pr-4">Disponibilidade</th>
+                  <th className="py-3 pr-4">Eliminacao</th>
                   <th className="py-3 pr-4">Participantes</th>
                   <th className="py-3 pr-4">Envios</th>
                   <th className="py-3 pr-4">Status</th>
@@ -252,6 +258,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                     <td className="py-3 pr-4 font-mono text-sm">{application.accessCode}</td>
                     <td className="py-3 pr-4">{application.exam.durationMinutes} min</td>
                     <td className="py-3 pr-4">{formatAvailabilityWindow(application)}</td>
+                    <td className="py-3 pr-4">{formatPurgeDate(application)}</td>
                     <td className="py-3 pr-4">{application.participants.length}</td>
                     <td className="py-3 pr-4">{application.attempts.length}</td>
                     <td className="py-3 pr-4">

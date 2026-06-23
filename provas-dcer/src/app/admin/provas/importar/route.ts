@@ -30,6 +30,7 @@ type ImportResult = {
   startsAt: string;
   endsAt: string;
   noExpiration: boolean;
+  purgeAt: string;
   categories: CategoryCode[];
   questions: ImportQuestion[];
   warnings: string[];
@@ -58,6 +59,9 @@ const fieldAliases = new Map<string, keyof ImportColumns>([
   ["datadeexpiracao", "endsAt"],
   ["expiracaoilimitada", "noExpiration"],
   ["semexpiracao", "noExpiration"],
+  ["eliminarem", "purgeAt"],
+  ["datadeeliminacao", "purgeAt"],
+  ["eliminardosistemaem", "purgeAt"],
   ["status", "sourceStatus"],
 ]);
 
@@ -81,6 +85,7 @@ const templateHeaders: string[] = [
   "Liberar em",
   "Expira em",
   "Expiração Ilimitada",
+  "Eliminar em",
   "Status",
 ];
 
@@ -105,6 +110,7 @@ const templateRows = [
     "",
     "31/12/2026",
     "Nao",
+    "31/12/2027",
     "Ativa",
   ],
   [
@@ -127,6 +133,7 @@ const templateRows = [
     "",
     "",
     "Sim",
+    "31/12/2026",
     "Ativa",
   ],
 ] satisfies string[][];
@@ -151,6 +158,7 @@ type ImportColumns = {
   startsAt: string;
   endsAt: string;
   noExpiration: string;
+  purgeAt: string;
   sourceStatus: string;
 };
 
@@ -216,6 +224,7 @@ async function parseImportFile(file: File): Promise<ImportResult> {
   const rowStartDates: string[] = [];
   const rowEndDates: string[] = [];
   const rowNoExpirationValues: boolean[] = [];
+  const rowPurgeDates: string[] = [];
 
   rows.forEach((rawRow, rowIndex) => {
     const rowNumber = rowIndex + 2;
@@ -241,6 +250,7 @@ async function parseImportFile(file: File): Promise<ImportResult> {
     const passingPercent = parseNumber(row.passingPercent);
     const startsAt = parseDateCell(row.startsAt);
     const endsAt = parseDateCell(row.endsAt);
+    const purgeAt = parseDateCell(row.purgeAt);
 
     if (duration !== null) rowDurations.push(Math.round(duration));
     if (passingPercent !== null) rowPassingPercents.push(normalizePercent(passingPercent));
@@ -249,6 +259,7 @@ async function parseImportFile(file: File): Promise<ImportResult> {
     if (startsAt) rowStartDates.push(startsAt);
     if (endsAt) rowEndDates.push(endsAt);
     if (row.noExpiration) rowNoExpirationValues.push(parseBooleanCell(row.noExpiration));
+    if (purgeAt) rowPurgeDates.push(purgeAt);
 
     if (row.startsAt && !startsAt) {
       warnings.push(`Linha ${rowNumber}: data de liberacao "${row.startsAt}" nao foi reconhecida.`);
@@ -256,6 +267,10 @@ async function parseImportFile(file: File): Promise<ImportResult> {
 
     if (row.endsAt && !endsAt) {
       warnings.push(`Linha ${rowNumber}: data de expiracao "${row.endsAt}" nao foi reconhecida.`);
+    }
+
+    if (row.purgeAt && !purgeAt) {
+      warnings.push(`Linha ${rowNumber}: data de eliminacao "${row.purgeAt}" nao foi reconhecida.`);
     }
 
     questions.push({
@@ -293,6 +308,7 @@ async function parseImportFile(file: File): Promise<ImportResult> {
     startsAt: firstText(rowStartDates, ""),
     endsAt,
     noExpiration,
+    purgeAt: firstText(rowPurgeDates, ""),
     categories,
     questions,
     warnings,
@@ -320,6 +336,7 @@ function normalizeRow(rawRow: Record<string, unknown>): ImportColumns {
     startsAt: "",
     endsAt: "",
     noExpiration: "",
+    purgeAt: "",
     sourceStatus: "",
   };
 
@@ -499,9 +516,10 @@ function buildXlsxTemplateResponse() {
     { wch: 14 },
     { wch: 14 },
     { wch: 22 },
+    { wch: 16 },
     { wch: 14 },
   ];
-  worksheet["!autofilter"] = { ref: `A1:T${templateRows.length + 1}` };
+  worksheet["!autofilter"] = { ref: `A1:U${templateRows.length + 1}` };
 
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, "Modelo");

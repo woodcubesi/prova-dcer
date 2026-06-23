@@ -113,6 +113,7 @@ export default async function EditExamPage({ params, searchParams }: EditExamPag
     accessCode: application.accessCode,
     startsAt: formatDateInput(application.startsAt),
     endsAt: formatDateInput(application.endsAt),
+    purgeAt: formatDateInput(application.purgeAt),
     churchIds: selectedChurchIds,
     categories: selectedCategories,
     questions: application.exam.questions.map((question) => {

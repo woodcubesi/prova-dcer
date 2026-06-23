@@ -76,6 +76,10 @@ export async function startAttemptAction(formData: FormData) {
     studentError("Esta prova ja foi encerrada.");
   }
 
+  if (application.purgeAt && now > application.purgeAt) {
+    studentError("Esta prova ja foi eliminada do sistema.");
+  }
+
   const existingAttempt = await prisma.attempt.findUnique({
     where: {
       applicationId_studentId: {

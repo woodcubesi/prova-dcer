@@ -68,6 +68,9 @@ export async function POST(request: Request) {
         {
           OR: [{ endsAt: null }, { endsAt: { gte: now } }],
         },
+        {
+          OR: [{ purgeAt: null }, { purgeAt: { gt: now } }],
+        },
       ],
       participants: {
         some: {
