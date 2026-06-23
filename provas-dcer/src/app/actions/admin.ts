@@ -17,6 +17,10 @@ import {
   verifyPassword,
 } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import {
+  findActiveStudentsByRegistrationNumber,
+  normalizeRegistrationNumber,
+} from "@/lib/student-registration";
 import { normalizeName } from "@/lib/text";
 
 const categorySchema = z.enum(["JUNIOR", "ADOLESCENTES", "JUVENIL"]);
@@ -109,6 +113,11 @@ function optionalText(value?: string | null) {
 
 function optionalFormText(formData: FormData, field: string) {
   return optionalText(String(formData.get(field) || ""));
+}
+
+function optionalRegistrationNumber(formData: FormData, field: string) {
+  const normalizedRegistrationNumber = normalizeRegistrationNumber(String(formData.get(field) || ""));
+  return normalizedRegistrationNumber || null;
 }
 
 function parseOptionalDate(formData: FormData, field: string, label: string) {
@@ -283,12 +292,10 @@ async function ensureUniqueStudent(
 async function ensureUniqueStudentExternalId(externalId: string | null, ignoredId?: string) {
   if (!externalId) return;
 
-  const existingStudent = await prisma.student.findFirst({
-    where: { externalId },
-    select: { id: true },
-  });
+  const existingStudents = await findActiveStudentsByRegistrationNumber(externalId);
+  const existingStudent = existingStudents.find((student) => student.id !== ignoredId);
 
-  if (existingStudent && existingStudent.id !== ignoredId) {
+  if (existingStudent) {
     errorRedirect("/admin/cadastros", "Ja existe embaixador com este numero de inscricao.");
   }
 }
@@ -545,7 +552,7 @@ export async function createStudentAction(formData: FormData) {
   const requestedChurchId = String(formData.get("churchId") || "");
   const churchId = scopedChurchId || requestedChurchId;
   const category = String(formData.get("category") || "") as Category;
-  const externalId = optionalFormText(formData, "externalId");
+  const externalId = optionalRegistrationNumber(formData, "externalId");
   const registrationIssuedAt = parseOptionalDate(formData, "registrationIssuedAt", "emissao");
   const registrationExpiresAt = parseOptionalDate(formData, "registrationExpiresAt", "validade");
   const birthDate = parseOptionalDate(formData, "birthDate", "nascimento");
@@ -610,7 +617,7 @@ export async function updateStudentAction(formData: FormData) {
   const requestedChurchId = String(formData.get("churchId") || "");
   const churchId = scopedChurchId || requestedChurchId;
   const category = String(formData.get("category") || "") as Category;
-  const externalId = optionalFormText(formData, "externalId");
+  const externalId = optionalRegistrationNumber(formData, "externalId");
   const registrationIssuedAt = parseOptionalDate(formData, "registrationIssuedAt", "emissao");
   const registrationExpiresAt = parseOptionalDate(formData, "registrationExpiresAt", "validade");
   const birthDate = parseOptionalDate(formData, "birthDate", "nascimento");

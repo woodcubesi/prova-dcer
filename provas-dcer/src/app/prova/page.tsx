@@ -15,7 +15,7 @@ export default async function StudentEntryPage({ searchParams }: StudentEntryPag
   const params = searchParams ? await searchParams : {};
   const now = new Date();
 
-  const applications = await prisma.examApplication.findMany({
+  const activeApplicationCount = await prisma.examApplication.count({
     where: {
       active: true,
       AND: [
@@ -27,40 +27,7 @@ export default async function StudentEntryPage({ searchParams }: StudentEntryPag
         },
       ],
     },
-    orderBy: { createdAt: "desc" },
-    include: {
-      exam: true,
-      participants: {
-        where: {
-          student: {
-            active: true,
-          },
-        },
-        include: {
-          student: {
-            include: {
-              church: true,
-            },
-          },
-        },
-      },
-    },
   });
-
-  const serializedApplications = applications.map((application) => ({
-    id: application.id,
-    title: application.title,
-    examTitle: application.exam.title,
-    accessCode: application.accessCode,
-    durationMinutes: application.exam.durationMinutes,
-    participants: application.participants.map((participant) => ({
-      id: participant.student.id,
-      name: participant.student.name,
-      category: participant.student.category,
-      churchId: participant.student.churchId,
-      churchName: participant.student.church.name,
-    })),
-  }));
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-3xl flex-col px-4 py-5 sm:px-6">
@@ -73,7 +40,7 @@ export default async function StudentEntryPage({ searchParams }: StudentEntryPag
           </Link>
           <h1 className="mt-3 text-3xl font-semibold">Entrada do embaixador</h1>
           <p className="mt-2 text-sm leading-6 text-[#f8f9ff]">
-            Escolha sua igreja e categoria, digite seu nome e depois selecione uma prova disponivel.
+            Digite o numero da carteirinha para carregar seu cadastro e as provas disponiveis.
           </p>
         </div>
       </header>
@@ -85,8 +52,8 @@ export default async function StudentEntryPage({ searchParams }: StudentEntryPag
       ) : null}
 
       <section className="mt-4">
-        {serializedApplications.length ? (
-          <StudentEntry applications={serializedApplications} />
+        {activeApplicationCount > 0 ? (
+          <StudentEntry />
         ) : (
           <div className="rounded-lg border border-[#d8def0] bg-white p-6 text-sm text-[#5d6480]">
             Nenhuma prova ativa no momento.

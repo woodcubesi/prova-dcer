@@ -1,12 +1,14 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { AttemptStatus, Category } from "@/generated/prisma/client";
+import { AttemptStatus } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { filterQuestionsForCategory } from "@/lib/questions";
-import { normalizeName } from "@/lib/text";
-
-const categories = ["JUNIOR", "ADOLESCENTES", "JUVENIL"];
+import {
+  findActiveStudentsByRegistrationNumber,
+  isRegistrationExpired,
+  normalizeRegistrationNumber,
+} from "@/lib/student-registration";
 
 function studentError(message: string): never {
   redirect(`/prova?erro=${encodeURIComponent(message)}`);
@@ -14,22 +16,35 @@ function studentError(message: string): never {
 
 export async function startAttemptAction(formData: FormData) {
   const applicationId = String(formData.get("applicationId") || "");
-  const churchId = String(formData.get("churchId") || "");
-  const category = String(formData.get("category") || "") as Category;
-  const studentName = String(formData.get("studentName") || "").trim();
+  const registrationNumber = String(formData.get("registrationNumber") || "");
+  const normalizedRegistrationNumber = normalizeRegistrationNumber(registrationNumber);
 
-  if (!applicationId || !churchId || !categories.includes(category) || studentName.length < 3) {
-    studentError("Selecione a igreja, a categoria, digite seu nome e escolha uma prova disponivel.");
+  if (!applicationId || normalizedRegistrationNumber.length < 3) {
+    studentError("Digite o numero da carteirinha e escolha uma prova disponivel.");
   }
 
-  const normalizedName = normalizeName(studentName);
+  const students = await findActiveStudentsByRegistrationNumber(registrationNumber);
+
+  if (students.length === 0) {
+    studentError("Carteirinha nao encontrada. Confira o numero ou procure a coordenacao.");
+  }
+
+  if (students.length > 1) {
+    studentError("Existe mais de um embaixador com este numero. Procure a coordenacao.");
+  }
+
+  const student = students[0];
+  const now = new Date();
+
+  if (isRegistrationExpired(student.registrationExpiresAt, now)) {
+    studentError("Esta carteirinha esta vencida. Procure a coordenacao.");
+  }
+
   const participant = await prisma.applicationParticipant.findFirst({
     where: {
       applicationId,
+      studentId: student.id,
       student: {
-        churchId,
-        category,
-        normalizedName,
         active: true,
       },
     },
@@ -44,10 +59,9 @@ export async function startAttemptAction(formData: FormData) {
   });
 
   if (!participant) {
-    studentError("Embaixador nao encontrado nesta prova. Confira igreja, categoria e nome.");
+    studentError("Nao ha prova disponivel para esta carteirinha.");
   }
 
-  const now = new Date();
   const application = participant.application;
 
   if (!application.active) {

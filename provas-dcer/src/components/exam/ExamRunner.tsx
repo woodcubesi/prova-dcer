@@ -21,6 +21,7 @@ type ExamRunnerProps = {
   attemptId: string;
   studentName: string;
   churchName: string;
+  embassyName?: string | null;
   category: string;
   applicationTitle: string;
   examTitle: string;
@@ -32,6 +33,7 @@ export function ExamRunner({
   attemptId,
   studentName,
   churchName,
+  embassyName,
   category,
   applicationTitle,
   examTitle,
@@ -75,7 +77,8 @@ export function ExamRunner({
             <p className="text-sm font-semibold text-[#000060]">{applicationTitle}</p>
             <h1 className="text-2xl font-semibold">{examTitle}</h1>
             <p className="mt-1 text-xs text-[#5d6480]">
-              {studentName} - {churchName} - {getCategoryLabel(category)}
+              {studentName} - {embassyName ? `${embassyName} - ` : ""}
+              {churchName} - {getCategoryLabel(category)}
             </p>
           </div>
           <div className="rounded-md bg-[#000060] px-4 py-3 text-center text-white">

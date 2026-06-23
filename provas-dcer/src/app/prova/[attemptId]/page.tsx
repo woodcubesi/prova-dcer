@@ -71,6 +71,7 @@ export default async function ExamPage({ params }: ExamPageProps) {
         attemptId={attempt.id}
         studentName={attempt.student.name}
         churchName={attempt.student.church.name}
+        embassyName={attempt.student.church.embassyName}
         category={attempt.student.category}
         applicationTitle={attempt.application.title}
         examTitle={attempt.application.exam.title}
