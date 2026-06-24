@@ -1,9 +1,0 @@
-.env
-.git
-.next
-node_modules
-npm-debug.log*
-pnpm-debug.log*
-Dockerfile
-docker-compose.override.yml
-README.md

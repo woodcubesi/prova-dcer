@@ -206,34 +206,6 @@ pnpm db:reset         # limpa e recria o banco pelo schema
 pnpm prisma:generate  # gera Prisma Client
 ```
 
-## Execucao 100% Docker
-
-Para rodar aplicacao e banco em containers:
-
-```bash
-docker compose up -d --build app
-```
-
-Para aplicar o schema Prisma e carregar dados de demonstracao no banco do Docker:
-
-```bash
-docker compose --profile setup run --rm setup
-```
-
-Para acompanhar logs:
-
-```bash
-docker compose logs -f app
-```
-
-Para parar tudo:
-
-```bash
-docker compose down
-```
-
-Com Docker, a aplicacao fica em `http://localhost:3000` e o PostgreSQL fica no servico `db`.
-
 ## Instalacao em Linux para homologacao/producao
 
 1. Clone o projeto:
