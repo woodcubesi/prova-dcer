@@ -1,4 +1,35 @@
 services:
+  app:
+    build:
+      context: .
+    container_name: provas_dcer_app
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://provas_dcer:provas_dcer_dev@db:5432/provas_dcer?schema=public
+      ADMIN_PASSWORD: admin123
+      ADMIN_SESSION_SECRET: troque-este-segredo-no-servidor-linux
+      NEXT_TELEMETRY_DISABLED: "1"
+    ports:
+      - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  setup:
+    build:
+      context: .
+    profiles:
+      - setup
+    environment:
+      DATABASE_URL: postgresql://provas_dcer:provas_dcer_dev@db:5432/provas_dcer?schema=public
+      ADMIN_PASSWORD: admin123
+      ADMIN_SESSION_SECRET: troque-este-segredo-no-servidor-linux
+      NEXT_TELEMETRY_DISABLED: "1"
+    depends_on:
+      db:
+        condition: service_healthy
+    command: sh -c "pnpm db:push && pnpm db:seed"
+
   db:
     image: postgres:16-alpine
     container_name: provas_dcer_postgres

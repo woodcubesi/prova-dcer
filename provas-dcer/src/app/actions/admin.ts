@@ -138,6 +138,33 @@ function parseOptionalDate(formData: FormData, field: string, label: string) {
   return date;
 }
 
+function parseMedicalReportFields(formData: FormData) {
+  const hasMedicalReport = formData.get("hasMedicalReport") === "on";
+  const rawExtraTimePercent = String(formData.get("extraTimePercent") || "").trim();
+
+  if (!hasMedicalReport) {
+    return {
+      hasMedicalReport: false,
+      extraTimePercent: null,
+    };
+  }
+
+  if (!rawExtraTimePercent) {
+    errorRedirect("/admin/cadastros", "Informe o percentual de tempo adicional do laudo.");
+  }
+
+  const extraTimePercent = Number(rawExtraTimePercent);
+
+  if (!Number.isInteger(extraTimePercent) || extraTimePercent < 0 || extraTimePercent > 100) {
+    errorRedirect("/admin/cadastros", "O percentual de tempo adicional do laudo deve ser de 0 a 100.");
+  }
+
+  return {
+    hasMedicalReport: true,
+    extraTimePercent,
+  };
+}
+
 function parseExamPayload(formData: FormData, errorPath: string) {
   const rawPayload = String(formData.get("payload") || "");
   let parsedJson: unknown;
@@ -557,6 +584,7 @@ export async function createStudentAction(formData: FormData) {
   const registrationExpiresAt = parseOptionalDate(formData, "registrationExpiresAt", "validade");
   const birthDate = parseOptionalDate(formData, "birthDate", "nascimento");
   const embassyAdmissionDate = parseOptionalDate(formData, "embassyAdmissionDate", "admissao na embaixada");
+  const medicalReport = parseMedicalReportFields(formData);
 
   if (context.role === AdminRole.TEACHER && !scopedChurchId) {
     errorRedirect("/admin/cadastros", "Seu usuario de conselheiro ainda nao esta vinculado a uma igreja.");
@@ -589,6 +617,8 @@ export async function createStudentAction(formData: FormData) {
       registrationExpiresAt,
       birthDate,
       embassyAdmissionDate,
+      hasMedicalReport: medicalReport.hasMedicalReport,
+      extraTimePercent: medicalReport.extraTimePercent,
       active: true,
     },
     create: {
@@ -600,6 +630,8 @@ export async function createStudentAction(formData: FormData) {
       registrationExpiresAt,
       birthDate,
       embassyAdmissionDate,
+      hasMedicalReport: medicalReport.hasMedicalReport,
+      extraTimePercent: medicalReport.extraTimePercent,
       churchId,
     },
   });
@@ -622,6 +654,7 @@ export async function updateStudentAction(formData: FormData) {
   const registrationExpiresAt = parseOptionalDate(formData, "registrationExpiresAt", "validade");
   const birthDate = parseOptionalDate(formData, "birthDate", "nascimento");
   const embassyAdmissionDate = parseOptionalDate(formData, "embassyAdmissionDate", "admissao na embaixada");
+  const medicalReport = parseMedicalReportFields(formData);
 
   if (context.role === AdminRole.TEACHER && !scopedChurchId) {
     errorRedirect("/admin/cadastros", "Seu usuario de conselheiro ainda nao esta vinculado a uma igreja.");
@@ -663,6 +696,8 @@ export async function updateStudentAction(formData: FormData) {
       registrationExpiresAt,
       birthDate,
       embassyAdmissionDate,
+      hasMedicalReport: medicalReport.hasMedicalReport,
+      extraTimePercent: medicalReport.extraTimePercent,
       churchId,
       active: true,
     },

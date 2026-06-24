@@ -252,6 +252,35 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
                 className="mt-1 w-full rounded-md border border-[#c5cce4] px-3 py-3 outline-none focus:ring-2 focus:ring-[#000060]"
               />
             </label>
+            <div className="rounded-md border border-[#d8def0] bg-[#f8faff] p-3 sm:col-span-2">
+              <label className="flex items-start gap-3">
+                <input
+                  name="hasMedicalReport"
+                  type="checkbox"
+                  defaultChecked={editingStudent?.hasMedicalReport || false}
+                  className="mt-1 h-4 w-4 rounded border-[#c5cce4] accent-[#000060]"
+                />
+                <span>
+                  <span className="block text-sm font-medium">Possui laudo</span>
+                  <span className="mt-1 block text-xs leading-5 text-[#5d6480]">
+                    Ao marcar esta opcao, informe o percentual de tempo adicional de 0 a 100%.
+                  </span>
+                </span>
+              </label>
+              <label className="mt-3 block">
+                <span className="text-sm font-medium">Tempo adicional do laudo (%)</span>
+                <input
+                  name="extraTimePercent"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="1"
+                  defaultValue={editingStudent?.extraTimePercent ?? ""}
+                  className="mt-1 w-full rounded-md border border-[#c5cce4] px-3 py-3 outline-none focus:ring-2 focus:ring-[#000060]"
+                  placeholder="Ex.: 10"
+                />
+              </label>
+            </div>
           </div>
           <div className="mt-4 flex flex-col gap-2 sm:flex-row">
             <button className="rounded-md bg-[#000060] px-4 py-3 text-sm font-semibold text-white hover:bg-[#000044]">
@@ -319,6 +348,12 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
                     <p className="text-[#5d6480]">Admissao</p>
                     <p className="font-semibold">{formatDateLabel(student.embassyAdmissionDate)}</p>
                   </div>
+                  <div className="rounded-md bg-[#f8faff] px-2 py-2">
+                    <p className="text-[#5d6480]">Laudo</p>
+                    <p className="font-semibold">
+                      {student.hasMedicalReport ? `${student.extraTimePercent ?? 0}% extra` : "-"}
+                    </p>
+                  </div>
                 </div>
                 <span className="mt-2 inline-flex rounded-full bg-[#effaf2] px-2 py-1 text-xs font-medium text-[#1f623e]">
                   {getCategoryLabel(student.category)}
@@ -343,6 +378,7 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
                   <th className="py-3 pr-4">Categoria</th>
                   <th className="py-3 pr-4">Nascimento</th>
                   <th className="py-3 pr-4">Validade</th>
+                  <th className="py-3 pr-4">Laudo</th>
                   <th className="py-3 pr-4">Acao</th>
                 </tr>
               </thead>
@@ -357,6 +393,9 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
                     <td className="py-3 pr-4">{formatDateLabel(student.birthDate)}</td>
                     <td className="py-3 pr-4">{formatDateLabel(student.registrationExpiresAt)}</td>
                     <td className="py-3 pr-4">
+                      {student.hasMedicalReport ? `${student.extraTimePercent ?? 0}% extra` : "-"}
+                    </td>
+                    <td className="py-3 pr-4">
                       <a
                         href={`/admin/cadastros?embaixador=${student.id}`}
                         className="rounded-md border border-[#000060] px-3 py-2 text-sm font-semibold text-[#000060] hover:bg-[#effaf2]"
@@ -368,7 +407,7 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
                 ))}
                 {students.length === 0 ? (
                   <tr>
-                    <td className="py-6 pr-4 text-sm text-[#5d6480]" colSpan={8}>
+                    <td className="py-6 pr-4 text-sm text-[#5d6480]" colSpan={9}>
                       Nenhum embaixador cadastrado ainda.
                     </td>
                   </tr>
