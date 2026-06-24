@@ -506,15 +506,35 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
                 className="mt-1 w-full rounded-md border border-[#c5cce4] px-3 py-3 outline-none focus:ring-2 focus:ring-[#000060]"
               />
             </label>
-            <label className="flex items-center gap-3 rounded-md border border-[#d8def0] bg-[#fbfcff] px-3 py-3 sm:col-span-2">
-              <input
-                name="hasMedicalReport"
-                type="checkbox"
-                defaultChecked={editingStudent?.hasMedicalReport || false}
-                className="h-4 w-4 rounded border-[#c5cce4]"
-              />
-              <span className="text-sm font-medium">Tem laudo</span>
-            </label>
+            <div className="rounded-md border border-[#d8def0] bg-[#f8faff] p-3 sm:col-span-2">
+              <label className="flex items-start gap-3">
+                <input
+                  name="hasMedicalReport"
+                  type="checkbox"
+                  defaultChecked={editingStudent?.hasMedicalReport || false}
+                  className="mt-1 h-4 w-4 rounded border-[#c5cce4] accent-[#000060]"
+                />
+                <span>
+                  <span className="block text-sm font-medium">Possui laudo</span>
+                  <span className="mt-1 block text-xs leading-5 text-[#5d6480]">
+                    Ao marcar esta opcao, informe o percentual de tempo adicional de 0 a 100%.
+                  </span>
+                </span>
+              </label>
+              <label className="mt-3 block">
+                <span className="text-sm font-medium">Tempo adicional do laudo (%)</span>
+                <input
+                  name="extraTimePercent"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="1"
+                  defaultValue={editingStudent?.extraTimePercent ?? ""}
+                  className="mt-1 w-full rounded-md border border-[#c5cce4] px-3 py-3 outline-none focus:ring-2 focus:ring-[#000060]"
+                  placeholder="Ex.: 10"
+                />
+              </label>
+            </div>
           </div>
           <div className="mt-4 flex flex-col gap-2 sm:flex-row">
             <button className="rounded-md bg-[#000060] px-4 py-3 text-sm font-semibold text-white hover:bg-[#000044]">
@@ -742,7 +762,9 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
                   </div>
                   <div className="rounded-md bg-[#f8faff] px-2 py-2">
                     <p className="text-[#5d6480]">Laudo</p>
-                    <p className="font-semibold">{student.hasMedicalReport ? "Sim" : "Nao"}</p>
+                    <p className="font-semibold">
+                      {student.hasMedicalReport ? `${student.extraTimePercent ?? 0}% extra` : "-"}
+                    </p>
                   </div>
                 </div>
                 <span className="mt-2 inline-flex rounded-full bg-[#effaf2] px-2 py-1 text-xs font-medium text-[#1f623e]">
@@ -782,7 +804,9 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
                     <td className="py-3 pr-4">{getCategoryLabel(student.category)}</td>
                     <td className="py-3 pr-4">{formatDateLabel(student.birthDate)}</td>
                     <td className="py-3 pr-4">{formatDateLabel(student.registrationExpiresAt)}</td>
-                    <td className="py-3 pr-4">{student.hasMedicalReport ? "Sim" : "Nao"}</td>
+                    <td className="py-3 pr-4">
+                      {student.hasMedicalReport ? `${student.extraTimePercent ?? 0}% extra` : "-"}
+                    </td>
                     <td className="py-3 pr-4">
                       <a
                         href={`/admin/cadastros?embaixador=${student.id}&igrejaResponsavel=${selectedChurchId}&embaixadorSelecionado=${student.id}`}
