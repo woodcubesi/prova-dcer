@@ -8,7 +8,7 @@ type ApplicationOption = {
   title: string;
   examTitle: string;
   durationMinutes: number;
-  baseDurationMinutes: number;
+  endsAt: string | null;
   alreadyStarted: boolean;
 };
 
@@ -24,8 +24,6 @@ type StudentLookup = {
     registrationExpiresAt: string | null;
     birthDate: string | null;
     embassyAdmissionDate: string | null;
-    hasMedicalReport: boolean;
-    extraTimePercent: number;
   };
   applications: ApplicationOption[];
 };
@@ -145,14 +143,6 @@ export function StudentEntry() {
               <StudentData label="Validade" value={formatDate(lookup.student.registrationExpiresAt)} />
               <StudentData label="Nascimento" value={formatDate(lookup.student.birthDate)} />
               <StudentData label="Admissao na embaixada" value={formatDate(lookup.student.embassyAdmissionDate)} />
-              <StudentData
-                label="Laudo"
-                value={
-                  lookup.student.hasMedicalReport
-                    ? `Sim, ${lookup.student.extraTimePercent}% de tempo adicional`
-                    : "Nao informado"
-                }
-              />
             </dl>
           </section>
 
@@ -185,9 +175,14 @@ export function StudentEntry() {
             {application ? (
               <div className="rounded-md bg-[#effaf2] px-3 py-2 text-sm text-[#1f623e]">
                 Tempo total: <strong>{application.durationMinutes} minutos</strong>.
-                {application.durationMinutes !== application.baseDurationMinutes
-                  ? ` A prova possui ${application.baseDurationMinutes} minutos e recebeu o adicional do laudo.`
-                  : ""}
+                {" "}
+                {application.endsAt ? (
+                  <>
+                    Disponivel ate <strong>{formatApplicationDate(application.endsAt)}</strong>.
+                  </>
+                ) : (
+                  <strong>Expiracao ilimitada.</strong>
+                )}
                 {application.alreadyStarted ? " Esta prova ja foi iniciada e sera retomada." : ""}
               </div>
             ) : null}
@@ -230,4 +225,10 @@ function formatDate(value: string | null) {
   if (!value) return "-";
 
   return new Intl.DateTimeFormat("pt-BR", { timeZone: "UTC" }).format(new Date(value));
+}
+
+function formatApplicationDate(value: string | null) {
+  if (!value) return "-";
+
+  return new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo" }).format(new Date(value));
 }

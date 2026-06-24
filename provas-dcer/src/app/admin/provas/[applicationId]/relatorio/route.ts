@@ -90,6 +90,9 @@ export async function GET(_request: Request, { params }: ApplicationReportRouteC
     examTitle: application.exam.title,
     applicationTitle: application.title,
     accessCode: application.accessCode,
+    startsAt: application.startsAt,
+    endsAt: application.endsAt,
+    purgeAt: application.purgeAt,
     passingPercent: application.exam.passingPercent ?? 70,
     rows: application.participants.map((participant) => {
       const attempt = attemptsByStudentId.get(participant.studentId);

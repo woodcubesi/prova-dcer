@@ -1,10 +1,17 @@
 "use server";
 
-import { randomInt } from "crypto";
+import { createHash, randomBytes, randomInt } from "crypto";
+import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { AdminRole, Category, ExamStatus } from "@/generated/prisma/client";
+import {
+  addYearsToDateInput,
+  formatDateInput,
+  maximumApplicationRetentionYears,
+  parseApplicationDateInput,
+} from "@/lib/application-availability";
 import {
   clearAdminSession,
   createAdminSession,
@@ -16,6 +23,8 @@ import {
   requireAdminRole,
   verifyPassword,
 } from "@/lib/auth";
+import { getAppUrl, sendAdminPasswordResetEmail } from "@/lib/mail";
+import { deleteExamApplicationRecords } from "@/lib/exam-application-retention";
 import { prisma } from "@/lib/prisma";
 import {
   findActiveStudentsByRegistrationNumber,
@@ -47,6 +56,22 @@ const staffUpdateSchema = staffUserSchema.extend({
     .refine((password) => !password || password.length >= 6, "A senha precisa ter pelo menos 6 caracteres.")
     .optional(),
 });
+const passwordResetExpirationMinutes = 30;
+const passwordResetMinIntervalSeconds = 60;
+const passwordResetMaxRequestsPerIpHour = 10;
+const passwordResetRequestSchema = z.object({
+  email: z.string().trim().email("Informe um e-mail valido.").transform((email) => email.toLowerCase()),
+});
+const passwordResetSchema = z
+  .object({
+    token: z.string().trim().min(20, "Link de redefinicao invalido."),
+    password: z.string().min(6, "A senha precisa ter pelo menos 6 caracteres.").max(120),
+    confirmPassword: z.string().min(1, "Confirme a nova senha."),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "As senhas nao conferem.",
+    path: ["confirmPassword"],
+  });
 
 const optionSchema = z.object({
   label: z.string().trim().min(1).max(3),
@@ -90,6 +115,10 @@ const examPayloadSchema = z.object({
   passingPercent: z.coerce.number().min(0, "O percentual minimo nao pode ser negativo.").max(100),
   applicationTitle: z.string().trim().min(3, "Informe o titulo da aplicacao."),
   accessCode: z.string().trim().optional(),
+  startsAt: z.string().trim().optional(),
+  endsAt: z.string().trim().optional(),
+  noExpiration: z.boolean().optional().default(false),
+  purgeAt: z.string().trim().optional(),
   churchIds: z.array(z.string().min(1)).min(1, "Selecione pelo menos uma igreja."),
   categories: z.array(categorySchema).min(1, "Selecione pelo menos uma categoria."),
   questions: z.array(questionSchema).min(1, "Crie pelo menos uma questao."),
@@ -97,6 +126,11 @@ const examPayloadSchema = z.object({
 
 function errorRedirect(path: string, message: string): never {
   redirect(`${path}?erro=${encodeURIComponent(message)}`);
+}
+
+function registersRedirect(ok: string, churchId?: string | null): never {
+  const churchParam = churchId ? `&igrejaResponsavel=${encodeURIComponent(churchId)}` : "";
+  redirect(`/admin/cadastros?ok=${encodeURIComponent(ok)}${churchParam}`);
 }
 
 function buildAccessCode(rawCode?: string) {
@@ -138,31 +172,70 @@ function parseOptionalDate(formData: FormData, field: string, label: string) {
   return date;
 }
 
-function parseMedicalReportFields(formData: FormData) {
-  const hasMedicalReport = formData.get("hasMedicalReport") === "on";
-  const rawExtraTimePercent = String(formData.get("extraTimePercent") || "").trim();
+function parsePayloadDate(value: string | undefined, label: string, errorPath: string, endOfDay = false) {
+  const cleanValue = value?.trim();
 
-  if (!hasMedicalReport) {
-    return {
-      hasMedicalReport: false,
-      extraTimePercent: null,
-    };
+  if (!cleanValue) return null;
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(cleanValue)) {
+    errorRedirect(errorPath, `Informe uma data valida para ${label}.`);
   }
 
-  if (!rawExtraTimePercent) {
-    errorRedirect("/admin/cadastros", "Informe o percentual de tempo adicional do laudo.");
+  const date = parseApplicationDateInput(cleanValue, endOfDay);
+
+  if (!date) {
+    errorRedirect(errorPath, `Informe uma data valida para ${label}.`);
   }
 
-  const extraTimePercent = Number(rawExtraTimePercent);
+  return date;
+}
 
-  if (!Number.isInteger(extraTimePercent) || extraTimePercent < 0 || extraTimePercent > 100) {
-    errorRedirect("/admin/cadastros", "O percentual de tempo adicional do laudo deve ser de 0 a 100.");
+function parseApplicationWindow(payload: z.infer<typeof examPayloadSchema>, errorPath: string) {
+  const startsAt = parsePayloadDate(payload.startsAt, "liberacao da prova", errorPath);
+  const endsAt = payload.noExpiration
+    ? null
+    : parsePayloadDate(payload.endsAt, "expiracao da prova", errorPath, true);
+  const purgeAt = parsePayloadDate(payload.purgeAt, "eliminacao da prova", errorPath, true);
+
+  if (!payload.noExpiration && !endsAt) {
+    errorRedirect(errorPath, "Informe a data de expiracao ou marque expiracao ilimitada.");
   }
 
-  return {
-    hasMedicalReport: true,
-    extraTimePercent,
-  };
+  if (!purgeAt) {
+    errorRedirect(errorPath, "Informe a data de eliminacao da prova.");
+  }
+
+  if (startsAt && endsAt && startsAt > endsAt) {
+    errorRedirect(errorPath, "A data de liberacao nao pode ser depois da expiracao.");
+  }
+
+  const todayInput = formatDateInput(new Date());
+  const purgeInput = payload.purgeAt?.trim() || "";
+  const startsInput = payload.startsAt?.trim() || "";
+  const endsInput = payload.endsAt?.trim() || "";
+  const retentionBaseInput = payload.noExpiration ? startsInput || todayInput : endsInput || startsInput || todayInput;
+  const maxPurgeInput = addYearsToDateInput(retentionBaseInput);
+
+  if (purgeInput < todayInput) {
+    errorRedirect(errorPath, "A data de eliminacao nao pode ficar no passado.");
+  }
+
+  if (startsInput && purgeInput < startsInput) {
+    errorRedirect(errorPath, "A data de eliminacao nao pode ser antes da liberacao da prova.");
+  }
+
+  if (!payload.noExpiration && endsInput && purgeInput < endsInput) {
+    errorRedirect(errorPath, "A data de eliminacao nao pode ser antes da expiracao da prova.");
+  }
+
+  if (!maxPurgeInput || purgeInput > maxPurgeInput) {
+    errorRedirect(
+      errorPath,
+      `A data de eliminacao nao pode ultrapassar ${maximumApplicationRetentionYears} ano apos a data base da prova.`,
+    );
+  }
+
+  return { startsAt, endsAt, purgeAt };
 }
 
 function parseExamPayload(formData: FormData, errorPath: string) {
@@ -235,6 +308,38 @@ async function ensureAccessCodeAvailable(accessCode: string, errorPath: string, 
 
 function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
+}
+
+function hashPasswordResetToken(token: string) {
+  return createHash("sha256").update(token).digest("hex");
+}
+
+function buildPasswordResetUrl(token: string) {
+  const url = new URL("/admin/redefinir-senha", getAppUrl());
+  url.searchParams.set("token", token);
+  return url.toString();
+}
+
+async function getRequestIp() {
+  const requestHeaders = await headers();
+  const forwardedFor = requestHeaders.get("x-forwarded-for")?.split(",")[0]?.trim();
+  return forwardedFor || requestHeaders.get("x-real-ip")?.trim() || null;
+}
+
+function passwordResetDoneRedirect(): never {
+  redirect("/admin/esqueci-senha?ok=1");
+}
+
+function passwordResetErrorRedirect(token: string, message: string): never {
+  const params = new URLSearchParams({
+    erro: message,
+  });
+
+  if (token) {
+    params.set("token", token);
+  }
+
+  redirect(`/admin/redefinir-senha?${params.toString()}`);
 }
 
 async function resolveStaffChurch(role: AdminRole, churchId: string | null) {
@@ -369,6 +474,159 @@ export async function logoutAdminAction() {
   redirect("/admin/login");
 }
 
+export async function requestAdminPasswordResetAction(formData: FormData) {
+  const parsed = passwordResetRequestSchema.safeParse({
+    email: String(formData.get("email") || ""),
+  });
+
+  if (!parsed.success) {
+    redirect("/admin/esqueci-senha?erro=email");
+  }
+
+  const email = parsed.data.email;
+  const requestedIp = await getRequestIp();
+  const now = new Date();
+  const recentRequestDate = new Date(now.getTime() - passwordResetMinIntervalSeconds * 1000);
+  const recentIpDate = new Date(now.getTime() - 60 * 60 * 1000);
+
+  const user = await prisma.adminUser.findFirst({
+    where: {
+      email,
+      active: true,
+    },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+    },
+  });
+
+  if (!user) {
+    passwordResetDoneRedirect();
+  }
+
+  await prisma.adminPasswordResetToken.deleteMany({
+    where: {
+      adminUserId: user.id,
+      OR: [{ expiresAt: { lte: now } }, { usedAt: { not: null } }],
+    },
+  });
+
+  const recentRequest = await prisma.adminPasswordResetToken.findFirst({
+    where: {
+      adminUserId: user.id,
+      createdAt: { gte: recentRequestDate },
+      usedAt: null,
+    },
+    select: { id: true },
+  });
+
+  if (recentRequest) {
+    passwordResetDoneRedirect();
+  }
+
+  if (requestedIp) {
+    const recentIpRequests = await prisma.adminPasswordResetToken.count({
+      where: {
+        requestedIp,
+        createdAt: { gte: recentIpDate },
+      },
+    });
+
+    if (recentIpRequests >= passwordResetMaxRequestsPerIpHour) {
+      passwordResetDoneRedirect();
+    }
+  }
+
+  const token = randomBytes(32).toString("base64url");
+  const tokenHash = hashPasswordResetToken(token);
+  const expiresAt = new Date(now.getTime() + passwordResetExpirationMinutes * 60 * 1000);
+
+  await prisma.adminPasswordResetToken.create({
+    data: {
+      adminUserId: user.id,
+      tokenHash,
+      requestedIp,
+      expiresAt,
+    },
+  });
+
+  try {
+    await sendAdminPasswordResetEmail({
+      to: user.email,
+      name: user.name,
+      resetUrl: buildPasswordResetUrl(token),
+      expiresInMinutes: passwordResetExpirationMinutes,
+    });
+  } catch (error) {
+    console.error("Admin password reset email failed", error);
+    await prisma.adminPasswordResetToken.deleteMany({
+      where: {
+        tokenHash,
+        usedAt: null,
+      },
+    });
+  }
+
+  passwordResetDoneRedirect();
+}
+
+export async function resetAdminPasswordAction(formData: FormData) {
+  const rawToken = String(formData.get("token") || "").trim();
+  const parsed = passwordResetSchema.safeParse({
+    token: rawToken,
+    password: String(formData.get("password") || ""),
+    confirmPassword: String(formData.get("confirmPassword") || ""),
+  });
+
+  if (!parsed.success) {
+    passwordResetErrorRedirect(rawToken, parsed.error.issues[0]?.message || "Revise a nova senha.");
+  }
+
+  const tokenHash = hashPasswordResetToken(parsed.data.token);
+  const now = new Date();
+  const resetToken = await prisma.adminPasswordResetToken.findFirst({
+    where: {
+      tokenHash,
+      usedAt: null,
+      expiresAt: { gt: now },
+      adminUser: {
+        active: true,
+      },
+    },
+    select: {
+      id: true,
+      adminUserId: true,
+    },
+  });
+
+  if (!resetToken) {
+    passwordResetErrorRedirect("", "Link de redefinicao invalido ou expirado.");
+  }
+
+  await prisma.$transaction([
+    prisma.adminUser.update({
+      where: { id: resetToken.adminUserId },
+      data: {
+        passwordHash: hashPassword(parsed.data.password),
+        sessionVersion: { increment: 1 },
+      },
+    }),
+    prisma.adminPasswordResetToken.updateMany({
+      where: {
+        adminUserId: resetToken.adminUserId,
+        usedAt: null,
+      },
+      data: {
+        usedAt: now,
+      },
+    }),
+  ]);
+
+  await clearAdminSession();
+  redirect("/admin/login?senha=alterada");
+}
+
 export async function createStaffUserAction(formData: FormData) {
   const context = await requireAdminContext();
 
@@ -488,7 +746,12 @@ export async function updateStaffUserAction(formData: FormData) {
       role,
       churchId,
       active: true,
-      ...(password ? { passwordHash: hashPassword(password) } : {}),
+      ...(password
+        ? {
+            passwordHash: hashPassword(password),
+            sessionVersion: { increment: 1 },
+          }
+        : {}),
     },
   });
 
@@ -512,7 +775,7 @@ export async function createChurchAction(formData: FormData) {
     errorRedirect("/admin/cadastros", "Informe o nome da embaixada.");
   }
 
-  await prisma.church.upsert({
+  const church = await prisma.church.upsert({
     where: { name },
     update: {
       embassyName,
@@ -528,7 +791,7 @@ export async function createChurchAction(formData: FormData) {
 
   revalidatePath("/admin");
   revalidatePath("/admin/cadastros");
-  redirect("/admin/cadastros?ok=igreja");
+  registersRedirect("igreja", church.id);
 }
 
 export async function updateChurchAction(formData: FormData) {
@@ -568,7 +831,7 @@ export async function updateChurchAction(formData: FormData) {
 
   revalidatePath("/admin");
   revalidatePath("/admin/cadastros");
-  redirect("/admin/cadastros?ok=igreja");
+  registersRedirect("igreja", id);
 }
 
 export async function createStudentAction(formData: FormData) {
@@ -584,7 +847,7 @@ export async function createStudentAction(formData: FormData) {
   const registrationExpiresAt = parseOptionalDate(formData, "registrationExpiresAt", "validade");
   const birthDate = parseOptionalDate(formData, "birthDate", "nascimento");
   const embassyAdmissionDate = parseOptionalDate(formData, "embassyAdmissionDate", "admissao na embaixada");
-  const medicalReport = parseMedicalReportFields(formData);
+  const hasMedicalReport = formData.get("hasMedicalReport") === "on";
 
   if (context.role === AdminRole.TEACHER && !scopedChurchId) {
     errorRedirect("/admin/cadastros", "Seu usuario de conselheiro ainda nao esta vinculado a uma igreja.");
@@ -617,8 +880,7 @@ export async function createStudentAction(formData: FormData) {
       registrationExpiresAt,
       birthDate,
       embassyAdmissionDate,
-      hasMedicalReport: medicalReport.hasMedicalReport,
-      extraTimePercent: medicalReport.extraTimePercent,
+      hasMedicalReport,
       active: true,
     },
     create: {
@@ -630,15 +892,14 @@ export async function createStudentAction(formData: FormData) {
       registrationExpiresAt,
       birthDate,
       embassyAdmissionDate,
-      hasMedicalReport: medicalReport.hasMedicalReport,
-      extraTimePercent: medicalReport.extraTimePercent,
+      hasMedicalReport,
       churchId,
     },
   });
 
   revalidatePath("/admin");
   revalidatePath("/admin/cadastros");
-  redirect("/admin/cadastros?ok=embaixador");
+  registersRedirect("embaixador", churchId);
 }
 
 export async function updateStudentAction(formData: FormData) {
@@ -654,7 +915,7 @@ export async function updateStudentAction(formData: FormData) {
   const registrationExpiresAt = parseOptionalDate(formData, "registrationExpiresAt", "validade");
   const birthDate = parseOptionalDate(formData, "birthDate", "nascimento");
   const embassyAdmissionDate = parseOptionalDate(formData, "embassyAdmissionDate", "admissao na embaixada");
-  const medicalReport = parseMedicalReportFields(formData);
+  const hasMedicalReport = formData.get("hasMedicalReport") === "on";
 
   if (context.role === AdminRole.TEACHER && !scopedChurchId) {
     errorRedirect("/admin/cadastros", "Seu usuario de conselheiro ainda nao esta vinculado a uma igreja.");
@@ -696,8 +957,7 @@ export async function updateStudentAction(formData: FormData) {
       registrationExpiresAt,
       birthDate,
       embassyAdmissionDate,
-      hasMedicalReport: medicalReport.hasMedicalReport,
-      extraTimePercent: medicalReport.extraTimePercent,
+      hasMedicalReport,
       churchId,
       active: true,
     },
@@ -705,7 +965,7 @@ export async function updateStudentAction(formData: FormData) {
 
   revalidatePath("/admin");
   revalidatePath("/admin/cadastros");
-  redirect("/admin/cadastros?ok=embaixador");
+  registersRedirect("embaixador", churchId);
 }
 
 export async function createExamAction(formData: FormData) {
@@ -713,6 +973,7 @@ export async function createExamAction(formData: FormData) {
   const errorPath = "/admin/provas/nova";
   const payload = parseExamPayload(formData, errorPath);
   validateQuestionAudience(payload, errorPath);
+  const applicationWindow = parseApplicationWindow(payload, errorPath);
   const churchIds = resolveExamChurchIds(context, payload.churchIds, errorPath);
 
   const accessCode = buildAccessCode(payload.accessCode);
@@ -771,6 +1032,9 @@ export async function createExamAction(formData: FormData) {
         title: payload.applicationTitle,
         accessCode,
         active: true,
+        startsAt: applicationWindow.startsAt,
+        endsAt: applicationWindow.endsAt,
+        purgeAt: applicationWindow.purgeAt,
         showResultToStudent: false,
         participants: {
           create: students.map((student) => ({
@@ -798,6 +1062,7 @@ export async function updateExamAction(formData: FormData) {
 
   const payload = parseExamPayload(formData, errorPath);
   validateQuestionAudience(payload, errorPath);
+  const applicationWindow = parseApplicationWindow(payload, errorPath);
   const churchIds = resolveExamChurchIds(context, payload.churchIds, errorPath);
   const scopedChurchId = getScopedChurchId(context);
   const accessCode = buildAccessCode(payload.accessCode);
@@ -821,6 +1086,15 @@ export async function updateExamAction(formData: FormData) {
       exam: {
         select: { id: true },
       },
+      participants: {
+        select: {
+          student: {
+            select: {
+              churchId: true,
+            },
+          },
+        },
+      },
       attempts: {
         take: 1,
         select: { id: true },
@@ -832,14 +1106,40 @@ export async function updateExamAction(formData: FormData) {
     errorRedirect(errorPath, "Aplicacao de prova nao encontrada.");
   }
 
-  if (application.attempts.length > 0) {
-    errorRedirect(
-      errorPath,
-      "Nao e possivel editar uma prova que ja foi iniciada por embaixadores. Crie uma nova aplicacao para preservar as respostas.",
+  if (!hasAdministratorAccess(context)) {
+    if (!context.churchId) {
+      errorRedirect(errorPath, "Seu usuario de conselheiro ainda nao esta vinculado a uma igreja.");
+    }
+
+    const hasOutsideChurch = application.participants.some(
+      (participant) => participant.student.churchId !== context.churchId,
     );
+
+    if (hasOutsideChurch) {
+      errorRedirect(errorPath, "Conselheiros so podem editar provas exclusivas da propria igreja.");
+    }
   }
 
   await ensureAccessCodeAvailable(accessCode, errorPath, application.id);
+
+  if (application.attempts.length > 0) {
+    await prisma.examApplication.update({
+      where: { id: application.id },
+      data: {
+        title: payload.applicationTitle,
+        accessCode,
+        startsAt: applicationWindow.startsAt,
+        endsAt: applicationWindow.endsAt,
+        purgeAt: applicationWindow.purgeAt,
+      },
+    });
+
+    revalidatePath("/admin");
+    revalidatePath("/admin/provas");
+    revalidatePath(`/admin/provas/${application.id}/editar`);
+    revalidatePath("/prova");
+    redirect("/admin/provas?ok=editada");
+  }
 
   const students = await prisma.student.findMany({
     where: {
@@ -911,6 +1211,9 @@ export async function updateExamAction(formData: FormData) {
         title: payload.applicationTitle,
         accessCode,
         active: true,
+        startsAt: applicationWindow.startsAt,
+        endsAt: applicationWindow.endsAt,
+        purgeAt: applicationWindow.purgeAt,
         showResultToStudent: false,
         participants: {
           create: students.map((student) => ({
@@ -975,55 +1278,10 @@ export async function deleteExamApplicationAction(formData: FormData) {
   }
 
   await prisma.$transaction(async (tx) => {
-    const attempts = await tx.attempt.findMany({
-      where: {
-        applicationId: application.id,
-      },
-      select: {
-        id: true,
-      },
+    await deleteExamApplicationRecords(tx, {
+      id: application.id,
+      examId: application.exam.id,
     });
-    const attemptIds = attempts.map((attempt) => attempt.id);
-
-    if (attemptIds.length > 0) {
-      await tx.answer.deleteMany({
-        where: {
-          attemptId: { in: attemptIds },
-        },
-      });
-    }
-
-    await tx.attempt.deleteMany({
-      where: {
-        applicationId: application.id,
-      },
-    });
-
-    await tx.applicationParticipant.deleteMany({
-      where: {
-        applicationId: application.id,
-      },
-    });
-
-    await tx.examApplication.delete({
-      where: {
-        id: application.id,
-      },
-    });
-
-    const remainingApplications = await tx.examApplication.count({
-      where: {
-        examId: application.exam.id,
-      },
-    });
-
-    if (remainingApplications === 0) {
-      await tx.exam.delete({
-        where: {
-          id: application.exam.id,
-        },
-      });
-    }
   });
 
   revalidatePath("/admin");

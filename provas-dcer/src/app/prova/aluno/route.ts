@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { AttemptStatus } from "@/generated/prisma/client";
 import { getCategoryLabel } from "@/lib/categories";
-import { getEffectiveExamDurationMinutes, getStudentExtraTimePercent } from "@/lib/exam-time";
 import { prisma } from "@/lib/prisma";
 import {
   findActiveStudentsByRegistrationNumber,
@@ -69,6 +68,9 @@ export async function POST(request: Request) {
         {
           OR: [{ endsAt: null }, { endsAt: { gte: now } }],
         },
+        {
+          OR: [{ purgeAt: null }, { purgeAt: { gt: now } }],
+        },
       ],
       participants: {
         some: {
@@ -116,15 +118,13 @@ export async function POST(request: Request) {
       registrationExpiresAt: isoDate(student.registrationExpiresAt),
       birthDate: isoDate(student.birthDate),
       embassyAdmissionDate: isoDate(student.embassyAdmissionDate),
-      hasMedicalReport: student.hasMedicalReport,
-      extraTimePercent: getStudentExtraTimePercent(student),
     },
     applications: availableApplications.map((application) => ({
       id: application.id,
       title: application.title,
       examTitle: application.exam.title,
-      durationMinutes: getEffectiveExamDurationMinutes(application.exam.durationMinutes, student),
-      baseDurationMinutes: application.exam.durationMinutes,
+      durationMinutes: application.exam.durationMinutes,
+      endsAt: isoDate(application.endsAt),
       alreadyStarted: application.attempts[0]?.status === AttemptStatus.IN_PROGRESS,
     })),
   });

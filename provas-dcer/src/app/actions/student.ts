@@ -2,7 +2,6 @@
 
 import { redirect } from "next/navigation";
 import { AttemptStatus } from "@/generated/prisma/client";
-import { getAttemptExpirationDate } from "@/lib/exam-time";
 import { prisma } from "@/lib/prisma";
 import { filterQuestionsForCategory } from "@/lib/questions";
 import {
@@ -77,6 +76,10 @@ export async function startAttemptAction(formData: FormData) {
     studentError("Esta prova ja foi encerrada.");
   }
 
+  if (application.purgeAt && now > application.purgeAt) {
+    studentError("Esta prova ja foi eliminada do sistema.");
+  }
+
   const existingAttempt = await prisma.attempt.findUnique({
     where: {
       applicationId_studentId: {
@@ -106,7 +109,7 @@ export async function startAttemptAction(formData: FormData) {
     data: {
       applicationId,
       studentId: participant.studentId,
-      expiresAt: getAttemptExpirationDate(now, application.exam.durationMinutes, participant.student),
+      expiresAt: new Date(now.getTime() + application.exam.durationMinutes * 60 * 1000),
       totalPoints: 0,
     },
   });

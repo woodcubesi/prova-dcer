@@ -5,6 +5,7 @@ import { AdminShell } from "@/components/admin/AdminShell";
 import { ConfirmSubmitButton } from "@/components/admin/ConfirmSubmitButton";
 import { ExamBuilder, type ExamBuilderInitialData } from "@/components/admin/ExamBuilder";
 import { AdminRole } from "@/generated/prisma/client";
+import { formatDateInput } from "@/lib/application-availability";
 import { type CategoryCode } from "@/lib/categories";
 import { requireAdminContext } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -110,6 +111,9 @@ export default async function EditExamPage({ params, searchParams }: EditExamPag
     passingPercent: application.exam.passingPercent ?? 70,
     applicationTitle: application.title,
     accessCode: application.accessCode,
+    startsAt: formatDateInput(application.startsAt),
+    endsAt: formatDateInput(application.endsAt),
+    purgeAt: formatDateInput(application.purgeAt),
     churchIds: selectedChurchIds,
     categories: selectedCategories,
     questions: application.exam.questions.map((question) => {

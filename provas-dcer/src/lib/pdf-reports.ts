@@ -4,6 +4,7 @@ import PDFDocument from "pdfkit";
 import type PDFKit from "pdfkit";
 import { getCategoryLabel } from "@/lib/categories";
 import { formatPercent, formatScore, getApprovalResult } from "@/lib/report-metrics";
+import { formatAvailabilityWindow, formatPurgeDate } from "@/lib/application-availability";
 import { formatDuration } from "@/lib/text";
 
 type PdfQuestion = {
@@ -49,6 +50,9 @@ export type ApplicationSummaryPdfData = {
   examTitle: string;
   applicationTitle: string;
   accessCode: string;
+  startsAt?: Date | null;
+  endsAt?: Date | null;
+  purgeAt?: Date | null;
   passingPercent: number;
   rows: Array<{
     studentName: string;
@@ -207,6 +211,8 @@ export function buildApplicationSummaryPdf(data: ApplicationSummaryPdfData) {
     drawMetaGrid(doc, [
       ["Aplicacao", data.applicationTitle],
       ["Codigo", data.accessCode],
+      ["Disponibilidade", formatAvailabilityWindow(data)],
+      ["Eliminar em", formatPurgeDate(data)],
       ["Aprovacao minima", formatPercent(data.passingPercent)],
       ["Inscritos", String(totalParticipants)],
       ["Embaixadores que fizeram", String(finalRows.length)],
@@ -222,17 +228,34 @@ export function buildApplicationSummaryPdf(data: ApplicationSummaryPdfData) {
       ["Total inscritos", String(totalParticipants)],
     ]);
 
-    sectionTitle(doc, "Embaixadores");
+    const rankedRows = [...finalRows].sort(compareRankingRows);
+    const pendingRows = rowResults.filter((row) => !hasFinalResult(row.status));
+
+    sectionTitle(doc, "Ranking dos embaixadores que fizeram a prova");
 
     if (rowResults.length === 0) {
       doc.font("Helvetica").fontSize(10).fillColor(mutedColor).text("Nenhum embaixador esta inscrito nesta aplicacao.");
       return;
     }
 
-    drawTableHeader(doc);
-    rowResults.forEach((row) => {
-      drawStudentRow(doc, row);
-    });
+    if (rankedRows.length === 0) {
+      doc.font("Helvetica").fontSize(10).fillColor(mutedColor).text("Nenhum embaixador fez esta prova ainda.");
+    } else {
+      drawTableHeader(doc);
+      rankedRows.forEach((row, index) => {
+        drawStudentRow(doc, row, index + 1);
+      });
+    }
+
+    if (pendingRows.length > 0) {
+      sectionTitle(doc, "Inscritos que nao fizeram");
+      drawTableHeader(doc, false);
+      pendingRows
+        .sort((first, second) => first.studentName.localeCompare(second.studentName, "pt-BR"))
+        .forEach((row) => {
+          drawStudentRow(doc, row);
+        });
+    }
   });
 }
 
@@ -346,16 +369,17 @@ function sectionTitle(doc: PDFKit.PDFDocument, title: string) {
   doc.moveDown(0.5);
 }
 
-function drawTableHeader(doc: PDFKit.PDFDocument) {
+function drawTableHeader(doc: PDFKit.PDFDocument, showRank = true) {
   ensureSpace(doc, 42);
   const y = doc.y;
   doc.roundedRect(pageMargin, y, contentWidth(doc), 24, 4).fill(brandColor);
   doc.font("Helvetica-Bold").fontSize(8).fillColor("#ffffff");
-  doc.text("Embaixador", pageMargin + 8, y + 8, { width: 142 });
-  doc.text("Igreja", pageMargin + 154, y + 8, { width: 112 });
-  doc.text("Categoria", pageMargin + 272, y + 8, { width: 70 });
-  doc.text("Aproveit.", pageMargin + 348, y + 8, { width: 58 });
-  doc.text("Resultado", pageMargin + 414, y + 8, { width: 72 });
+  doc.text(showRank ? "Pos." : "", pageMargin + 8, y + 8, { width: 30 });
+  doc.text("Embaixador", pageMargin + 44, y + 8, { width: 126 });
+  doc.text("Igreja", pageMargin + 174, y + 8, { width: 108 });
+  doc.text("Categoria", pageMargin + 286, y + 8, { width: 68 });
+  doc.text("Aproveit.", pageMargin + 360, y + 8, { width: 58 });
+  doc.text("Resultado", pageMargin + 424, y + 8, { width: 68 });
   doc.y = y + 30;
 }
 
@@ -366,18 +390,20 @@ function drawStudentRow(
     passed: boolean;
     label: string;
   },
+  rank?: number,
 ) {
   ensureSpace(doc, 34);
   const y = doc.y;
 
   doc.roundedRect(pageMargin, y, contentWidth(doc), 28, 3).fillAndStroke("#ffffff", borderColor);
   doc.font("Helvetica").fontSize(8).fillColor("#111827");
-  doc.text(row.studentName, pageMargin + 8, y + 7, { width: 142, ellipsis: true });
-  doc.text(row.churchName, pageMargin + 154, y + 7, { width: 112, ellipsis: true });
-  doc.text(getCategoryLabel(row.category), pageMargin + 272, y + 7, { width: 70, ellipsis: true });
-  doc.text(row.percent === null ? "-" : formatPercent(row.percent), pageMargin + 348, y + 7, { width: 58 });
+  doc.font("Helvetica-Bold").text(rank ? `${rank}.` : "-", pageMargin + 8, y + 7, { width: 30 });
+  doc.font("Helvetica").text(row.studentName, pageMargin + 44, y + 7, { width: 126, ellipsis: true });
+  doc.text(row.churchName, pageMargin + 174, y + 7, { width: 108, ellipsis: true });
+  doc.text(getCategoryLabel(row.category), pageMargin + 286, y + 7, { width: 68, ellipsis: true });
+  doc.text(row.percent === null ? "-" : formatPercent(row.percent), pageMargin + 360, y + 7, { width: 58 });
   doc.font("Helvetica-Bold").fillColor(getResultColor(row));
-  doc.text(row.label, pageMargin + 414, y + 7, { width: 72 });
+  doc.text(row.label, pageMargin + 424, y + 7, { width: 68 });
   doc.y = y + 34;
 }
 
@@ -410,4 +436,22 @@ function hasFinalResult(status: string) {
 function getResultColor(row: { passed: boolean; percent: number | null }) {
   if (row.percent === null) return mutedColor;
   return row.passed ? successColor : dangerColor;
+}
+
+function compareRankingRows(
+  first: ApplicationSummaryPdfData["rows"][number] & { percent: number | null },
+  second: ApplicationSummaryPdfData["rows"][number] & { percent: number | null },
+) {
+  const percentDiff = (second.percent ?? 0) - (first.percent ?? 0);
+  if (percentDiff !== 0) return percentDiff;
+
+  const scoreDiff = (second.score ?? 0) - (first.score ?? 0);
+  if (scoreDiff !== 0) return scoreDiff;
+
+  const firstTime = first.timeUsedSeconds ?? Number.MAX_SAFE_INTEGER;
+  const secondTime = second.timeUsedSeconds ?? Number.MAX_SAFE_INTEGER;
+  const timeDiff = firstTime - secondTime;
+  if (timeDiff !== 0) return timeDiff;
+
+  return first.studentName.localeCompare(second.studentName, "pt-BR");
 }

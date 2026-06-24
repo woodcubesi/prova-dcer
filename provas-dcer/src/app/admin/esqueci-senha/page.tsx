@@ -1,15 +1,15 @@
 import Link from "next/link";
-import { loginAdminAction } from "@/app/actions/admin";
+import { requestAdminPasswordResetAction } from "@/app/actions/admin";
 import { BrandLockup } from "@/components/BrandLockup";
 
-type LoginPageProps = {
+type ForgotPasswordPageProps = {
   searchParams?: Promise<{
     erro?: string;
-    senha?: string;
+    ok?: string;
   }>;
 };
 
-export default async function AdminLoginPage({ searchParams }: LoginPageProps) {
+export default async function ForgotPasswordPage({ searchParams }: ForgotPasswordPageProps) {
   const params = searchParams ? await searchParams : {};
 
   return (
@@ -18,61 +18,45 @@ export default async function AdminLoginPage({ searchParams }: LoginPageProps) {
         <div className="h-1.5 bg-[#000060]" />
         <div className="p-6">
           <BrandLockup compact />
-          <Link href="/" className="mt-4 inline-flex text-sm font-semibold text-[#000060]">
-            Provas DCER Paulista
+          <Link href="/admin/login" className="mt-4 inline-flex text-sm font-semibold text-[#000060]">
+            Voltar para o login
           </Link>
-          <h1 className="mt-4 text-2xl font-semibold">Acesso administrativo</h1>
+          <h1 className="mt-4 text-2xl font-semibold">Redefinir senha</h1>
           <p className="mt-2 text-sm leading-6 text-[#5d6480]">
-            Entre com e-mail e senha cadastrados. No primeiro acesso, deixe o e-mail em branco e use a senha do ambiente.
+            Informe o e-mail cadastrado na equipe administrativa. Se o e-mail estiver ativo, enviaremos um link de
+            redefinicao.
           </p>
 
           {params.erro ? (
             <div className="mt-4 rounded-md border border-[#f2b8bf] bg-[#fff4f2] px-3 py-2 text-sm text-[#b00018]">
-              E-mail ou senha invalidos. Tente novamente.
+              Informe um e-mail valido.
             </div>
           ) : null}
 
-          {params.senha === "alterada" ? (
+          {params.ok ? (
             <div className="mt-4 rounded-md border border-[#b9dfc7] bg-[#effaf2] px-3 py-2 text-sm text-[#1f623e]">
-              Senha alterada. Entre novamente com a nova senha.
+              Se este e-mail estiver cadastrado, o link de redefinicao foi enviado.
             </div>
           ) : null}
 
-          <form action={loginAdminAction} className="mt-5 space-y-4">
+          <form action={requestAdminPasswordResetAction} className="mt-5 space-y-4">
             <label className="block">
               <span className="text-sm font-medium">E-mail</span>
               <input
                 name="email"
                 type="email"
                 autoFocus
+                required
                 autoComplete="email"
                 className="mt-1 w-full rounded-md border border-[#c5cce4] bg-white px-3 py-3 outline-none ring-[#000060] focus:ring-2"
                 placeholder="nome@email.com"
               />
             </label>
-            <label className="block">
-              <span className="text-sm font-medium">Senha</span>
-              <input
-                name="password"
-                type="password"
-                autoComplete="current-password"
-                className="mt-1 w-full rounded-md border border-[#c5cce4] bg-white px-3 py-3 outline-none ring-[#000060] focus:ring-2"
-                placeholder="Digite a senha"
-              />
-            </label>
 
             <button className="w-full rounded-md bg-[#000060] px-4 py-3 text-sm font-semibold text-white hover:bg-[#000044]">
-              Entrar
+              Enviar link de redefinicao
             </button>
           </form>
-
-          <Link href="/admin/esqueci-senha" className="mt-4 inline-flex text-sm font-semibold text-[#000060]">
-            Esqueci minha senha
-          </Link>
-
-          <p className="mt-4 text-xs text-[#5d6480]">
-            Cadastre administradores e conselheiros no menu Equipe depois de entrar.
-          </p>
         </div>
       </section>
     </main>

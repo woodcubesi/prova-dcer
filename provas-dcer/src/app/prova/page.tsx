@@ -25,6 +25,9 @@ export default async function StudentEntryPage({ searchParams }: StudentEntryPag
         {
           OR: [{ endsAt: null }, { endsAt: { gte: now } }],
         },
+        {
+          OR: [{ purgeAt: null }, { purgeAt: { gt: now } }],
+        },
       ],
     },
   });

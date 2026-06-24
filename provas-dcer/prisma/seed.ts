@@ -167,6 +167,8 @@ async function main() {
       title: "Aplicacao demonstrativa",
       accessCode: "DEMO2026",
       active: true,
+      endsAt: new Date("2026-12-31T23:59:59.999-03:00"),
+      purgeAt: new Date("2027-12-31T23:59:59.999-03:00"),
       showResultToStudent: false,
       participants: {
         create: createdChurches.flatMap((church) =>
