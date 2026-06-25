@@ -1,7 +1,6 @@
 services:
   app:
-    build:
-      context: .
+    image: ghcr.io/woodcubesi/prova-dcer:latest
     container_name: provas_dcer_app
     restart: unless-stopped
     extra_hosts:

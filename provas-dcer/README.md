@@ -103,7 +103,8 @@ Portainer no servidor testado: 0.0.0.0:9000 -> 9000/tcp
 Para subir somente aplicacao e banco com Docker:
 
 ```bash
-docker compose up -d --build
+docker pull ghcr.io/woodcubesi/prova-dcer:latest
+docker compose up -d
 docker compose run --rm app pnpm prisma db push
 ```
 
