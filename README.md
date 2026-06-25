@@ -2,77 +2,38 @@
 
 Aplicacao web para montar, aplicar, corrigir e gerar relatorios de provas do DCER Paulista.
 
-O codigo da aplicacao fica na pasta:
+O codigo da aplicacao fica em:
 
 ```text
 provas-dcer/
 ```
 
-## Senhas padrao de desenvolvimento
+## Instalacao rapida com Docker
 
-Use estes dados apenas em ambiente local ou de testes.
+Este projeto foi empacotado para rodar com dois containers:
 
-```text
-Acesso administrativo inicial
-E-mail: deixe em branco
-Senha: admin123
-```
+- `provas_dcer_app`: aplicacao Next.js
+- `provas_dcer_postgres`: banco PostgreSQL
 
-```text
-Banco PostgreSQL local via Docker
-Banco: provas_dcer
-Usuario: provas_dcer
-Senha: provas_dcer_dev
-Host: localhost
-Porta: 5432
-```
-
-URL padrao do banco:
+A imagem pronta da aplicacao e:
 
 ```text
-postgresql://provas_dcer:provas_dcer_dev@localhost:5432/provas_dcer?schema=public
+ghcr.io/woodcubesi/prova-dcer:latest
 ```
 
-Em homologacao ou producao, troque obrigatoriamente `ADMIN_PASSWORD`, `ADMIN_SESSION_SECRET` e a senha do PostgreSQL.
+Antes de divulgar para terceiros, confirme no GitHub que o pacote esta publico:
 
-## Requisitos
-
-Instale antes:
-
-- Git
-- Node.js 20 ou superior, recomendado Node.js 22
-- pnpm
-- Docker
-- Docker Compose
-
-No Windows:
-
-```powershell
-winget install Git.Git
-winget install OpenJS.NodeJS
-winget install Docker.DockerDesktop
-corepack enable
-corepack prepare pnpm@latest --activate
+```text
+https://github.com/users/woodcubesi/packages/container/package/prova-dcer
 ```
 
-Depois abra o Docker Desktop pelo menos uma vez.
-
-No Ubuntu/Debian:
+Em `Package settings`, altere a visibilidade para `Public`. Depois qualquer pessoa podera baixar com:
 
 ```bash
-sudo apt update
-sudo apt install -y git curl ca-certificates docker.io docker-compose-plugin
-curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
-sudo apt install -y nodejs
-sudo systemctl enable --now docker
-sudo usermod -aG docker "$USER"
-corepack enable
-corepack prepare pnpm@latest --activate
+docker pull ghcr.io/woodcubesi/prova-dcer:latest
 ```
 
-Depois de adicionar o usuario ao grupo `docker`, saia e entre novamente na sessao.
-
-## Instalacao local passo a passo
+## Passo a passo
 
 1. Baixe o projeto:
 
@@ -81,55 +42,27 @@ git clone https://github.com/woodcubesi/prova-dcer.git
 cd prova-dcer/provas-dcer
 ```
 
-2. Crie o arquivo de ambiente:
+2. Suba os containers:
 
 ```bash
-cp .env.example .env
+docker compose up -d
 ```
 
-No Windows PowerShell:
+3. Crie a estrutura do banco:
 
-```powershell
-Copy-Item .env.example .env
+```bash
+docker compose run --rm app pnpm prisma db push
 ```
 
-3. Confira o `.env` local:
+4. Acesse:
 
 ```text
-DATABASE_URL="postgresql://provas_dcer:provas_dcer_dev@localhost:5432/provas_dcer?schema=public"
-ADMIN_PASSWORD="admin123"
-ADMIN_SESSION_SECRET="troque-este-segredo-no-servidor-linux"
+Aplicacao: http://localhost:3001
+Administracao: http://localhost:3001/admin/login
+PostgreSQL: localhost:5433
 ```
 
-4. Instale as dependencias:
-
-```bash
-pnpm install
-```
-
-5. Suba o banco, aplique o schema e carregue dados de demonstracao:
-
-```bash
-pnpm setup
-```
-
-6. Rode o servidor de desenvolvimento:
-
-```bash
-pnpm dev
-```
-
-7. Acesse:
-
-```text
-Inicio: http://localhost:3000
-Embaixador: http://localhost:3000/prova
-Administracao: http://localhost:3000/admin/login
-```
-
-## Primeiro acesso administrativo
-
-Na tela administrativa:
+5. Primeiro acesso administrativo:
 
 ```text
 E-mail: deixe em branco
@@ -138,112 +71,67 @@ Senha: admin123
 
 Depois de entrar, acesse `Equipe` e cadastre administradores e conselheiros com e-mail e senha proprios.
 
-## Dados de demonstracao
+## Ambiente testado
 
-O seed cria igrejas, embaixadores e uma aplicacao demonstrativa.
-
-Exemplo para teste:
+O empacotamento Docker publicado foi auditado contra o servidor de producao:
 
 ```text
-Codigo da aplicacao: DEMO2026
-Igreja: Igreja Sede Central
-Categoria: Junior
-Embaixador: Ana Clara Souza
+Host: Ubuntu 26.04 LTS
+Kernel: Linux 7.0.0 x86_64
+Docker: 29.1.3
+Aplicacao: node:24-bookworm-slim, Node.js 24.18.0, Debian 12 bookworm
+Banco: postgres:16-alpine, PostgreSQL 16.14
+Portainer: portainer/portainer-ce:lts
 ```
+
+Portas usadas:
+
+```text
+Aplicacao: 127.0.0.1:3001 -> 3001/tcp
+PostgreSQL: 127.0.0.1:5433 -> 5432/tcp
+```
+
+## E-mail em producao
+
+No servidor testado, o Postfix fica no host e a aplicacao roda em Docker. Nesse caso, use `host.docker.internal` para a aplicacao acessar o Postfix do host:
+
+```text
+MAIL_DRIVER="smtp"
+SMTP_HOST="host.docker.internal"
+SMTP_PORT="25"
+SMTP_SECURE="false"
+SMTP_REQUIRE_TLS="false"
+SMTP_IGNORE_TLS="true"
+```
+
+No host Linux, permita somente a rede Docker interna usada pela aplicacao:
+
+```bash
+docker network inspect provas_dcer_net --format '{{(index .IPAM.Config 0).Gateway}} {{(index .IPAM.Config 0).Subnet}}'
+sudo postconf -e "inet_interfaces = 127.0.0.1, 172.18.0.1"
+sudo postconf -e "mynetworks = 127.0.0.0/8 172.18.0.0/16"
+sudo postfix check
+sudo systemctl restart postfix
+```
+
+Assim o SMTP nao fica publico: ele escuta em `127.0.0.1:25` e no gateway Docker interno.
 
 ## Comandos uteis
 
 ```bash
-pnpm install          # instala dependencias
-pnpm setup            # sobe banco, gera Prisma, aplica schema e roda seed
-pnpm dev              # roda em desenvolvimento
-pnpm build            # build de producao
-pnpm start            # inicia build de producao
-pnpm lint             # validacao ESLint
-pnpm db:up            # sobe PostgreSQL em Docker
-pnpm db:down          # para PostgreSQL
-pnpm db:push          # aplica schema Prisma no banco
-pnpm db:seed          # recria dados de demonstracao
-pnpm db:reset         # limpa e recria o banco pelo schema
-pnpm prisma:generate  # gera Prisma Client
+docker compose ps                  # mostra containers
+docker compose logs -f app          # logs da aplicacao
+docker compose logs -f db           # logs do banco
+docker compose restart app          # reinicia a aplicacao
+docker compose down                 # para os containers
+docker compose up -d                # sobe novamente
+docker compose pull                 # baixa imagem atualizada
 ```
 
-## Instalacao em Linux para homologacao/producao
+## Desenvolvimento
 
-1. Clone o projeto:
-
-```bash
-git clone https://github.com/woodcubesi/prova-dcer.git
-cd prova-dcer/provas-dcer
-```
-
-2. Crie o `.env`:
-
-```bash
-cp .env.example .env
-nano .env
-```
-
-3. Troque as senhas antes de publicar:
+Para detalhes de desenvolvimento, instalacao com Node/pnpm, seed de demonstracao e comandos internos, veja:
 
 ```text
-DATABASE_URL="postgresql://USUARIO:SENHA_FORTE@localhost:5432/provas_dcer?schema=public"
-ADMIN_PASSWORD="SENHA_ADMINISTRATIVA_FORTE"
-ADMIN_SESSION_SECRET="SEGREDO_GRANDE_ALEATORIO"
+provas-dcer/README.md
 ```
-
-4. Instale e prepare:
-
-```bash
-pnpm install --frozen-lockfile
-pnpm db:up
-pnpm prisma:generate
-pnpm db:push
-pnpm build
-```
-
-5. Inicie:
-
-```bash
-pnpm start
-```
-
-Por padrao, a aplicacao sobe na porta `3000`.
-
-Em servidor real, use Nginx ou Apache como proxy reverso para a porta da aplicacao e configure HTTPS.
-
-## Atualizar uma instalacao existente
-
-```bash
-git pull
-pnpm install --frozen-lockfile
-pnpm prisma:generate
-pnpm db:push
-pnpm build
-pnpm start
-```
-
-Se a aplicacao estiver rodando como servico `systemd`, reinicie o servico depois do build:
-
-```bash
-sudo systemctl restart provas-dcer
-```
-
-## Problemas comuns
-
-Se o banco nao conectar, confirme se o Docker esta rodando:
-
-```bash
-docker ps
-pnpm db:up
-```
-
-Se a porta `5432` ja estiver em uso, pare outro PostgreSQL local ou altere a porta no `docker-compose.yml`.
-
-Se a porta `3000` ja estiver em uso, rode em outra porta:
-
-```bash
-pnpm dev -- --port 3001
-```
-
-Se o login administrativo inicial falhar, confira no `.env` qual valor esta em `ADMIN_PASSWORD`. O campo de e-mail deve ficar em branco para usar a senha administrativa inicial.
