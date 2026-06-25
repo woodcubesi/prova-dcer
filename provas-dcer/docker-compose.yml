@@ -8,10 +8,11 @@ services:
       DATABASE_URL: postgresql://provas_dcer:provas_dcer_dev@db:5432/provas_dcer?schema=public
       ADMIN_PASSWORD: admin123
       ADMIN_SESSION_SECRET: troque-este-segredo-no-servidor-linux
+      PORT: "3001"
       NEXT_TELEMETRY_DISABLED: "1"
-      APP_URL: http://localhost:3000
+      APP_URL: http://localhost:3001
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3001:3001"
     depends_on:
       db:
         condition: service_healthy
@@ -25,7 +26,7 @@ services:
       POSTGRES_USER: provas_dcer
       POSTGRES_PASSWORD: provas_dcer_dev
     ports:
-      - "5433:5432"
+      - "127.0.0.1:5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:

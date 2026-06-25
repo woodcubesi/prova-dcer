@@ -31,13 +31,13 @@ Banco: provas_dcer
 Usuario: provas_dcer
 Senha: provas_dcer_dev
 Host: localhost
-Porta: 5432
+Porta: 5433
 ```
 
 URL padrao do banco:
 
 ```text
-postgresql://provas_dcer:provas_dcer_dev@localhost:5432/provas_dcer?schema=public
+postgresql://provas_dcer:provas_dcer_dev@localhost:5433/provas_dcer?schema=public
 ```
 
 Em homologacao ou producao, troque obrigatoriamente `ADMIN_PASSWORD`, `ADMIN_SESSION_SECRET` e a senha do PostgreSQL.
@@ -79,6 +79,42 @@ corepack prepare pnpm@latest --activate
 
 Depois de adicionar o usuario ao grupo `docker`, saia e entre novamente na sessao.
 
+## Ambiente Docker testado
+
+O pacote Docker publicado neste repositorio foi auditado contra o servidor de producao em:
+
+```text
+Host: Ubuntu 26.04 LTS
+Kernel: Linux 7.0.0 x86_64
+Docker: 29.1.3
+Aplicacao: node:24-bookworm-slim, Node.js 24.18.0, Debian 12 bookworm
+Banco: postgres:16-alpine, PostgreSQL 16.14
+Portainer: portainer/portainer-ce:lts
+```
+
+Portas usadas no ambiente Docker:
+
+```text
+Aplicacao: 127.0.0.1:3001 -> 3001/tcp
+PostgreSQL: 127.0.0.1:5433 -> 5432/tcp
+Portainer no servidor testado: 0.0.0.0:9000 -> 9000/tcp
+```
+
+Para subir somente aplicacao e banco com Docker:
+
+```bash
+docker compose up -d --build
+docker compose run --rm app pnpm prisma db push
+```
+
+Acesse:
+
+```text
+Aplicacao: http://localhost:3001
+Administracao: http://localhost:3001/admin/login
+PostgreSQL: localhost:5433
+```
+
 ## Instalacao local passo a passo
 
 1. Baixe o projeto:
@@ -103,7 +139,7 @@ Copy-Item .env.example .env
 3. Confira o `.env` local:
 
 ```text
-DATABASE_URL="postgresql://provas_dcer:provas_dcer_dev@localhost:5432/provas_dcer?schema=public"
+DATABASE_URL="postgresql://provas_dcer:provas_dcer_dev@localhost:5433/provas_dcer?schema=public"
 ADMIN_PASSWORD="admin123"
 ADMIN_SESSION_SECRET="troque-este-segredo-no-servidor-linux"
 APP_URL="http://localhost:3000"
@@ -225,7 +261,7 @@ nano .env
 3. Troque as senhas antes de publicar:
 
 ```text
-DATABASE_URL="postgresql://USUARIO:SENHA_FORTE@localhost:5432/provas_dcer?schema=public"
+DATABASE_URL="postgresql://USUARIO:SENHA_FORTE@localhost:5433/provas_dcer?schema=public"
 ADMIN_PASSWORD="SENHA_ADMINISTRATIVA_FORTE"
 ADMIN_SESSION_SECRET="SEGREDO_GRANDE_ALEATORIO"
 APP_URL="https://seu-dominio"
@@ -284,7 +320,7 @@ docker ps
 pnpm db:up
 ```
 
-Se a porta `5432` ja estiver em uso, pare outro PostgreSQL local ou altere a porta no `docker-compose.yml`.
+Se a porta `5433` ja estiver em uso, pare outro PostgreSQL local ou altere a porta no `docker-compose.yml`.
 
 Se a porta `3000` ja estiver em uso, rode em outra porta:
 
