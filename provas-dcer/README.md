@@ -115,6 +115,31 @@ Administracao: http://localhost:3001/admin/login
 PostgreSQL: localhost:5433
 ```
 
+### E-mail com Docker e Postfix no host
+
+No servidor testado, o Postfix fica no host e a aplicacao roda em container. Nesse caso, `127.0.0.1` dentro do container nao e o host; use `host.docker.internal` no ambiente da aplicacao:
+
+```text
+MAIL_DRIVER="smtp"
+SMTP_HOST="host.docker.internal"
+SMTP_PORT="25"
+SMTP_SECURE="false"
+SMTP_REQUIRE_TLS="false"
+SMTP_IGNORE_TLS="true"
+```
+
+No host Linux, permita somente a rede Docker interna usada pela aplicacao. Exemplo auditado no servidor:
+
+```bash
+docker network inspect provas_dcer_net --format '{{(index .IPAM.Config 0).Gateway}} {{(index .IPAM.Config 0).Subnet}}'
+sudo postconf -e "inet_interfaces = 127.0.0.1, 172.18.0.1"
+sudo postconf -e "mynetworks = 127.0.0.0/8 172.18.0.0/16"
+sudo postfix check
+sudo systemctl restart postfix
+```
+
+Com isso o SMTP nao fica publico: ele escuta em `127.0.0.1:25` e no gateway Docker interno, por exemplo `172.18.0.1:25`.
+
 ## Instalacao local passo a passo
 
 1. Baixe o projeto:
