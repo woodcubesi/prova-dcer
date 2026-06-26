@@ -763,7 +763,7 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
                   <div className="rounded-md bg-[#f8faff] px-2 py-2">
                     <p className="text-[#5d6480]">Laudo</p>
                     <p className="font-semibold">
-                      {student.hasMedicalReport ? `${student.extraTimePercent ?? 0}% extra` : "-"}
+                      {student.hasMedicalReport ? `Sim, ${student.extraTimePercent ?? 0}% extra` : "Nao"}
                     </p>
                   </div>
                 </div>
@@ -805,7 +805,7 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
                     <td className="py-3 pr-4">{formatDateLabel(student.birthDate)}</td>
                     <td className="py-3 pr-4">{formatDateLabel(student.registrationExpiresAt)}</td>
                     <td className="py-3 pr-4">
-                      {student.hasMedicalReport ? `${student.extraTimePercent ?? 0}% extra` : "-"}
+                      {student.hasMedicalReport ? `Sim, ${student.extraTimePercent ?? 0}% extra` : "Nao"}
                     </td>
                     <td className="py-3 pr-4">
                       <a
