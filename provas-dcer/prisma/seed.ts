@@ -1,6 +1,6 @@
 import "dotenv/config";
 import { PrismaPg } from "@prisma/adapter-pg";
-import { Category, ExamStatus, PrismaClient, QuestionType } from "../src/generated/prisma/client";
+import { Category, ExamStatus, PrismaClient, QuestionType, StudentProgram } from "../src/generated/prisma/client";
 import { normalizeName } from "../src/lib/text";
 
 const adapter = new PrismaPg({
@@ -9,7 +9,23 @@ const adapter = new PrismaPg({
 
 const prisma = new PrismaClient({ adapter });
 
-const churches = [
+type SeedStudent = {
+  name: string;
+  program: StudentProgram;
+  category: Category;
+  externalId: string;
+  registrationIssuedAt?: Date;
+  registrationExpiresAt?: Date;
+  birthDate?: Date;
+  embassyAdmissionDate?: Date;
+};
+
+const churches: Array<{
+  name: string;
+  embassyName: string;
+  city: string;
+  students: SeedStudent[];
+}> = [
   {
     name: "Igreja Sede Central",
     embassyName: "Pastor Sergio Medeiros",
@@ -17,16 +33,17 @@ const churches = [
     students: [
       {
         name: "Ana Clara Souza",
+        program: StudentProgram.MR,
         category: Category.JUNIOR,
-        externalId: "210300100049",
+        externalId: "MR210300100049",
         registrationIssuedAt: new Date("2019-03-25T00:00:00.000Z"),
         registrationExpiresAt: new Date("2028-12-05T00:00:00.000Z"),
         birthDate: new Date("2010-12-06T00:00:00.000Z"),
         embassyAdmissionDate: new Date("2018-12-06T00:00:00.000Z"),
       },
-      { name: "Lucas Gabriel Lima", category: Category.JUNIOR, externalId: "210300100050" },
-      { name: "Beatriz Santos", category: Category.ADOLESCENTES, externalId: "210300100051" },
-      { name: "Mateus Oliveira", category: Category.JUVENIL, externalId: "210300100052" },
+      { name: "Lucas Gabriel Lima", program: StudentProgram.ER, category: Category.JUNIOR, externalId: "ER210300100050" },
+      { name: "Beatriz Santos", program: StudentProgram.MR, category: Category.ADOLESCENTES, externalId: "MR210300100051" },
+      { name: "Mateus Oliveira", program: StudentProgram.ER, category: Category.JUVENIL, externalId: "ER210300100052" },
     ],
   },
   {
@@ -34,10 +51,10 @@ const churches = [
     embassyName: "Embaixada Jardim Paulista",
     city: "Paulista",
     students: [
-      { name: "Maria Eduarda Silva", category: Category.JUNIOR, externalId: "210300100053" },
-      { name: "Pedro Henrique Costa", category: Category.ADOLESCENTES, externalId: "210300100054" },
-      { name: "Julia Ferreira", category: Category.ADOLESCENTES, externalId: "210300100055" },
-      { name: "Rafael Almeida", category: Category.JUVENIL, externalId: "210300100056" },
+      { name: "Maria Eduarda Silva", program: StudentProgram.MR, category: Category.JUNIOR, externalId: "MR210300100053" },
+      { name: "Pedro Henrique Costa", program: StudentProgram.ER, category: Category.ADOLESCENTES, externalId: "ER210300100054" },
+      { name: "Julia Ferreira", program: StudentProgram.MR, category: Category.ADOLESCENTES, externalId: "MR210300100055" },
+      { name: "Rafael Almeida", program: StudentProgram.ER, category: Category.JUVENIL, externalId: "ER210300100056" },
     ],
   },
   {
@@ -45,9 +62,9 @@ const churches = [
     embassyName: "Embaixada Vila Esperanca",
     city: "Paulista",
     students: [
-      { name: "Davi Rocha", category: Category.JUNIOR, externalId: "210300100057" },
-      { name: "Sofia Martins", category: Category.ADOLESCENTES, externalId: "210300100058" },
-      { name: "Gabriel Nascimento", category: Category.JUVENIL, externalId: "210300100059" },
+      { name: "Davi Rocha", program: StudentProgram.ER, category: Category.JUNIOR, externalId: "ER210300100057" },
+      { name: "Sofia Martins", program: StudentProgram.MR, category: Category.ADOLESCENTES, externalId: "MR210300100058" },
+      { name: "Gabriel Nascimento", program: StudentProgram.ER, category: Category.JUVENIL, externalId: "ER210300100059" },
     ],
   },
 ];
@@ -75,6 +92,7 @@ async function main() {
           create: church.students.map((student) => ({
             name: student.name,
             normalizedName: normalizeName(student.name),
+            program: student.program,
             category: student.category,
             externalId: student.externalId,
             registrationIssuedAt: student.registrationIssuedAt,
@@ -165,6 +183,7 @@ async function main() {
     data: {
       examId: exam.id,
       title: "Aplicacao demonstrativa",
+      program: StudentProgram.ER,
       accessCode: "DEMO2026",
       active: true,
       endsAt: new Date("2026-12-31T23:59:59.999-03:00"),
@@ -172,9 +191,11 @@ async function main() {
       showResultToStudent: false,
       participants: {
         create: createdChurches.flatMap((church) =>
-          church.students.map((student) => ({
-            studentId: student.id,
-          })),
+          church.students
+            .filter((student) => student.program === StudentProgram.ER)
+            .map((student) => ({
+              studentId: student.id,
+            })),
         ),
       },
     },

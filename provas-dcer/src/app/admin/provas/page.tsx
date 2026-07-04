@@ -11,6 +11,7 @@ import {
 } from "@/lib/application-availability";
 import { requireAdminContext } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getStudentProgramLabel } from "@/lib/student-programs";
 
 export const dynamic = "force-dynamic";
 
@@ -191,6 +192,10 @@ export default async function ExamsPage({ searchParams }: ExamsPageProps) {
                   <p className="font-semibold">{application.exam.passingPercent ?? 70}%</p>
                 </div>
                 <div className="rounded-md bg-[#f8faff] px-3 py-2">
+                  <p className="text-xs text-[#5d6480]">Tipo</p>
+                  <p className="font-semibold">{getStudentProgramLabel(application.program)}</p>
+                </div>
+                <div className="rounded-md bg-[#f8faff] px-3 py-2">
                   <p className="text-xs text-[#5d6480]">Participantes</p>
                   <p className="font-semibold">{application._count.participants}</p>
                 </div>
@@ -233,11 +238,12 @@ export default async function ExamsPage({ searchParams }: ExamsPageProps) {
         </div>
 
         <div className="mt-4 hidden overflow-x-auto md:block">
-          <table className="w-full min-w-[1160px] text-left text-sm">
+          <table className="w-full min-w-[1240px] text-left text-sm">
             <thead className="border-b border-[#d8def0] text-xs uppercase tracking-wide text-[#5d6480]">
               <tr>
                 <th className="py-3 pr-4">Prova</th>
                 <th className="py-3 pr-4">Codigo</th>
+                <th className="py-3 pr-4">Tipo</th>
                 <th className="py-3 pr-4">Tempo</th>
                 <th className="py-3 pr-4">Aprovacao</th>
                 <th className="py-3 pr-4">Expiracao</th>
@@ -256,6 +262,7 @@ export default async function ExamsPage({ searchParams }: ExamsPageProps) {
                     <p className="text-xs text-[#5d6480]">{application.title}</p>
                   </td>
                   <td className="py-3 pr-4 font-mono">{application.accessCode}</td>
+                  <td className="py-3 pr-4">{getStudentProgramLabel(application.program)}</td>
                   <td className="py-3 pr-4">{application.exam.durationMinutes} min</td>
                   <td className="py-3 pr-4">{application.exam.passingPercent ?? 70}%</td>
                   <td className="py-3 pr-4">{formatAvailabilityWindow(application)}</td>
@@ -296,7 +303,7 @@ export default async function ExamsPage({ searchParams }: ExamsPageProps) {
               ))}
               {applications.length === 0 ? (
                 <tr>
-                  <td className="py-6 pr-4 text-sm text-[#5d6480]" colSpan={10}>
+                  <td className="py-6 pr-4 text-sm text-[#5d6480]" colSpan={11}>
                     Nenhuma prova criada ainda.
                   </td>
                 </tr>

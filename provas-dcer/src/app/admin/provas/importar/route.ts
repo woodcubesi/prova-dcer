@@ -6,6 +6,8 @@ import type { CategoryCode } from "@/lib/categories";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+type StudentProgramCode = "ER" | "MR";
+
 type ImportQuestion = {
   id: string;
   statement: string;
@@ -26,6 +28,7 @@ type ImportResult = {
   durationMinutes: number;
   passingPercent: number;
   applicationTitle: string;
+  program: StudentProgramCode;
   accessCode: string;
   startsAt: string;
   endsAt: string;
@@ -52,6 +55,10 @@ const fieldAliases = new Map<string, keyof ImportColumns>([
   ["tempodaprovaemminutos", "durationMinutes"],
   ["percentualdeaprovacao", "passingPercent"],
   ["titulodaaplicacao", "applicationTitle"],
+  ["direcionarpara", "program"],
+  ["tipodaaplicacao", "program"],
+  ["tipo", "program"],
+  ["eroumr", "program"],
   ["codigodaaplicacao", "accessCode"],
   ["liberarem", "startsAt"],
   ["datadeliberacao", "startsAt"],
@@ -81,6 +88,7 @@ const templateHeaders: string[] = [
   "Tempo da Prova em Minutos",
   "Percentual de Aprovação",
   "Título da Aplicação",
+  "Direcionar para",
   "Código da Aplicação",
   "Liberar em",
   "Expira em",
@@ -106,6 +114,7 @@ const templateRows = [
     "60",
     "70",
     "Aplicacao principal",
+    "ER",
     "PROVA2026",
     "",
     "31/12/2026",
@@ -129,6 +138,7 @@ const templateRows = [
     "60",
     "70",
     "Aplicacao principal",
+    "MR",
     "",
     "",
     "",
@@ -154,6 +164,7 @@ type ImportColumns = {
   durationMinutes: string;
   passingPercent: string;
   applicationTitle: string;
+  program: string;
   accessCode: string;
   startsAt: string;
   endsAt: string;
@@ -220,6 +231,7 @@ async function parseImportFile(file: File): Promise<ImportResult> {
   const rowDurations: number[] = [];
   const rowPassingPercents: number[] = [];
   const rowApplicationTitles: string[] = [];
+  const rowPrograms: StudentProgramCode[] = [];
   const rowAccessCodes: string[] = [];
   const rowStartDates: string[] = [];
   const rowEndDates: string[] = [];
@@ -255,6 +267,14 @@ async function parseImportFile(file: File): Promise<ImportResult> {
     if (duration !== null) rowDurations.push(Math.round(duration));
     if (passingPercent !== null) rowPassingPercents.push(normalizePercent(passingPercent));
     if (row.applicationTitle) rowApplicationTitles.push(row.applicationTitle);
+    if (row.program) {
+      const program = parseStudentProgram(row.program);
+      if (program) {
+        rowPrograms.push(program);
+      } else {
+        warnings.push(`Linha ${rowNumber}: tipo "${row.program}" nao foi reconhecido. Use ER ou MR.`);
+      }
+    }
     if (row.accessCode) rowAccessCodes.push(row.accessCode);
     if (startsAt) rowStartDates.push(startsAt);
     if (endsAt) rowEndDates.push(endsAt);
@@ -304,6 +324,7 @@ async function parseImportFile(file: File): Promise<ImportResult> {
     durationMinutes: clamp(firstValue(rowDurations, 60), 1, 300),
     passingPercent: clamp(firstValue(rowPassingPercents, 70), 0, 100),
     applicationTitle: firstText(rowApplicationTitles, "Aplicacao principal"),
+    program: firstValue(rowPrograms, "ER"),
     accessCode: firstText(rowAccessCodes, ""),
     startsAt: firstText(rowStartDates, ""),
     endsAt,
@@ -332,6 +353,7 @@ function normalizeRow(rawRow: Record<string, unknown>): ImportColumns {
     durationMinutes: "",
     passingPercent: "",
     applicationTitle: "",
+    program: "",
     accessCode: "",
     startsAt: "",
     endsAt: "",
@@ -405,6 +427,15 @@ function parseCategory(value: string): CategoryCode | undefined {
   return undefined;
 }
 
+function parseStudentProgram(value: string): StudentProgramCode | undefined {
+  const program = normalizeKey(value);
+
+  if (!program) return undefined;
+  if (program === "er" || program.includes("embaixador")) return "ER";
+  if (program === "mr" || program.includes("mensageira")) return "MR";
+  return undefined;
+}
+
 function parseActiveStatus(value: string) {
   const status = normalizeKey(value);
 
@@ -464,8 +495,8 @@ function uniqueCategories(questions: ImportQuestion[]) {
   );
 }
 
-function firstValue(values: number[], fallback: number) {
-  return values.find((value) => Number.isFinite(value)) ?? fallback;
+function firstValue<T>(values: T[], fallback: T) {
+  return values[0] ?? fallback;
 }
 
 function firstText(values: string[], fallback: string) {
@@ -513,13 +544,14 @@ function buildXlsxTemplateResponse() {
     { wch: 24 },
     { wch: 24 },
     { wch: 18 },
+    { wch: 18 },
     { wch: 14 },
     { wch: 14 },
     { wch: 22 },
     { wch: 16 },
     { wch: 14 },
   ];
-  worksheet["!autofilter"] = { ref: `A1:U${templateRows.length + 1}` };
+  worksheet["!autofilter"] = { ref: `A1:V${templateRows.length + 1}` };
 
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, "Modelo");

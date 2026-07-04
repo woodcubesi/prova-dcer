@@ -31,7 +31,7 @@ export async function startAttemptAction(formData: FormData) {
   }
 
   if (students.length > 1) {
-    studentError("Existe mais de um embaixador com este numero. Procure a coordenacao.");
+    studentError("Existe mais de um aluno com este numero. Procure a coordenacao.");
   }
 
   const student = students[0];
@@ -64,6 +64,10 @@ export async function startAttemptAction(formData: FormData) {
   }
 
   const application = participant.application;
+
+  if (application.program !== student.program) {
+    studentError("Esta prova nao esta disponivel para o tipo desta carteirinha.");
+  }
 
   if (!application.active) {
     studentError("Esta aplicacao de prova nao esta ativa.");

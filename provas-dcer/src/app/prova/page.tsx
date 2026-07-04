@@ -41,9 +41,9 @@ export default async function StudentEntryPage({ searchParams }: StudentEntryPag
           <Link href="/" className="mt-4 inline-flex text-sm font-semibold text-[#fff200]">
             Provas DCER Paulista
           </Link>
-          <h1 className="mt-3 text-3xl font-semibold">Entrada do embaixador</h1>
+          <h1 className="mt-3 text-3xl font-semibold">Entrada do aluno</h1>
           <p className="mt-2 text-sm leading-6 text-[#f8f9ff]">
-            Digite o numero da carteirinha para carregar seu cadastro e as provas disponiveis.
+            Escolha ER ou MR e digite o numero da inscricao para carregar seu cadastro e as provas disponiveis.
           </p>
         </div>
       </header>

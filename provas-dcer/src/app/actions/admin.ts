@@ -5,7 +5,7 @@ import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { AdminRole, Category, ExamStatus } from "@/generated/prisma/client";
+import { AdminRole, Category, ExamStatus, StudentProgram } from "@/generated/prisma/client";
 import {
   addYearsToDateInput,
   formatDateInput,
@@ -28,11 +28,12 @@ import { deleteExamApplicationRecords } from "@/lib/exam-application-retention";
 import { prisma } from "@/lib/prisma";
 import {
   findActiveStudentsByRegistrationNumber,
-  normalizeRegistrationNumber,
 } from "@/lib/student-registration";
+import { buildStudentRegistrationNumber } from "@/lib/student-programs";
 import { normalizeName } from "@/lib/text";
 
 const categorySchema = z.enum(["JUNIOR", "ADOLESCENTES", "JUVENIL"]);
+const studentProgramSchema = z.enum(["ER", "MR"]);
 const staffRoleSchema = z.enum(["ADMIN", "TEACHER", "ADMIN_TEACHER"]);
 const categoryLabels: Record<Category, string> = {
   JUNIOR: "Junior",
@@ -114,6 +115,7 @@ const examPayloadSchema = z.object({
   durationMinutes: z.coerce.number().int().min(1).max(300),
   passingPercent: z.coerce.number().min(0, "O percentual minimo nao pode ser negativo.").max(100),
   applicationTitle: z.string().trim().min(3, "Informe o titulo da aplicacao."),
+  program: studentProgramSchema,
   accessCode: z.string().trim().optional(),
   startsAt: z.string().trim().optional(),
   endsAt: z.string().trim().optional(),
@@ -149,9 +151,24 @@ function optionalFormText(formData: FormData, field: string) {
   return optionalText(String(formData.get(field) || ""));
 }
 
-function optionalRegistrationNumber(formData: FormData, field: string) {
-  const normalizedRegistrationNumber = normalizeRegistrationNumber(String(formData.get(field) || ""));
-  return normalizedRegistrationNumber || null;
+function parseStudentProgram(formData: FormData) {
+  const parsed = studentProgramSchema.safeParse(String(formData.get("program") || ""));
+
+  if (!parsed.success) {
+    errorRedirect("/admin/cadastros", "Selecione se o aluno e ER ou MR.");
+  }
+
+  return parsed.data as StudentProgram;
+}
+
+function parseStudentRegistrationNumber(formData: FormData, program: StudentProgram) {
+  const externalId = buildStudentRegistrationNumber(program, String(formData.get("externalId") || ""));
+
+  if (!externalId) {
+    errorRedirect("/admin/cadastros", "Informe o numero de inscricao do aluno.");
+  }
+
+  return externalId;
 }
 
 function parseOptionalDate(formData: FormData, field: string, label: string) {
@@ -444,7 +461,7 @@ async function ensureUniqueStudent(
   });
 
   if (existingStudent && existingStudent.id !== ignoredId) {
-    errorRedirect("/admin/cadastros", "Ja existe embaixador com este nome, igreja e categoria.");
+    errorRedirect("/admin/cadastros", "Ja existe aluno com este nome, igreja e categoria.");
   }
 }
 
@@ -455,7 +472,7 @@ async function ensureUniqueStudentExternalId(externalId: string | null, ignoredI
   const existingStudent = existingStudents.find((student) => student.id !== ignoredId);
 
   if (existingStudent) {
-    errorRedirect("/admin/cadastros", "Ja existe embaixador com este numero de inscricao.");
+    errorRedirect("/admin/cadastros", "Ja existe aluno com este numero de inscricao.");
   }
 }
 
@@ -868,8 +885,9 @@ export async function createStudentAction(formData: FormData) {
   const name = String(formData.get("name") || "").trim();
   const requestedChurchId = String(formData.get("churchId") || "");
   const churchId = scopedChurchId || requestedChurchId;
+  const program = parseStudentProgram(formData);
   const category = String(formData.get("category") || "") as Category;
-  const externalId = optionalRegistrationNumber(formData, "externalId");
+  const externalId = parseStudentRegistrationNumber(formData, program);
   const registrationIssuedAt = parseOptionalDate(formData, "registrationIssuedAt", "emissao");
   const registrationExpiresAt = parseOptionalDate(formData, "registrationExpiresAt", "validade");
   const birthDate = parseOptionalDate(formData, "birthDate", "nascimento");
@@ -881,11 +899,11 @@ export async function createStudentAction(formData: FormData) {
   }
 
   if (scopedChurchId && requestedChurchId && requestedChurchId !== scopedChurchId) {
-    errorRedirect("/admin/cadastros", "Conselheiros so podem cadastrar embaixadores da propria igreja.");
+    errorRedirect("/admin/cadastros", "Conselheiros so podem cadastrar alunos da propria igreja.");
   }
 
   if (name.length < 3 || !churchId || !categorySchema.safeParse(category).success) {
-    errorRedirect("/admin/cadastros", "Preencha igreja, categoria e nome do embaixador.");
+    errorRedirect("/admin/cadastros", "Preencha igreja, tipo, categoria e nome do aluno.");
   }
 
   const normalizedName = normalizeName(name);
@@ -902,6 +920,7 @@ export async function createStudentAction(formData: FormData) {
     },
     update: {
       name,
+      program,
       externalId,
       registrationIssuedAt,
       registrationExpiresAt,
@@ -914,6 +933,7 @@ export async function createStudentAction(formData: FormData) {
     create: {
       name,
       normalizedName,
+      program,
       category,
       externalId,
       registrationIssuedAt,
@@ -939,7 +959,6 @@ export async function updateStudentAction(formData: FormData) {
   const requestedChurchId = String(formData.get("churchId") || "");
   const churchId = scopedChurchId || requestedChurchId;
   const category = String(formData.get("category") || "") as Category;
-  const externalId = optionalRegistrationNumber(formData, "externalId");
   const registrationIssuedAt = parseOptionalDate(formData, "registrationIssuedAt", "emissao");
   const registrationExpiresAt = parseOptionalDate(formData, "registrationExpiresAt", "validade");
   const birthDate = parseOptionalDate(formData, "birthDate", "nascimento");
@@ -951,11 +970,11 @@ export async function updateStudentAction(formData: FormData) {
   }
 
   if (scopedChurchId && requestedChurchId && requestedChurchId !== scopedChurchId) {
-    errorRedirect("/admin/cadastros", "Conselheiros so podem editar embaixadores da propria igreja.");
+    errorRedirect("/admin/cadastros", "Conselheiros so podem editar alunos da propria igreja.");
   }
 
   if (!id || name.length < 3 || !churchId || !categorySchema.safeParse(category).success) {
-    errorRedirect("/admin/cadastros", "Preencha igreja, categoria e nome do embaixador.");
+    errorRedirect("/admin/cadastros", "Preencha igreja, categoria e nome do aluno.");
   }
 
   const target = await prisma.student.findFirst({
@@ -964,13 +983,14 @@ export async function updateStudentAction(formData: FormData) {
       active: true,
       ...(scopedChurchId ? { churchId: scopedChurchId } : {}),
     },
-    select: { id: true },
+    select: { id: true, program: true },
   });
 
   if (!target) {
-    errorRedirect("/admin/cadastros", "Embaixador nao encontrado.");
+    errorRedirect("/admin/cadastros", "Aluno nao encontrado.");
   }
 
+  const externalId = parseStudentRegistrationNumber(formData, target.program);
   const normalizedName = normalizeName(name);
   await ensureUniqueStudent(churchId, category, normalizedName, id);
   await ensureUniqueStudentExternalId(externalId, id);
@@ -980,6 +1000,7 @@ export async function updateStudentAction(formData: FormData) {
     data: {
       name,
       normalizedName,
+      program: target.program,
       category,
       externalId,
       registrationIssuedAt,
@@ -1013,13 +1034,14 @@ export async function createExamAction(formData: FormData) {
     where: {
       active: true,
       churchId: { in: churchIds },
+      program: payload.program as StudentProgram,
       category: { in: payload.categories as Category[] },
     },
     select: { id: true },
   });
 
   if (students.length === 0) {
-    errorRedirect("/admin/provas/nova", "Nao ha embaixadores cadastrados para os filtros escolhidos.");
+    errorRedirect("/admin/provas/nova", "Nao ha alunos cadastrados para os filtros escolhidos.");
   }
 
   const application = await prisma.$transaction(async (tx) => {
@@ -1060,6 +1082,7 @@ export async function createExamAction(formData: FormData) {
       data: {
         examId: exam.id,
         title: payload.applicationTitle,
+        program: payload.program as StudentProgram,
         accessCode,
         active: true,
         startsAt: applicationWindow.startsAt,
@@ -1175,13 +1198,14 @@ export async function updateExamAction(formData: FormData) {
     where: {
       active: true,
       churchId: { in: churchIds },
+      program: payload.program as StudentProgram,
       category: { in: payload.categories as Category[] },
     },
     select: { id: true },
   });
 
   if (students.length === 0) {
-    errorRedirect(errorPath, "Nao ha embaixadores cadastrados para os filtros escolhidos.");
+    errorRedirect(errorPath, "Nao ha alunos cadastrados para os filtros escolhidos.");
   }
 
   await prisma.$transaction(async (tx) => {
@@ -1239,6 +1263,7 @@ export async function updateExamAction(formData: FormData) {
       },
       data: {
         title: payload.applicationTitle,
+        program: payload.program as StudentProgram,
         accessCode,
         active: true,
         startsAt: applicationWindow.startsAt,

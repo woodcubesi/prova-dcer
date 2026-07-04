@@ -3,6 +3,13 @@
 import { type FormEvent, useState } from "react";
 import { startAttemptAction } from "@/app/actions/student";
 
+type StudentProgramCode = "ER" | "MR";
+
+const studentProgramOptions: { value: StudentProgramCode; label: string }[] = [
+  { value: "ER", label: "ER - Embaixador do Rei" },
+  { value: "MR", label: "MR - Mensageira do Rei" },
+];
+
 type ApplicationOption = {
   id: string;
   title: string;
@@ -17,6 +24,9 @@ type StudentLookup = {
   student: {
     registrationNumber: string;
     name: string;
+    program: string;
+    programLabel: string;
+    programPrefix: string;
     category: string;
     categoryLabel: string;
     churchName: string;
@@ -32,6 +42,7 @@ type StudentLookup = {
 };
 
 export function StudentEntry() {
+  const [studentProgram, setStudentProgram] = useState<StudentProgramCode>("ER");
   const [registrationNumber, setRegistrationNumber] = useState("");
   const [applicationId, setApplicationId] = useState("");
   const [lookup, setLookup] = useState<StudentLookup | null>(null);
@@ -43,16 +54,19 @@ export function StudentEntry() {
     : "";
   const application = lookup?.applications.find((item) => item.id === selectedApplicationId);
   const canStart = Boolean(lookup && selectedApplicationId);
+  const registrationSuffixPreview = normalizeRegistrationNumber(registrationNumber);
+  const registrationPreview = registrationSuffixPreview ? `${studentProgram}${registrationSuffixPreview}` : studentProgram;
 
   async function handleLookup(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    const cleanRegistrationNumber = registrationNumber.trim();
+    const cleanRegistrationSuffix = normalizeRegistrationNumber(registrationNumber);
+    const cleanRegistrationNumber = `${studentProgram}${cleanRegistrationSuffix}`;
 
-    if (cleanRegistrationNumber.length < 3) {
+    if (!cleanRegistrationSuffix) {
       setLookup(null);
       setApplicationId("");
-      setLookupError("Informe o numero da carteirinha.");
+      setLookupError("Informe o numero da inscricao.");
       return;
     }
 
@@ -89,7 +103,14 @@ export function StudentEntry() {
   }
 
   function resetLookup(nextRegistrationNumber: string) {
-    setRegistrationNumber(nextRegistrationNumber);
+    setRegistrationNumber(normalizeRegistrationNumber(nextRegistrationNumber));
+    setLookup(null);
+    setApplicationId("");
+    setLookupError("");
+  }
+
+  function resetProgram(nextProgram: StudentProgramCode) {
+    setStudentProgram(nextProgram);
     setLookup(null);
     setApplicationId("");
     setLookupError("");
@@ -99,7 +120,23 @@ export function StudentEntry() {
     <div className="rounded-lg border border-[#d8def0] bg-white p-4 shadow-sm sm:p-6">
       <form onSubmit={handleLookup} className="grid gap-4">
         <label className="block">
-          <span className="text-sm font-medium">Numero da carteirinha</span>
+          <span className="text-sm font-medium">Tipo do aluno</span>
+          <select
+            name="studentProgramLookup"
+            value={studentProgram}
+            onChange={(event) => resetProgram(event.target.value as StudentProgramCode)}
+            className="mt-1 w-full rounded-md border border-[#c5cce4] bg-white px-3 py-3 outline-none focus:ring-2 focus:ring-[#000060]"
+          >
+            {studentProgramOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="block">
+          <span className="text-sm font-medium">Numero da inscricao sem sigla</span>
           <input
             name="registrationNumberLookup"
             value={registrationNumber}
@@ -108,7 +145,11 @@ export function StudentEntry() {
             placeholder="Ex.: 210300100049"
             autoComplete="off"
             inputMode="numeric"
+            pattern="[0-9]*"
           />
+          <span className="mt-1 block text-xs text-[#5d6480]">
+            O sistema vai consultar como {registrationPreview}.
+          </span>
         </label>
 
         <button
@@ -130,7 +171,7 @@ export function StudentEntry() {
           <section className="rounded-md border border-[#d8def0] bg-[#f8faff] p-4">
             <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <p className="text-xs uppercase tracking-[0.14em] text-[#5d6480]">Embaixador</p>
+                <p className="text-xs uppercase tracking-[0.14em] text-[#5d6480]">Aluno</p>
                 <h2 className="mt-1 text-xl font-semibold text-[#111827]">{lookup.student.name}</h2>
               </div>
               <span className="w-fit rounded-full bg-[#effaf2] px-3 py-1 text-xs font-semibold text-[#1f623e]">
@@ -140,6 +181,7 @@ export function StudentEntry() {
 
             <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
               <StudentData label="Carteirinha" value={lookup.student.registrationNumber} mono />
+              <StudentData label="Tipo" value={lookup.student.programLabel} />
               <StudentData label="Igreja" value={lookup.student.churchName} />
               <StudentData label="Embaixada" value={lookup.student.embassyName || "-"} />
               <StudentData label="Emissao" value={formatDate(lookup.student.registrationIssuedAt)} />
@@ -170,7 +212,7 @@ export function StudentEntry() {
                 className="mt-1 w-full rounded-md border border-[#c5cce4] bg-white px-3 py-3 outline-none focus:ring-2 focus:ring-[#000060] disabled:bg-[#f2f4fb] disabled:text-[#888fa8]"
               >
                 {!lookup.applications.length ? (
-                  <option value="">Nenhuma prova disponivel para este embaixador</option>
+                  <option value="">Nenhuma prova disponivel para este aluno</option>
                 ) : (
                   <option value="">Selecione a prova</option>
                 )}
@@ -211,11 +253,15 @@ export function StudentEntry() {
         </div>
       ) : (
         <p className="mt-4 text-sm leading-6 text-[#5d6480]">
-          Digite o numero da carteirinha para o sistema localizar seu cadastro, igreja, embaixada e provas liberadas.
+          Escolha ER ou MR e digite o numero da inscricao para o sistema localizar seu cadastro, igreja, embaixada e provas liberadas.
         </p>
       )}
     </div>
   );
+}
+
+function normalizeRegistrationNumber(value: string) {
+  return value.replace(/\D/g, "");
 }
 
 function StudentData({

@@ -41,6 +41,11 @@ enum AdminRole {
   ADMIN_TEACHER
 }
 
+enum StudentProgram {
+  ER
+  MR
+}
+
 model AdminUser {
   id                  String                    @id @default(cuid())
   name                String
@@ -91,6 +96,7 @@ model Student {
   id                    String                   @id @default(cuid())
   name                  String
   normalizedName        String
+  program               StudentProgram           @default(ER)
   category              Category
   externalId            String?
   registrationIssuedAt  DateTime?
@@ -108,6 +114,7 @@ model Student {
   attempts              Attempt[]
 
   @@unique([churchId, category, normalizedName])
+  @@index([program])
   @@index([category])
   @@index([externalId])
 }
@@ -166,6 +173,7 @@ model ExamApplication {
   examId              String
   exam                Exam                     @relation(fields: [examId], references: [id], onDelete: Cascade)
   title               String
+  program             StudentProgram           @default(ER)
   accessCode          String                   @unique
   active              Boolean                  @default(true)
   startsAt            DateTime?
@@ -178,6 +186,7 @@ model ExamApplication {
   attempts            Attempt[]
 
   @@index([active])
+  @@index([program])
   @@index([startsAt])
   @@index([endsAt])
   @@index([purgeAt])
