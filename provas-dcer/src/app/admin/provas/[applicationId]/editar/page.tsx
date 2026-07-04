@@ -110,6 +110,7 @@ export default async function EditExamPage({ params, searchParams }: EditExamPag
     durationMinutes: application.exam.durationMinutes,
     passingPercent: application.exam.passingPercent ?? 70,
     applicationTitle: application.title,
+    program: application.program,
     accessCode: application.accessCode,
     startsAt: formatDateInput(application.startsAt),
     endsAt: formatDateInput(application.endsAt),

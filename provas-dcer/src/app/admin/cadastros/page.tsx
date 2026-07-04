@@ -5,10 +5,16 @@ import {
   updateStudentAction,
 } from "@/app/actions/admin";
 import { AdminShell } from "@/components/admin/AdminShell";
-import { AdminRole } from "@/generated/prisma/client";
+import { AdminRole, StudentProgram } from "@/generated/prisma/client";
 import { CATEGORIES, getCategoryLabel } from "@/lib/categories";
 import { requireAdminContext } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import {
+  getStudentProgramLabel,
+  getStudentProgramPrefix,
+  normalizeRegistrationSuffix,
+  studentProgramOptions,
+} from "@/lib/student-programs";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +42,10 @@ function formatDateInput(date?: Date | null) {
 
 function formatDateLabel(date?: Date | null) {
   return date ? date.toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "-";
+}
+
+function formatRegistrationInputValue(externalId?: string | null) {
+  return externalId ? normalizeRegistrationSuffix(externalId) : "";
 }
 
 function parsePositiveInt(value?: string) {
@@ -204,6 +214,7 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
       select: {
         id: true,
         name: true,
+        program: true,
         category: true,
         externalId: true,
       },
@@ -283,9 +294,11 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
       ? `${selectedChurch.name} - ${selectedChurch.embassyName}`
       : selectedChurch.name
     : "";
+  const editingStudentProgram = editingStudent?.program || StudentProgram.ER;
+  const editingRegistrationPrefix = getStudentProgramPrefix(editingStudentProgram);
 
   return (
-    <AdminShell title="Cadastros" description="Pre-cadastre igrejas e embaixadores antes de liberar uma prova.">
+    <AdminShell title="Cadastros" description="Pre-cadastre igrejas, ERs e MRs antes de liberar uma prova.">
       {isTeacher && !scopedChurchId ? (
         <div className="mb-4 rounded-md border border-[#f2b8bf] bg-[#fff4f2] px-4 py-3 text-sm text-[#b00018]">
           Seu usuario de conselheiro ainda nao esta vinculado a uma igreja.
@@ -308,7 +321,7 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
       ) : null}
       {params.embaixador && !editingStudent ? (
         <div className="mb-4 rounded-md border border-[#f2b8bf] bg-[#fff4f2] px-4 py-3 text-sm text-[#b00018]">
-          Embaixador nao encontrado para edicao.
+          Aluno nao encontrado para edicao.
         </div>
       ) : null}
 
@@ -338,7 +351,7 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
         </form>
         {selectedChurch ? (
           <p className="mt-3 text-sm text-[#5d6480]">
-            Exibindo embaixadores e provas vinculados a <strong>{selectedChurchLabel}</strong>.
+            Exibindo alunos e provas vinculados a <strong>{selectedChurchLabel}</strong>.
           </p>
         ) : !isTeacher && churchOptions.length > 0 ? (
           <p className="mt-3 text-sm text-[#5d6480]">
@@ -407,7 +420,7 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
           className="rounded-lg border border-[#d8def0] bg-white p-4"
         >
           {editingStudent ? <input type="hidden" name="id" value={editingStudent.id} /> : null}
-          <h2 className="text-lg font-semibold">{editingStudent ? "Editar embaixador" : "Novo embaixador"}</h2>
+          <h2 className="text-lg font-semibold">{editingStudent ? "Editar aluno" : "Novo aluno"}</h2>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             {isTeacher ? (
               <label className="block">
@@ -438,6 +451,26 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
               </label>
             )}
             <label className="block">
+              <span className="text-sm font-medium">Tipo</span>
+              <select
+                name="program"
+                defaultValue={editingStudentProgram}
+                disabled={Boolean(editingStudent)}
+                className="mt-1 w-full rounded-md border border-[#c5cce4] bg-white px-3 py-3 outline-none focus:ring-2 focus:ring-[#000060] disabled:bg-[#f2f4fb] disabled:text-[#5d6480]"
+              >
+                {studentProgramOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs leading-5 text-[#5d6480]">
+                {editingStudent
+                  ? `Tipo imutavel. A inscricao deste cadastro sempre usa a sigla ${editingRegistrationPrefix}.`
+                  : "Define automaticamente a sigla ER ou MR no numero de inscricao."}
+              </p>
+            </label>
+            <label className="block">
               <span className="text-sm font-medium">Categoria</span>
               <select
                 name="category"
@@ -453,7 +486,7 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
               </select>
             </label>
             <label className="block sm:col-span-2">
-              <span className="text-sm font-medium">Nome do embaixador</span>
+              <span className="text-sm font-medium">Nome do aluno</span>
               <input
                 name="name"
                 defaultValue={editingStudent?.name || ""}
@@ -462,13 +495,18 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
               />
             </label>
             <label className="block">
-              <span className="text-sm font-medium">Numero da inscricao</span>
+              <span className="text-sm font-medium">Numero da inscricao sem sigla</span>
               <input
                 name="externalId"
-                defaultValue={editingStudent?.externalId || ""}
+                defaultValue={formatRegistrationInputValue(editingStudent?.externalId)}
                 className="mt-1 w-full rounded-md border border-[#c5cce4] px-3 py-3 outline-none focus:ring-2 focus:ring-[#000060]"
                 placeholder="Ex.: 210300100049"
               />
+              <p className="mt-1 text-xs leading-5 text-[#5d6480]">
+                {editingStudent
+                  ? `Ao salvar, o sistema mantem a sigla ${editingRegistrationPrefix}.`
+                  : "Digite apenas o numero; o sistema salva com a sigla do tipo escolhido."}
+              </p>
             </label>
             <label className="block">
               <span className="text-sm font-medium">Emissao</span>
@@ -538,7 +576,7 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
           </div>
           <div className="mt-4 flex flex-col gap-2 sm:flex-row">
             <button className="rounded-md bg-[#000060] px-4 py-3 text-sm font-semibold text-white hover:bg-[#000044]">
-              {editingStudent ? "Atualizar embaixador" : "Salvar embaixador"}
+              {editingStudent ? "Atualizar aluno" : "Salvar aluno"}
             </button>
             {editingStudent ? (
               <a
@@ -561,7 +599,7 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
                 <p className="font-medium">{selectedChurch.name}</p>
                 <p className="text-sm text-[#111827]">{selectedChurch.embassyName || "Embaixada nao informada"}</p>
                 <p className="text-xs text-[#5d6480]">
-                  {selectedChurch._count.students} embaixador(es) {selectedChurch.city ? `- ${selectedChurch.city}` : ""}
+                  {selectedChurch._count.students} aluno(s) {selectedChurch.city ? `- ${selectedChurch.city}` : ""}
                 </p>
                 {!isTeacher ? (
                   <a
@@ -676,7 +714,7 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
           <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <h2 className="text-lg font-semibold">
-                {selectedChurchId ? "Embaixadores da igreja" : "Todos os embaixadores"}
+                {selectedChurchId ? "Alunos da igreja" : "Todos os alunos"}
               </h2>
               <p className="text-sm text-[#5d6480]">
                 Mostrando {formatPageRange(studentPage, studentPageSize, students.length, filteredTotalStudents)}.
@@ -697,13 +735,13 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
                 className="min-w-0 rounded-md border border-[#c5cce4] bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#000060] disabled:bg-[#f3f4f6] disabled:text-[#6b7280]"
               >
                 <option value="">
-                  {selectedChurchId ? "Todos os embaixadores da igreja" : "Todas as igrejas selecionadas"}
+                  {selectedChurchId ? "Todos os alunos da igreja" : "Todas as igrejas selecionadas"}
                 </option>
                 {studentOptions.map((student) => (
                   <option key={student.id} value={student.id}>
                     {student.externalId
-                      ? `${student.name} - ${student.externalId} - ${getCategoryLabel(student.category)}`
-                      : `${student.name} - ${getCategoryLabel(student.category)}`}
+                      ? `${getStudentProgramPrefix(student.program)} - ${student.name} - ${student.externalId} - ${getCategoryLabel(student.category)}`
+                      : `${getStudentProgramPrefix(student.program)} - ${student.name} - ${getCategoryLabel(student.category)}`}
                   </option>
                 ))}
               </select>
@@ -745,6 +783,10 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
                 </p>
                 <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
                   <div className="rounded-md bg-[#f8faff] px-2 py-2">
+                    <p className="text-[#5d6480]">Tipo</p>
+                    <p className="font-semibold">{getStudentProgramLabel(student.program)}</p>
+                  </div>
+                  <div className="rounded-md bg-[#f8faff] px-2 py-2">
                     <p className="text-[#5d6480]">Inscricao</p>
                     <p className="font-semibold">{student.externalId || "-"}</p>
                   </div>
@@ -780,10 +822,11 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
             ))}
           </div>
           <div className="mt-3 hidden overflow-x-auto md:block">
-            <table className="w-full min-w-[1060px] text-left text-sm">
+            <table className="w-full min-w-[1120px] text-left text-sm">
               <thead className="border-b border-[#d8def0] text-xs uppercase tracking-wide text-[#5d6480]">
                 <tr>
                   <th className="py-3 pr-4">Nome</th>
+                  <th className="py-3 pr-4">Tipo</th>
                   <th className="py-3 pr-4">Inscricao</th>
                   <th className="py-3 pr-4">Embaixada</th>
                   <th className="py-3 pr-4">Igreja</th>
@@ -798,6 +841,7 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
                 {students.map((student) => (
                   <tr key={student.id} className="border-b border-[#e8ecf8] last:border-0">
                     <td className="py-3 pr-4 font-medium">{student.name}</td>
+                    <td className="py-3 pr-4">{getStudentProgramPrefix(student.program)}</td>
                     <td className="py-3 pr-4 font-mono">{student.externalId || "-"}</td>
                     <td className="py-3 pr-4">{student.church.embassyName || "-"}</td>
                     <td className="py-3 pr-4">{student.church.name}</td>
@@ -819,10 +863,10 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
                 ))}
                 {students.length === 0 ? (
                   <tr>
-                    <td className="py-6 pr-4 text-sm text-[#5d6480]" colSpan={9}>
+                    <td className="py-6 pr-4 text-sm text-[#5d6480]" colSpan={10}>
                       {selectedChurchId
-                        ? "Nenhum embaixador encontrado para esta selecao."
-                        : "Nenhum embaixador cadastrado para as igrejas ativas."}
+                        ? "Nenhum aluno encontrado para esta selecao."
+                        : "Nenhum aluno cadastrado para as igrejas ativas."}
                     </td>
                   </tr>
                 ) : null}
@@ -832,8 +876,8 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
           {students.length === 0 ? (
             <div className="mt-3 rounded-md border border-[#e8ecf8] bg-[#fbfcff] p-4 text-sm text-[#5d6480] md:hidden">
               {selectedChurchId
-                ? "Nenhum embaixador encontrado para esta selecao."
-                : "Nenhum embaixador cadastrado para as igrejas ativas."}
+                ? "Nenhum aluno encontrado para esta selecao."
+                : "Nenhum aluno cadastrado para as igrejas ativas."}
             </div>
           ) : null}
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm">

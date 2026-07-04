@@ -33,7 +33,7 @@ services:
       POSTGRES_USER: provas_dcer
       POSTGRES_PASSWORD: provas_dcer_dev
     ports:
-      - "127.0.0.1:5433:5432"
+      - "127.0.0.1:${POSTGRES_HOST_PORT:-5433}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:

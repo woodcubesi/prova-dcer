@@ -11,6 +11,13 @@ type ChurchOption = {
   students: number;
 };
 
+type StudentProgramCode = "ER" | "MR";
+
+const studentProgramOptions: { value: StudentProgramCode; label: string }[] = [
+  { value: "ER", label: "ER - Embaixadores do Rei" },
+  { value: "MR", label: "MR - Mensageiras do Rei" },
+];
+
 type QuestionDraft = {
   id: string;
   statement: string;
@@ -31,6 +38,7 @@ type ImportedExamFile = {
   durationMinutes?: number;
   passingPercent?: number;
   applicationTitle?: string;
+  program?: StudentProgramCode;
   accessCode?: string;
   startsAt?: string;
   endsAt?: string;
@@ -48,6 +56,7 @@ export type ExamBuilderInitialData = {
   durationMinutes: number;
   passingPercent: number;
   applicationTitle: string;
+  program: StudentProgramCode;
   accessCode: string;
   startsAt: string;
   endsAt: string;
@@ -130,6 +139,7 @@ export function ExamBuilder({ churches, initialData, locked = false, mode = "cre
   const [durationMinutes, setDurationMinutes] = useState(initialData?.durationMinutes || 60);
   const [passingPercent, setPassingPercent] = useState(initialData?.passingPercent ?? 70);
   const [applicationTitle, setApplicationTitle] = useState(initialData?.applicationTitle || "Aplicacao principal");
+  const [program, setProgram] = useState<StudentProgramCode>(initialData?.program || "ER");
   const [accessCode, setAccessCode] = useState(initialData?.accessCode || "");
   const [startsAt, setStartsAt] = useState(initialData?.startsAt || "");
   const [endsAt, setEndsAt] = useState(initialData?.endsAt || getDefaultEndsAtInput());
@@ -164,6 +174,7 @@ export function ExamBuilder({ churches, initialData, locked = false, mode = "cre
         durationMinutes,
         passingPercent,
         applicationTitle,
+        program,
         accessCode,
         startsAt,
         endsAt: noExpiration ? "" : endsAt,
@@ -194,6 +205,7 @@ export function ExamBuilder({ churches, initialData, locked = false, mode = "cre
       endsAt,
       noExpiration,
       passingPercent,
+      program,
       purgeAt,
       questions,
       selectedCategories,
@@ -232,6 +244,7 @@ export function ExamBuilder({ churches, initialData, locked = false, mode = "cre
       setDurationMinutes(imported.durationMinutes || durationMinutes);
       setPassingPercent(imported.passingPercent ?? passingPercent);
       setApplicationTitle(imported.applicationTitle || applicationTitle);
+      setProgram(imported.program || program);
       setAccessCode(imported.accessCode || accessCode);
       setStartsAt(normalizeImportedDate(imported.startsAt));
       const importedEndsAt = normalizeImportedDate(imported.endsAt) || endsAt;
@@ -446,6 +459,24 @@ export function ExamBuilder({ churches, initialData, locked = false, mode = "cre
               className="mt-1 w-full rounded-md border border-[#c5cce4] px-3 py-3 outline-none focus:ring-2 focus:ring-[#000060]"
             />
           </label>
+          <label className="block">
+            <span className="text-sm font-medium">Direcionar prova para</span>
+            <select
+              value={program}
+              disabled={locked}
+              onChange={(event) => setProgram(event.target.value as StudentProgramCode)}
+              className="mt-1 w-full rounded-md border border-[#c5cce4] bg-white px-3 py-3 outline-none focus:ring-2 focus:ring-[#000060] disabled:bg-[#f8faff]"
+            >
+              {studentProgramOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <span className="mt-1 block text-xs text-[#5d6480]">
+              Apenas alunos desse tipo serao incluidos e poderao visualizar esta prova.
+            </span>
+          </label>
           <label className="block lg:col-span-2">
             <span className="text-sm font-medium">Codigo opcional da aplicacao</span>
             <input
@@ -488,7 +519,7 @@ export function ExamBuilder({ churches, initialData, locked = false, mode = "cre
               }}
               className="mt-1 w-full rounded-md border border-[#c5cce4] px-3 py-3 outline-none focus:ring-2 focus:ring-[#000060] disabled:bg-[#f8faff] disabled:text-[#8a91aa]"
             />
-            <span className="mt-1 block text-xs text-[#5d6480]">Prazo final para o embaixador fazer a prova.</span>
+            <span className="mt-1 block text-xs text-[#5d6480]">Prazo final para o aluno fazer a prova.</span>
           </label>
           <label className="flex items-center gap-3 rounded-md border border-[#d8def0] px-3 py-3 text-sm font-medium lg:mt-6">
             <input
@@ -533,7 +564,7 @@ export function ExamBuilder({ churches, initialData, locked = false, mode = "cre
               >
                 <span>
                   <span className="block text-sm font-medium">{church.name}</span>
-                  <span className="text-xs text-[#5d6480]">{church.students} embaixador(es)</span>
+                  <span className="text-xs text-[#5d6480]">{church.students} aluno(s) cadastrado(s)</span>
                 </span>
                 <input
                   type="checkbox"

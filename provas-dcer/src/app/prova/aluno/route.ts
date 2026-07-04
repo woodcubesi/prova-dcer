@@ -8,6 +8,7 @@ import {
   isRegistrationExpired,
   normalizeRegistrationNumber,
 } from "@/lib/student-registration";
+import { getStudentProgramLabel, getStudentProgramPrefix } from "@/lib/student-programs";
 
 type LookupPayload = {
   registrationNumber?: unknown;
@@ -44,7 +45,7 @@ export async function POST(request: Request) {
 
   if (students.length > 1) {
     return NextResponse.json(
-      { message: "Existe mais de um embaixador com este numero. Procure a coordenacao." },
+      { message: "Existe mais de um aluno com este numero. Procure a coordenacao." },
       { status: 409 },
     );
   }
@@ -62,6 +63,7 @@ export async function POST(request: Request) {
   const applications = await prisma.examApplication.findMany({
     where: {
       active: true,
+      program: student.program,
       AND: [
         {
           OR: [{ startsAt: null }, { startsAt: { lte: now } }],
@@ -111,6 +113,9 @@ export async function POST(request: Request) {
     student: {
       registrationNumber: student.externalId || normalizedRegistrationNumber,
       name: student.name,
+      program: student.program,
+      programLabel: getStudentProgramLabel(student.program),
+      programPrefix: getStudentProgramPrefix(student.program),
       category: student.category,
       categoryLabel: getCategoryLabel(student.category),
       churchName: student.church.name,

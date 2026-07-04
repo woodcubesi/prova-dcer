@@ -10,6 +10,7 @@ import {
 import { getCategoryLabel } from "@/lib/categories";
 import { requireAdminContext } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getStudentProgramLabel } from "@/lib/student-programs";
 
 export const dynamic = "force-dynamic";
 
@@ -128,7 +129,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   ]);
   const stats = [
     [isTeacher ? "Igreja" : "Igrejas", churches],
-    ["Embaixadores", students],
+    ["Alunos", students],
     ["Provas", exams],
     ["Enviadas", submittedAttempts],
     ...(isTeacher ? [] : ([["Administradores", administrators]] as [string, number][])),
@@ -207,6 +208,10 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                     <p className="font-semibold">{application.exam.durationMinutes} min</p>
                   </div>
                   <div className="rounded-md bg-[#f8faff] px-3 py-2">
+                    <p className="text-xs text-[#5d6480]">Tipo</p>
+                    <p className="font-semibold">{getStudentProgramLabel(application.program)}</p>
+                  </div>
+                  <div className="rounded-md bg-[#f8faff] px-3 py-2">
                     <p className="text-xs text-[#5d6480]">Participantes</p>
                     <p className="font-semibold">{application.participants.length}</p>
                   </div>
@@ -234,11 +239,12 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           </div>
 
           <div className="mt-4 hidden overflow-x-auto md:block">
-            <table className="w-full min-w-[1080px] text-left text-sm">
+            <table className="w-full min-w-[1160px] text-left text-sm">
               <thead className="border-b border-[#d8def0] text-xs uppercase tracking-wide text-[#5d6480]">
                 <tr>
                   <th className="py-3 pr-4">Aplicacao</th>
                   <th className="py-3 pr-4">Codigo</th>
+                  <th className="py-3 pr-4">Tipo</th>
                   <th className="py-3 pr-4">Tempo</th>
                   <th className="py-3 pr-4">Disponibilidade</th>
                   <th className="py-3 pr-4">Eliminacao</th>
@@ -256,6 +262,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                       <p className="text-xs text-[#5d6480]">{application.exam.title}</p>
                     </td>
                     <td className="py-3 pr-4 font-mono text-sm">{application.accessCode}</td>
+                    <td className="py-3 pr-4">{getStudentProgramLabel(application.program)}</td>
                     <td className="py-3 pr-4">{application.exam.durationMinutes} min</td>
                     <td className="py-3 pr-4">{formatAvailabilityWindow(application)}</td>
                     <td className="py-3 pr-4">{formatPurgeDate(application)}</td>
@@ -291,15 +298,15 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             href="/prova"
             className="block rounded-lg border border-[#d8def0] bg-white p-4 transition hover:border-[#ffd500]"
           >
-            <p className="text-sm font-semibold text-[#000060]">Tela do embaixador</p>
-            <p className="mt-1 text-sm text-[#5d6480]">Abrir entrada por igreja, categoria e nome.</p>
+            <p className="text-sm font-semibold text-[#000060]">Tela do aluno</p>
+            <p className="mt-1 text-sm text-[#5d6480]">Abrir entrada por tipo, inscricao e provas disponiveis.</p>
           </Link>
           <Link
             href="/admin/cadastros"
             className="block rounded-lg border border-[#d8def0] bg-white p-4 transition hover:border-[#ffd500]"
           >
             <p className="text-sm font-semibold text-[#000060]">Pre-cadastro</p>
-            <p className="mt-1 text-sm text-[#5d6480]">Adicionar igrejas e embaixadores antes da aplicacao.</p>
+            <p className="mt-1 text-sm text-[#5d6480]">Adicionar igrejas e alunos antes da aplicacao.</p>
           </Link>
           <Link
             href="/admin/equipe"

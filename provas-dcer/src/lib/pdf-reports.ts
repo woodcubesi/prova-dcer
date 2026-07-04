@@ -2,7 +2,7 @@ import { existsSync } from "fs";
 import { join } from "path";
 import PDFDocument from "pdfkit";
 import type PDFKit from "pdfkit";
-import { getCategoryLabel } from "@/lib/categories";
+import { CATEGORIES, getCategoryLabel } from "@/lib/categories";
 import { formatPercent, formatScore, getApprovalResult } from "@/lib/report-metrics";
 import { formatAvailabilityWindow, formatPurgeDate } from "@/lib/application-availability";
 import { formatDuration } from "@/lib/text";
@@ -215,7 +215,7 @@ export function buildApplicationSummaryPdf(data: ApplicationSummaryPdfData) {
       ["Eliminar em", formatPurgeDate(data)],
       ["Aprovacao minima", formatPercent(data.passingPercent)],
       ["Inscritos", String(totalParticipants)],
-      ["Embaixadores que fizeram", String(finalRows.length)],
+      ["Alunos que fizeram", String(finalRows.length)],
       ["Nao fizeram", String(notFinished)],
     ]);
 
@@ -228,22 +228,29 @@ export function buildApplicationSummaryPdf(data: ApplicationSummaryPdfData) {
       ["Total inscritos", String(totalParticipants)],
     ]);
 
-    const rankedRows = [...finalRows].sort(compareRankingRows);
+    const rankedCategories = getOrderedCategories(finalRows);
     const pendingRows = rowResults.filter((row) => !hasFinalResult(row.status));
 
-    sectionTitle(doc, "Ranking dos embaixadores que fizeram a prova");
+    sectionTitle(doc, "Ranking por categoria");
 
     if (rowResults.length === 0) {
-      doc.font("Helvetica").fontSize(10).fillColor(mutedColor).text("Nenhum embaixador esta inscrito nesta aplicacao.");
+      doc.font("Helvetica").fontSize(10).fillColor(mutedColor).text("Nenhum aluno esta inscrito nesta aplicacao.");
       return;
     }
 
-    if (rankedRows.length === 0) {
-      doc.font("Helvetica").fontSize(10).fillColor(mutedColor).text("Nenhum embaixador fez esta prova ainda.");
+    if (finalRows.length === 0) {
+      doc.font("Helvetica").fontSize(10).fillColor(mutedColor).text("Nenhum aluno fez esta prova ainda.");
     } else {
-      drawTableHeader(doc);
-      rankedRows.forEach((row, index) => {
-        drawStudentRow(doc, row, index + 1);
+      rankedCategories.forEach((category) => {
+        const rankedRows = finalRows.filter((row) => row.category === category).sort(compareRankingRows);
+
+        if (rankedRows.length === 0) return;
+
+        subsectionTitle(doc, getCategoryLabel(category));
+        drawTableHeader(doc);
+        rankedRows.forEach((row, index) => {
+          drawStudentRow(doc, row, index + 1);
+        });
       });
     }
 
@@ -369,17 +376,25 @@ function sectionTitle(doc: PDFKit.PDFDocument, title: string) {
   doc.moveDown(0.5);
 }
 
+function subsectionTitle(doc: PDFKit.PDFDocument, title: string) {
+  ensureSpace(doc, 42);
+  doc.moveDown(0.2);
+  doc.font("Helvetica-Bold").fontSize(11).fillColor("#111827").text(title);
+  doc.moveDown(0.35);
+}
+
 function drawTableHeader(doc: PDFKit.PDFDocument, showRank = true) {
   ensureSpace(doc, 42);
   const y = doc.y;
   doc.roundedRect(pageMargin, y, contentWidth(doc), 24, 4).fill(brandColor);
   doc.font("Helvetica-Bold").fontSize(8).fillColor("#ffffff");
-  doc.text(showRank ? "Pos." : "", pageMargin + 8, y + 8, { width: 30 });
-  doc.text("Embaixador", pageMargin + 44, y + 8, { width: 126 });
-  doc.text("Igreja", pageMargin + 174, y + 8, { width: 108 });
-  doc.text("Categoria", pageMargin + 286, y + 8, { width: 68 });
-  doc.text("Aproveit.", pageMargin + 360, y + 8, { width: 58 });
-  doc.text("Resultado", pageMargin + 424, y + 8, { width: 68 });
+  doc.text(showRank ? "Pos." : "", pageMargin + 8, y + 8, { width: 28 });
+  doc.text("Aluno", pageMargin + 40, y + 8, { width: 112 });
+  doc.text("Igreja", pageMargin + 156, y + 8, { width: 92 });
+  doc.text("Categoria", pageMargin + 252, y + 8, { width: 68 });
+  doc.text("Aproveit.", pageMargin + 324, y + 8, { width: 54 });
+  doc.text("Tempo", pageMargin + 382, y + 8, { width: 50 });
+  doc.text("Resultado", pageMargin + 436, y + 8, { width: 58 });
   doc.y = y + 30;
 }
 
@@ -397,13 +412,14 @@ function drawStudentRow(
 
   doc.roundedRect(pageMargin, y, contentWidth(doc), 28, 3).fillAndStroke("#ffffff", borderColor);
   doc.font("Helvetica").fontSize(8).fillColor("#111827");
-  doc.font("Helvetica-Bold").text(rank ? `${rank}.` : "-", pageMargin + 8, y + 7, { width: 30 });
-  doc.font("Helvetica").text(row.studentName, pageMargin + 44, y + 7, { width: 126, ellipsis: true });
-  doc.text(row.churchName, pageMargin + 174, y + 7, { width: 108, ellipsis: true });
-  doc.text(getCategoryLabel(row.category), pageMargin + 286, y + 7, { width: 68, ellipsis: true });
-  doc.text(row.percent === null ? "-" : formatPercent(row.percent), pageMargin + 360, y + 7, { width: 58 });
+  doc.font("Helvetica-Bold").text(rank ? `${rank}º` : "-", pageMargin + 8, y + 7, { width: 28 });
+  doc.font("Helvetica").text(row.studentName, pageMargin + 40, y + 7, { width: 112, ellipsis: true });
+  doc.text(row.churchName, pageMargin + 156, y + 7, { width: 92, ellipsis: true });
+  doc.text(getCategoryLabel(row.category), pageMargin + 252, y + 7, { width: 68, ellipsis: true });
+  doc.text(row.percent === null ? "-" : formatPercent(row.percent), pageMargin + 324, y + 7, { width: 54 });
+  doc.text(formatReportDuration(row.timeUsedSeconds), pageMargin + 382, y + 7, { width: 50 });
   doc.font("Helvetica-Bold").fillColor(getResultColor(row));
-  doc.text(row.label, pageMargin + 424, y + 7, { width: 68 });
+  doc.text(row.label, pageMargin + 436, y + 7, { width: 58 });
   doc.y = y + 34;
 }
 
@@ -436,6 +452,20 @@ function hasFinalResult(status: string) {
 function getResultColor(row: { passed: boolean; percent: number | null }) {
   if (row.percent === null) return mutedColor;
   return row.passed ? successColor : dangerColor;
+}
+
+function getOrderedCategories(rows: Array<{ category: string }>) {
+  const categories = new Set(rows.map((row) => row.category));
+  const knownCategories = CATEGORIES.map((category) => category.value).filter((category) => categories.has(category));
+  const unknownCategories = Array.from(categories)
+    .filter((category) => !knownCategories.includes(category as (typeof knownCategories)[number]))
+    .sort((first, second) => getCategoryLabel(first).localeCompare(getCategoryLabel(second), "pt-BR"));
+
+  return [...knownCategories, ...unknownCategories];
+}
+
+function formatReportDuration(seconds?: number | null) {
+  return typeof seconds === "number" ? formatDuration(seconds) : "-";
 }
 
 function compareRankingRows(

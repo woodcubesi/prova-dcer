@@ -8,6 +8,10 @@ export function normalizeRegistrationNumber(value: string) {
     .toUpperCase();
 }
 
+export function hasRegistrationProgramPrefix(value: string) {
+  return /^(ER|MR)[A-Z0-9]+$/.test(normalizeRegistrationNumber(value));
+}
+
 export function isRegistrationExpired(expiresAt?: Date | null, now = new Date()) {
   if (!expiresAt) return false;
 
@@ -20,7 +24,7 @@ export function isRegistrationExpired(expiresAt?: Date | null, now = new Date())
 export async function findActiveStudentsByRegistrationNumber(registrationNumber: string) {
   const normalizedRegistrationNumber = normalizeRegistrationNumber(registrationNumber);
 
-  if (normalizedRegistrationNumber.length < 3) {
+  if (normalizedRegistrationNumber.length < 3 || !hasRegistrationProgramPrefix(normalizedRegistrationNumber)) {
     return [];
   }
 
