@@ -2,6 +2,7 @@ import { existsSync } from "fs";
 import { join } from "path";
 import PDFDocument from "pdfkit";
 import type PDFKit from "pdfkit";
+import QRCode from "qrcode";
 import { getCategoryLabel } from "@/lib/categories";
 import { formatPercent, formatScore, getApprovalResult } from "@/lib/report-metrics";
 import { formatAvailabilityWindow, formatPurgeDate } from "@/lib/application-availability";
@@ -65,6 +66,15 @@ export type ApplicationSummaryPdfData = {
   }>;
 };
 
+export type EventBadgePdfData = {
+  eventTitle: string;
+  participantName: string;
+  churchName: string;
+  category: string;
+  registrationCode: string;
+  qrTargetUrl: string;
+};
+
 const pageMargin = 48;
 const brandColor = "#000060";
 const brandYellow = "#fff200";
@@ -76,6 +86,11 @@ const successColor = "#1f623e";
 const dangerColor = "#b00018";
 const dcerLogoPath = join(process.cwd(), "public", "brand", "dcer-paulista-logo.png");
 const erInsigniaPath = join(process.cwd(), "public", "brand", "embaixadores-rei-insignia.png");
+const pointsPerMillimeter = 72 / 25.4;
+const creditCardPortraitSize: [number, number] = [
+  53.98 * pointsPerMillimeter,
+  85.6 * pointsPerMillimeter,
+];
 
 export async function createPdfBuffer(build: (doc: PDFKit.PDFDocument) => void) {
   const doc = new PDFDocument({
@@ -259,6 +274,97 @@ export function buildApplicationSummaryPdf(data: ApplicationSummaryPdfData) {
   });
 }
 
+export async function buildEventBadgePdf(data: EventBadgePdfData) {
+  const doc = new PDFDocument({
+    size: creditCardPortraitSize,
+    margin: 0,
+    bufferPages: false,
+    info: {
+      Producer: "Provas DCER Paulista",
+      Creator: "Provas DCER Paulista",
+      Title: `Cracha - ${data.participantName}`,
+    },
+  });
+  const qrBuffer = await QRCode.toBuffer(data.qrTargetUrl, {
+    errorCorrectionLevel: "M",
+    margin: 1,
+    width: 256,
+  });
+  const chunks: Buffer[] = [];
+  const done = new Promise<Buffer>((resolve, reject) => {
+    doc.on("data", (chunk: Buffer) => chunks.push(chunk));
+    doc.on("end", () => resolve(Buffer.concat(chunks)));
+    doc.on("error", reject);
+  });
+  const width = doc.page.width;
+  const height = doc.page.height;
+  const cardInset = 4;
+  const contentX = 11;
+  const contentWidth = width - contentX * 2;
+  const qrSize = 88;
+  const registrationBoxWidth = width - 26;
+
+  doc.roundedRect(cardInset, cardInset, width - cardInset * 2, height - cardInset * 2, 7).fillAndStroke("#ffffff", borderColor);
+  doc.rect(cardInset, cardInset, width - cardInset * 2, 15).fill(brandColor);
+  doc.rect(cardInset, 19, width - cardInset * 2, 3).fill(brandYellow);
+  doc.rect(cardInset + (width - cardInset * 2) * 0.72, 19, (width - cardInset * 2) * 0.28, 3).fill(brandRed);
+
+  drawImageIfExists(doc, dcerLogoPath, (width - 54) / 2, 29, { width: 54 });
+
+  drawCenteredFittedText(doc, "PROVAS DCER PAULISTA", contentX, 58, contentWidth, 8, {
+    font: "Helvetica-Bold",
+    fontSize: 5.4,
+    minFontSize: 4.8,
+    color: brandColor,
+  });
+  drawCenteredFittedText(doc, data.eventTitle, contentX, 68, contentWidth, 20, {
+    font: "Helvetica-Bold",
+    fontSize: 7.8,
+    minFontSize: 5.6,
+    color: "#111827",
+  });
+  drawCenteredFittedText(doc, data.participantName, contentX, 91, contentWidth, 17, {
+    font: "Helvetica-Bold",
+    fontSize: 9.2,
+    minFontSize: 6.4,
+    color: "#111827",
+  });
+  drawCenteredFittedText(doc, `${data.churchName} - ${getCategoryLabel(data.category)}`, contentX, 109, contentWidth, 9, {
+    font: "Helvetica",
+    fontSize: 5.2,
+    minFontSize: 4.3,
+    color: mutedColor,
+  });
+
+  doc.image(qrBuffer, (width - qrSize) / 2, 122, { width: qrSize, height: qrSize });
+
+  doc
+    .roundedRect((width - registrationBoxWidth) / 2, 215, registrationBoxWidth, 18, 4)
+    .fillAndStroke(lightFill, borderColor);
+  doc
+    .font("Helvetica-Bold")
+    .fontSize(4.8)
+    .fillColor(mutedColor)
+    .text("INSCRICAO", (width - registrationBoxWidth) / 2, 218, {
+      width: registrationBoxWidth,
+      align: "center",
+      lineBreak: false,
+    });
+  doc
+    .font("Helvetica-Bold")
+    .fontSize(11.5)
+    .fillColor(brandColor)
+    .text(data.registrationCode.toUpperCase(), (width - registrationBoxWidth) / 2, 222.2, {
+      width: registrationBoxWidth,
+      align: "center",
+      lineBreak: false,
+    });
+
+  doc.end();
+
+  return done;
+}
+
 function contentWidth(doc: PDFKit.PDFDocument) {
   return doc.page.width - doc.page.margins.left - doc.page.margins.right;
 }
@@ -306,6 +412,37 @@ function drawImageIfExists(
   } catch {
     // PDF generation should continue even if an optional brand asset cannot be read.
   }
+}
+
+function drawCenteredFittedText(
+  doc: PDFKit.PDFDocument,
+  text: string,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  options: {
+    font: string;
+    fontSize: number;
+    minFontSize: number;
+    color: string;
+  },
+) {
+  let fontSize = options.fontSize;
+
+  doc.font(options.font).fontSize(fontSize);
+  while (fontSize > options.minFontSize && doc.heightOfString(text, { width, align: "center" }) > height) {
+    fontSize -= 0.4;
+    doc.fontSize(fontSize);
+  }
+
+  doc.fillColor(options.color).text(text, x, y, {
+    width,
+    height,
+    align: "center",
+    ellipsis: true,
+    lineGap: 0,
+  });
 }
 
 function drawMetaGrid(doc: PDFKit.PDFDocument, entries: Array<[string, string]>) {

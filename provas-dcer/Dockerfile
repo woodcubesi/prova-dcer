@@ -7,6 +7,10 @@ RUN corepack enable
 
 WORKDIR /app
 
+RUN apt-get update -y \
+  && apt-get install -y --no-install-recommends ca-certificates openssl \
+  && rm -rf /var/lib/apt/lists/*
+
 FROM base AS deps
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
@@ -34,7 +38,8 @@ COPY --from=builder /app/tsconfig.json ./tsconfig.json
 COPY --from=builder /app/next.config.ts ./next.config.ts
 COPY docker-entrypoint.sh ./docker-entrypoint.sh
 
-RUN chmod +x ./docker-entrypoint.sh
+RUN sed -i 's/\r$//' ./docker-entrypoint.sh \
+  && chmod +x ./docker-entrypoint.sh
 
 EXPOSE 3001
 

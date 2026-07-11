@@ -1,6 +1,7 @@
 services:
   app:
-    image: ghcr.io/woodcubesi/prova-dcer:latest
+    build: .
+    image: prova-dcer-local:eventos
     container_name: provas_dcer_app
     restart: unless-stopped
     extra_hosts:
@@ -9,9 +10,9 @@ services:
       DATABASE_URL: postgresql://provas_dcer:provas_dcer_dev@db:5432/provas_dcer?schema=public
       ADMIN_PASSWORD: admin123
       ADMIN_SESSION_SECRET: troque-este-segredo-no-servidor-linux
-      PORT: "3001"
+      PORT: "3002"
       NEXT_TELEMETRY_DISABLED: "1"
-      APP_URL: http://localhost:3001
+      APP_URL: http://localhost:3002
       MAIL_DRIVER: console
       SMTP_HOST: ""
       SMTP_PORT: "25"
@@ -19,7 +20,7 @@ services:
       SMTP_REQUIRE_TLS: "false"
       SMTP_IGNORE_TLS: "false"
     ports:
-      - "127.0.0.1:3001:3001"
+      - "127.0.0.1:3002:3002"
     depends_on:
       db:
         condition: service_healthy
@@ -33,7 +34,7 @@ services:
       POSTGRES_USER: provas_dcer
       POSTGRES_PASSWORD: provas_dcer_dev
     ports:
-      - "127.0.0.1:5433:5432"
+      - "127.0.0.1:5434:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:

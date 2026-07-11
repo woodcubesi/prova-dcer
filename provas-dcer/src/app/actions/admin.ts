@@ -5,7 +5,13 @@ import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { AdminRole, Category, ExamStatus } from "@/generated/prisma/client";
+import {
+  AdminRole,
+  Category,
+  EventApplicationType,
+  EventLeaderRole,
+  ExamStatus,
+} from "@/generated/prisma/client";
 import {
   addYearsToDateInput,
   formatDateInput,
@@ -34,6 +40,14 @@ import { normalizeName } from "@/lib/text";
 
 const categorySchema = z.enum(["JUNIOR", "ADOLESCENTES", "JUVENIL"]);
 const staffRoleSchema = z.enum(["ADMIN", "TEACHER", "ADMIN_TEACHER"]);
+const eventApplicationTypeSchema = z.enum([
+  "BIBLICA_ONLINE",
+  "BIBLICA_ORAL",
+  "ESPORTIVA_PROVA",
+  "ESPORTIVA_JOGOS",
+  "GERAL",
+]);
+const eventLeaderRoleSchema = z.enum(["CONSELHEIRO", "ORIENTADOR"]);
 const categoryLabels: Record<Category, string> = {
   JUNIOR: "Junior",
   ADOLESCENTES: "Adolescentes",
@@ -115,6 +129,9 @@ const examPayloadSchema = z.object({
   passingPercent: z.coerce.number().min(0, "O percentual minimo nao pode ser negativo.").max(100),
   applicationTitle: z.string().trim().min(3, "Informe o titulo da aplicacao."),
   accessCode: z.string().trim().optional(),
+  associateWithEvent: z.boolean().optional().default(false),
+  eventId: z.string().trim().optional(),
+  eventApplicationType: eventApplicationTypeSchema.optional(),
   startsAt: z.string().trim().optional(),
   endsAt: z.string().trim().optional(),
   noExpiration: z.boolean().optional().default(false),
@@ -1005,6 +1022,7 @@ export async function createExamAction(formData: FormData) {
   validateQuestionAudience(payload, errorPath);
   const applicationWindow = parseApplicationWindow(payload, errorPath);
   const churchIds = resolveExamChurchIds(context, payload.churchIds, errorPath);
+  const eventAssociation = await resolvePayloadEventAssociation(payload, errorPath);
 
   const accessCode = buildAccessCode(payload.accessCode);
   await ensureAccessCodeAvailable(accessCode, errorPath);
@@ -1018,7 +1036,7 @@ export async function createExamAction(formData: FormData) {
     select: { id: true },
   });
 
-  if (students.length === 0) {
+  if (!eventAssociation && students.length === 0) {
     errorRedirect("/admin/provas/nova", "Nao ha embaixadores cadastrados para os filtros escolhidos.");
   }
 
@@ -1056,7 +1074,7 @@ export async function createExamAction(formData: FormData) {
       },
     });
 
-    return tx.examApplication.create({
+    const application = await tx.examApplication.create({
       data: {
         examId: exam.id,
         title: payload.applicationTitle,
@@ -1066,13 +1084,21 @@ export async function createExamAction(formData: FormData) {
         endsAt: applicationWindow.endsAt,
         purgeAt: applicationWindow.purgeAt,
         showResultToStudent: false,
-        participants: {
-          create: students.map((student) => ({
-            studentId: student.id,
-          })),
-        },
+        ...(eventAssociation
+          ? {}
+          : {
+              participants: {
+                create: students.map((student) => ({
+                  studentId: student.id,
+                })),
+              },
+            }),
       },
     });
+
+    await syncApplicationEventAssociation(tx, application.id, eventAssociation);
+
+    return application;
   });
 
   revalidatePath("/admin");
@@ -1094,6 +1120,7 @@ export async function updateExamAction(formData: FormData) {
   validateQuestionAudience(payload, errorPath);
   const applicationWindow = parseApplicationWindow(payload, errorPath);
   const churchIds = resolveExamChurchIds(context, payload.churchIds, errorPath);
+  const eventAssociation = await resolvePayloadEventAssociation(payload, errorPath);
   const scopedChurchId = getScopedChurchId(context);
   const accessCode = buildAccessCode(payload.accessCode);
 
@@ -1153,15 +1180,19 @@ export async function updateExamAction(formData: FormData) {
   await ensureAccessCodeAvailable(accessCode, errorPath, application.id);
 
   if (application.attempts.length > 0) {
-    await prisma.examApplication.update({
-      where: { id: application.id },
-      data: {
-        title: payload.applicationTitle,
-        accessCode,
-        startsAt: applicationWindow.startsAt,
-        endsAt: applicationWindow.endsAt,
-        purgeAt: applicationWindow.purgeAt,
-      },
+    await prisma.$transaction(async (tx) => {
+      await tx.examApplication.update({
+        where: { id: application.id },
+        data: {
+          title: payload.applicationTitle,
+          accessCode,
+          startsAt: applicationWindow.startsAt,
+          endsAt: applicationWindow.endsAt,
+          purgeAt: applicationWindow.purgeAt,
+        },
+      });
+
+      await syncApplicationEventAssociation(tx, application.id, eventAssociation);
     });
 
     revalidatePath("/admin");
@@ -1180,7 +1211,7 @@ export async function updateExamAction(formData: FormData) {
     select: { id: true },
   });
 
-  if (students.length === 0) {
+  if (!eventAssociation && students.length === 0) {
     errorRedirect(errorPath, "Nao ha embaixadores cadastrados para os filtros escolhidos.");
   }
 
@@ -1245,13 +1276,19 @@ export async function updateExamAction(formData: FormData) {
         endsAt: applicationWindow.endsAt,
         purgeAt: applicationWindow.purgeAt,
         showResultToStudent: false,
-        participants: {
-          create: students.map((student) => ({
-            studentId: student.id,
-          })),
-        },
+        ...(eventAssociation
+          ? {}
+          : {
+              participants: {
+                create: students.map((student) => ({
+                  studentId: student.id,
+                })),
+              },
+            }),
       },
     });
+
+    await syncApplicationEventAssociation(tx, application.id, eventAssociation);
   });
 
   revalidatePath("/admin");
@@ -1319,4 +1356,507 @@ export async function deleteExamApplicationAction(formData: FormData) {
   revalidatePath("/admin/correcao");
   revalidatePath("/prova");
   redirect("/admin/provas?ok=excluida");
+}
+
+async function resolvePayloadEventAssociation(payload: z.infer<typeof examPayloadSchema>, errorPath: string) {
+  const eventId = payload.eventId?.trim();
+
+  if (payload.associateWithEvent && !eventId) {
+    errorRedirect(errorPath, "Selecione o evento para vincular a prova.");
+  }
+
+  if (!eventId) return null;
+
+  const event = await prisma.event.findUnique({
+    where: { id: eventId },
+    select: { id: true },
+  });
+
+  if (!event) {
+    errorRedirect(errorPath, "Evento nao encontrado para vincular a prova.");
+  }
+
+  return {
+    eventId: event.id,
+    type: (payload.eventApplicationType || "GERAL") as EventApplicationType,
+  };
+}
+
+async function syncApplicationEventAssociation(
+  tx: { eventApplication: typeof prisma.eventApplication },
+  applicationId: string,
+  association: { eventId: string; type: EventApplicationType } | null,
+) {
+  await tx.eventApplication.deleteMany({
+    where: { applicationId },
+  });
+
+  if (association) {
+    await tx.eventApplication.create({
+      data: {
+        applicationId,
+        eventId: association.eventId,
+        type: association.type,
+      },
+    });
+  }
+}
+
+function eventRedirect(eventId: string, params: Record<string, string>): never {
+  const query = new URLSearchParams(params);
+  redirect(`/admin/eventos/${eventId}?${query.toString()}`);
+}
+
+function parseEventWindow(formData: FormData, errorPath: string) {
+  const startsAt = parsePayloadDate(String(formData.get("startsAt") || ""), "inicio do evento", errorPath);
+  const endsAt = parsePayloadDate(String(formData.get("endsAt") || ""), "fim do evento", errorPath, true);
+
+  if (startsAt && endsAt && startsAt > endsAt) {
+    errorRedirect(errorPath, "A data de inicio do evento nao pode ser depois do fim.");
+  }
+
+  return { startsAt, endsAt };
+}
+
+function parseEventApplicationType(value: FormDataEntryValue | null, errorPath: string) {
+  const parsed = eventApplicationTypeSchema.safeParse(String(value || ""));
+
+  if (!parsed.success) {
+    errorRedirect(errorPath, "Selecione um tipo de prova valido para o evento.");
+  }
+
+  return parsed.data as EventApplicationType;
+}
+
+function parseEventLeaderRole(value: FormDataEntryValue | null, eventId: string) {
+  const parsed = eventLeaderRoleSchema.safeParse(String(value || ""));
+
+  if (!parsed.success) {
+    eventRedirect(eventId, { erro: "Selecione se o lider e conselheiro ou orientador." });
+  }
+
+  return parsed.data as EventLeaderRole;
+}
+
+function parseEventLimit(formData: FormData, errorPath: string) {
+  const rawLimit = Number(String(formData.get("maxApplicationsPerParticipant") || "1"));
+
+  if (!Number.isInteger(rawLimit) || rawLimit < 1 || rawLimit > 20) {
+    errorRedirect(errorPath, "A quantidade de provas por inscrito deve ficar entre 1 e 20.");
+  }
+
+  return rawLimit;
+}
+
+function parseEventOptionalDate(formData: FormData, field: string, label: string, eventId: string) {
+  const value = String(formData.get(field) || "").trim();
+
+  if (!value) return null;
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    eventRedirect(eventId, { erro: `Informe uma data valida para ${label}.` });
+  }
+
+  const date = new Date(`${value}T00:00:00.000Z`);
+
+  if (Number.isNaN(date.getTime())) {
+    eventRedirect(eventId, { erro: `Informe uma data valida para ${label}.` });
+  }
+
+  return date;
+}
+
+const eventRegistrationCodeAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+function buildEventRegistrationCode() {
+  return Array.from({ length: 6 }, () =>
+    eventRegistrationCodeAlphabet[randomInt(0, eventRegistrationCodeAlphabet.length)],
+  ).join("");
+}
+
+async function buildUniqueEventRegistrationCode() {
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    const registrationCode = buildEventRegistrationCode();
+    const existing = await prisma.eventRegistration.findUnique({
+      where: { registrationCode },
+      select: { id: true },
+    });
+
+    if (!existing) return registrationCode;
+  }
+
+  throw new Error("Nao foi possivel gerar um numero de inscricao do evento.");
+}
+
+async function ensureEventManager() {
+  return requireAdminRole([AdminRole.ADMIN, AdminRole.ADMIN_TEACHER]);
+}
+
+export async function createEventAction(formData: FormData) {
+  await ensureEventManager();
+
+  const errorPath = "/admin/eventos";
+  const title = String(formData.get("title") || "").trim();
+  const description = optionalFormText(formData, "description");
+  const eventWindow = parseEventWindow(formData, errorPath);
+  const maxApplicationsPerParticipant = parseEventLimit(formData, errorPath);
+
+  if (title.length < 3) {
+    errorRedirect(errorPath, "Informe o titulo do evento.");
+  }
+
+  const event = await prisma.event.create({
+    data: {
+      title,
+      description,
+      active: true,
+      startsAt: eventWindow.startsAt,
+      endsAt: eventWindow.endsAt,
+      maxApplicationsPerParticipant,
+    },
+  });
+
+  revalidatePath("/admin");
+  revalidatePath("/admin/eventos");
+  redirect(`/admin/eventos/${event.id}?ok=criado`);
+}
+
+export async function updateEventAction(formData: FormData) {
+  await ensureEventManager();
+
+  const eventId = String(formData.get("eventId") || "");
+  const errorPath = eventId ? `/admin/eventos/${eventId}` : "/admin/eventos";
+  const title = String(formData.get("title") || "").trim();
+  const description = optionalFormText(formData, "description");
+  const eventWindow = parseEventWindow(formData, errorPath);
+  const maxApplicationsPerParticipant = parseEventLimit(formData, errorPath);
+  const active = formData.get("active") === "on";
+
+  if (!eventId) {
+    errorRedirect(errorPath, "Evento nao encontrado.");
+  }
+
+  if (title.length < 3) {
+    errorRedirect(errorPath, "Informe o titulo do evento.");
+  }
+
+  await prisma.event.update({
+    where: { id: eventId },
+    data: {
+      title,
+      description,
+      active,
+      startsAt: eventWindow.startsAt,
+      endsAt: eventWindow.endsAt,
+      maxApplicationsPerParticipant,
+    },
+  });
+
+  revalidatePath("/admin");
+  revalidatePath("/admin/eventos");
+  revalidatePath(`/admin/eventos/${eventId}`);
+  revalidatePath("/prova");
+  eventRedirect(eventId, { ok: "evento" });
+}
+
+export async function addEventApplicationAction(formData: FormData) {
+  await ensureEventManager();
+
+  const eventId = String(formData.get("eventId") || "");
+  const applicationId = String(formData.get("applicationId") || "");
+  const errorPath = eventId ? `/admin/eventos/${eventId}` : "/admin/eventos";
+  const type = parseEventApplicationType(formData.get("type"), errorPath);
+
+  if (!eventId || !applicationId) {
+    errorRedirect(errorPath, "Selecione o evento e a prova.");
+  }
+
+  const [event, application, existing] = await Promise.all([
+    prisma.event.findUnique({ where: { id: eventId }, select: { id: true } }),
+    prisma.examApplication.findUnique({ where: { id: applicationId }, select: { id: true } }),
+    prisma.eventApplication.findUnique({
+      where: {
+        eventId_applicationId: {
+          eventId,
+          applicationId,
+        },
+      },
+      select: { id: true },
+    }),
+  ]);
+
+  if (!event) {
+    errorRedirect("/admin/eventos", "Evento nao encontrado.");
+  }
+
+  if (!application) {
+    errorRedirect(errorPath, "Prova nao encontrada.");
+  }
+
+  if (existing) {
+    errorRedirect(errorPath, "Esta prova ja esta vinculada ao evento.");
+  }
+
+  await prisma.eventApplication.create({
+    data: {
+      eventId,
+      applicationId,
+      type,
+    },
+  });
+
+  revalidatePath("/admin/eventos");
+  revalidatePath(`/admin/eventos/${eventId}`);
+  revalidatePath("/prova");
+  eventRedirect(eventId, { ok: "prova" });
+}
+
+export async function removeEventApplicationAction(formData: FormData) {
+  await ensureEventManager();
+
+  const eventId = String(formData.get("eventId") || "");
+  const eventApplicationId = String(formData.get("eventApplicationId") || "");
+  const errorPath = eventId ? `/admin/eventos/${eventId}` : "/admin/eventos";
+
+  if (!eventId || !eventApplicationId) {
+    errorRedirect(errorPath, "Prova do evento nao encontrada.");
+  }
+
+  await prisma.eventApplication.deleteMany({
+    where: {
+      id: eventApplicationId,
+      eventId,
+    },
+  });
+
+  revalidatePath("/admin/eventos");
+  revalidatePath(`/admin/eventos/${eventId}`);
+  revalidatePath("/prova");
+  eventRedirect(eventId, { ok: "prova-removida" });
+}
+
+export async function createEventRegistrationAction(formData: FormData) {
+  const context = await requireAdminContext();
+  const eventId = String(formData.get("eventId") || "");
+  const studentId = String(formData.get("studentId") || "").trim();
+  const leaderUserId = String(formData.get("leaderUserId") || "").trim();
+  const leaderRole = parseEventLeaderRole(formData.get("leaderRole"), eventId);
+  const name = String(formData.get("name") || "").trim();
+  const churchId = String(formData.get("churchId") || "").trim();
+  const category = String(formData.get("category") || "") as Category;
+  const birthDate = parseEventOptionalDate(formData, "birthDate", "nascimento", eventId);
+  const selectedEventApplicationIds = Array.from(
+    new Set(formData.getAll("eventApplicationIds").map((value) => String(value)).filter(Boolean)),
+  );
+
+  if (!eventId) {
+    errorRedirect("/admin/eventos", "Evento nao encontrado.");
+  }
+
+  if (!studentId && (name.length < 3 || !churchId || !categorySchema.safeParse(category).success)) {
+    eventRedirect(eventId, { erro: "Selecione um ER/MR existente ou preencha nome, igreja e categoria do inscrito." });
+  }
+
+  if (!leaderUserId) {
+    eventRedirect(eventId, { erro: "Selecione o conselheiro ou orientador responsavel." });
+  }
+
+  const [event, student, leader] = await Promise.all([
+    prisma.event.findUnique({
+      where: { id: eventId },
+      include: {
+        applications: {
+          select: {
+            id: true,
+            applicationId: true,
+          },
+        },
+      },
+    }),
+    studentId
+      ? prisma.student.findFirst({
+          where: {
+            id: studentId,
+            active: true,
+          },
+          select: {
+            id: true,
+            name: true,
+            normalizedName: true,
+            category: true,
+            birthDate: true,
+            churchId: true,
+          },
+        })
+      : Promise.resolve(null),
+    prisma.adminUser.findFirst({
+      where: {
+        id: leaderUserId,
+        active: true,
+      },
+      select: {
+        id: true,
+        name: true,
+        churchId: true,
+      },
+    }),
+  ]);
+
+  if (!event) {
+    errorRedirect("/admin/eventos", "Evento nao encontrado.");
+  }
+
+  if (studentId && !student) {
+    eventRedirect(eventId, { erro: "Embaixador nao encontrado." });
+  }
+
+  const scopedChurchId = getScopedChurchId(context);
+  const registrationChurchId = student?.churchId || churchId;
+
+  if (scopedChurchId && registrationChurchId !== scopedChurchId) {
+    eventRedirect(eventId, { erro: "Conselheiros so podem inscrever embaixadores da propria igreja." });
+  }
+
+  if (!leader) {
+    eventRedirect(eventId, { erro: "Conselheiro ou orientador nao encontrado no cadastro de equipe." });
+  }
+
+  if (scopedChurchId && leader.churchId && leader.churchId !== scopedChurchId) {
+    eventRedirect(eventId, { erro: "Selecione um lider da sua igreja." });
+  }
+
+  if (selectedEventApplicationIds.length === 0) {
+    eventRedirect(eventId, { erro: "Selecione pelo menos uma prova para esta inscricao." });
+  }
+
+  if (selectedEventApplicationIds.length > event.maxApplicationsPerParticipant) {
+    eventRedirect(eventId, {
+      erro: `Este evento permite no maximo ${event.maxApplicationsPerParticipant} prova(s) por inscrito.`,
+    });
+  }
+
+  const eventApplicationById = new Map(event.applications.map((application) => [application.id, application]));
+  const selectedEventApplications = selectedEventApplicationIds.map((id) => eventApplicationById.get(id));
+
+  if (selectedEventApplications.some((application) => !application)) {
+    eventRedirect(eventId, { erro: "Selecione apenas provas vinculadas a este evento." });
+  }
+
+  const registrationName = student?.name || name;
+  const registrationNormalizedName = student?.normalizedName || normalizeName(name);
+  const registrationCategory = student?.category || category;
+  const registrationBirthDate = student?.birthDate || birthDate;
+
+  await prisma.$transaction(async (tx) => {
+    const existingRegistration = student
+      ? await tx.eventRegistration.findUnique({
+          where: {
+            eventId_studentId: {
+              eventId,
+              studentId: student.id,
+            },
+          },
+          select: { id: true },
+        })
+      : null;
+    const registration = existingRegistration
+      ? await tx.eventRegistration.update({
+          where: { id: existingRegistration.id },
+          data: {
+            name: registrationName,
+            normalizedName: registrationNormalizedName,
+            category: registrationCategory,
+            birthDate: registrationBirthDate,
+            churchId: registrationChurchId,
+            leaderUserId: leader.id,
+            leaderName: leader.name,
+            leaderRole,
+          },
+          select: { id: true },
+        })
+      : await tx.eventRegistration.create({
+          data: {
+            eventId,
+            registrationCode: await buildUniqueEventRegistrationCode(),
+            studentId: student?.id || null,
+            name: registrationName,
+            normalizedName: registrationNormalizedName,
+            category: registrationCategory,
+            birthDate: registrationBirthDate,
+            churchId: registrationChurchId,
+            leaderUserId: leader.id,
+            leaderName: leader.name,
+            leaderRole,
+          },
+          select: { id: true },
+        });
+
+    await tx.eventRegistrationAssignment.deleteMany({
+      where: {
+        registrationId: registration.id,
+      },
+    });
+
+    await tx.eventRegistrationAssignment.createMany({
+      data: selectedEventApplicationIds.map((eventApplicationId) => ({
+        registrationId: registration.id,
+        eventApplicationId,
+      })),
+    });
+  });
+
+  revalidatePath("/admin/eventos");
+  revalidatePath(`/admin/eventos/${eventId}`);
+  revalidatePath("/admin/correcao");
+  revalidatePath("/admin/correcao/eventos");
+  revalidatePath("/prova");
+  eventRedirect(eventId, { ok: "inscricao" });
+}
+
+export async function deleteEventRegistrationAction(formData: FormData) {
+  const context = await requireAdminContext();
+  const eventId = String(formData.get("eventId") || "");
+  const registrationId = String(formData.get("registrationId") || "");
+  const errorPath = eventId ? `/admin/eventos/${eventId}` : "/admin/eventos";
+
+  if (!eventId || !registrationId) {
+    errorRedirect(errorPath, "Inscricao do evento nao encontrada.");
+  }
+
+  const registration = await prisma.eventRegistration.findFirst({
+    where: {
+      id: registrationId,
+      eventId,
+    },
+    include: {
+      attempts: {
+        take: 1,
+        select: { id: true },
+      },
+    },
+  });
+
+  if (!registration) {
+    errorRedirect(errorPath, "Inscricao do evento nao encontrada.");
+  }
+
+  const scopedChurchId = getScopedChurchId(context);
+
+  if (scopedChurchId && registration.churchId !== scopedChurchId) {
+    eventRedirect(eventId, { erro: "Conselheiros so podem excluir inscricoes da propria igreja." });
+  }
+
+  if (registration.attempts.length > 0) {
+    eventRedirect(eventId, { erro: "Esta inscricao ja possui prova iniciada e nao pode ser excluida." });
+  }
+
+  await prisma.eventRegistration.delete({
+    where: { id: registration.id },
+  });
+
+  revalidatePath("/admin/eventos");
+  revalidatePath(`/admin/eventos/${eventId}`);
+  revalidatePath("/admin/correcao/eventos");
+  revalidatePath("/prova");
+  eventRedirect(eventId, { ok: "inscricao-removida" });
 }

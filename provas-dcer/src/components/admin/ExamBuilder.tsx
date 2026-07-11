@@ -11,6 +11,19 @@ type ChurchOption = {
   students: number;
 };
 
+type EventOption = {
+  id: string;
+  title: string;
+};
+
+const EVENT_APPLICATION_TYPES = [
+  { value: "BIBLICA_ONLINE", label: "Biblica online" },
+  { value: "BIBLICA_ORAL", label: "Biblica oral" },
+  { value: "ESPORTIVA_PROVA", label: "Esportiva - prova" },
+  { value: "ESPORTIVA_JOGOS", label: "Esportiva - jogos" },
+  { value: "GERAL", label: "Geral" },
+] as const;
+
 type QuestionDraft = {
   id: string;
   statement: string;
@@ -49,6 +62,8 @@ export type ExamBuilderInitialData = {
   passingPercent: number;
   applicationTitle: string;
   accessCode: string;
+  eventId?: string;
+  eventApplicationType?: string;
   startsAt: string;
   endsAt: string;
   purgeAt: string;
@@ -59,6 +74,7 @@ export type ExamBuilderInitialData = {
 
 type ExamBuilderProps = {
   churches: ChurchOption[];
+  events?: EventOption[];
   initialData?: ExamBuilderInitialData;
   locked?: boolean;
   mode?: "create" | "edit";
@@ -123,7 +139,7 @@ function normalizePurgeInput(value: string, startsAt: string, endsAt: string, no
   return value;
 }
 
-export function ExamBuilder({ churches, initialData, locked = false, mode = "create" }: ExamBuilderProps) {
+export function ExamBuilder({ churches, events = [], initialData, locked = false, mode = "create" }: ExamBuilderProps) {
   const isEditing = mode === "edit";
   const [title, setTitle] = useState(initialData?.title || "Nova prova");
   const [description, setDescription] = useState(initialData?.description || "");
@@ -131,6 +147,11 @@ export function ExamBuilder({ churches, initialData, locked = false, mode = "cre
   const [passingPercent, setPassingPercent] = useState(initialData?.passingPercent ?? 70);
   const [applicationTitle, setApplicationTitle] = useState(initialData?.applicationTitle || "Aplicacao principal");
   const [accessCode, setAccessCode] = useState(initialData?.accessCode || "");
+  const [associateWithEvent, setAssociateWithEvent] = useState(Boolean(initialData?.eventId));
+  const [eventId, setEventId] = useState(initialData?.eventId || "");
+  const [eventApplicationType, setEventApplicationType] = useState(
+    initialData?.eventApplicationType || "GERAL",
+  );
   const [startsAt, setStartsAt] = useState(initialData?.startsAt || "");
   const [endsAt, setEndsAt] = useState(initialData?.endsAt || getDefaultEndsAtInput());
   const [noExpiration, setNoExpiration] = useState(() => (initialData ? !initialData.endsAt : false));
@@ -165,6 +186,9 @@ export function ExamBuilder({ churches, initialData, locked = false, mode = "cre
         passingPercent,
         applicationTitle,
         accessCode,
+        associateWithEvent,
+        eventId: associateWithEvent ? eventId : "",
+        eventApplicationType: associateWithEvent ? eventApplicationType : undefined,
         startsAt,
         endsAt: noExpiration ? "" : endsAt,
         noExpiration,
@@ -188,10 +212,13 @@ export function ExamBuilder({ churches, initialData, locked = false, mode = "cre
       }),
     [
       accessCode,
+      associateWithEvent,
       applicationTitle,
       description,
       durationMinutes,
       endsAt,
+      eventApplicationType,
+      eventId,
       noExpiration,
       passingPercent,
       purgeAt,
@@ -455,6 +482,61 @@ export function ExamBuilder({ churches, initialData, locked = false, mode = "cre
               placeholder="Ex.: PROVA2026"
             />
           </label>
+          <label className="flex items-center gap-3 rounded-md border border-[#d8def0] px-3 py-3 text-sm font-medium lg:col-span-2">
+            <input
+              type="checkbox"
+              checked={associateWithEvent}
+              onChange={(event) => {
+                const checked = event.target.checked;
+                setAssociateWithEvent(checked);
+                if (!checked) {
+                  setEventId("");
+                } else if (!eventId && events[0]) {
+                  setEventId(events[0].id);
+                }
+              }}
+              className="h-5 w-5 accent-[#000060]"
+            />
+            Associar esta prova a um evento
+          </label>
+          {associateWithEvent ? (
+            <>
+              <label className="block">
+                <span className="text-sm font-medium">Evento</span>
+                <select
+                  value={eventId}
+                  onChange={(event) => setEventId(event.target.value)}
+                  className="mt-1 w-full rounded-md border border-[#c5cce4] bg-white px-3 py-3 outline-none focus:ring-2 focus:ring-[#000060]"
+                >
+                  <option value="">Selecione o evento</option>
+                  {events.map((event) => (
+                    <option key={event.id} value={event.id}>
+                      {event.title}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block">
+                <span className="text-sm font-medium">Tipo no evento</span>
+                <select
+                  value={eventApplicationType}
+                  onChange={(event) => setEventApplicationType(event.target.value)}
+                  className="mt-1 w-full rounded-md border border-[#c5cce4] bg-white px-3 py-3 outline-none focus:ring-2 focus:ring-[#000060]"
+                >
+                  {EVENT_APPLICATION_TYPES.map((type) => (
+                    <option key={type.value} value={type.value}>
+                      {type.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {events.length === 0 ? (
+                <div className="rounded-md border border-[#f5d58c] bg-[#fff9e6] px-3 py-2 text-sm text-[#73510a] lg:col-span-2">
+                  Cadastre um evento antes de vincular esta prova.
+                </div>
+              ) : null}
+            </>
+          ) : null}
         </div>
       </section>
 

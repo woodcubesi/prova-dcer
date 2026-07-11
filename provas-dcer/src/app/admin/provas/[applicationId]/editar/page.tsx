@@ -32,7 +32,7 @@ export default async function EditExamPage({ params, searchParams }: EditExamPag
   const isTeacher = context.role === AdminRole.TEACHER;
   const scopedChurchId = isTeacher ? context.churchId : null;
 
-  const [application, churches] = await Promise.all([
+  const [application, churches, events] = await Promise.all([
     prisma.examApplication.findFirst({
       where: {
         id: applicationId,
@@ -71,6 +71,13 @@ export default async function EditExamPage({ params, searchParams }: EditExamPag
             },
           },
         },
+        eventApplications: {
+          take: 1,
+          select: {
+            eventId: true,
+            type: true,
+          },
+        },
         _count: {
           select: {
             attempts: true,
@@ -88,6 +95,14 @@ export default async function EditExamPage({ params, searchParams }: EditExamPag
         _count: {
           select: { students: true },
         },
+      },
+    }),
+    prisma.event.findMany({
+      where: { active: true },
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        title: true,
       },
     }),
   ]);
@@ -111,6 +126,8 @@ export default async function EditExamPage({ params, searchParams }: EditExamPag
     passingPercent: application.exam.passingPercent ?? 70,
     applicationTitle: application.title,
     accessCode: application.accessCode,
+    eventId: application.eventApplications[0]?.eventId || "",
+    eventApplicationType: application.eventApplications[0]?.type || "GERAL",
     startsAt: formatDateInput(application.startsAt),
     endsAt: formatDateInput(application.endsAt),
     purgeAt: formatDateInput(application.purgeAt),
@@ -190,6 +207,7 @@ export default async function EditExamPage({ params, searchParams }: EditExamPag
           name: church.name,
           students: church._count.students,
         }))}
+        events={events}
       />
     </AdminShell>
   );

@@ -26,9 +26,18 @@ export async function GET(_request: Request, { params }: CorrectionPdfRouteConte
       status: { in: ["SUBMITTED", "EXPIRED"] },
       ...(isTeacher
         ? {
-            student: {
-              churchId: scopedChurchId || "__missing_church__",
-            },
+            OR: [
+              {
+                student: {
+                  churchId: scopedChurchId || "__missing_church__",
+                },
+              },
+              {
+                eventRegistration: {
+                  churchId: scopedChurchId || "__missing_church__",
+                },
+              },
+            ],
           }
         : {}),
     },
@@ -36,6 +45,12 @@ export async function GET(_request: Request, { params }: CorrectionPdfRouteConte
       student: {
         include: {
           church: true,
+        },
+      },
+      eventRegistration: {
+        include: {
+          church: true,
+          event: true,
         },
       },
       application: {
@@ -66,15 +81,33 @@ export async function GET(_request: Request, { params }: CorrectionPdfRouteConte
     notFound();
   }
 
-  const questions = filterQuestionsForCategory(attempt.application.exam.questions, attempt.student.category);
+  const participant = attempt.student
+    ? {
+        name: attempt.student.name,
+        churchName: attempt.student.church.name,
+        category: attempt.student.category,
+      }
+    : attempt.eventRegistration
+      ? {
+          name: attempt.eventRegistration.name,
+          churchName: attempt.eventRegistration.church.name,
+          category: attempt.eventRegistration.category,
+        }
+      : null;
+
+  if (!participant) {
+    notFound();
+  }
+
+  const questions = filterQuestionsForCategory(attempt.application.exam.questions, participant.category);
   const totalPoints = attempt.totalPoints ?? questions.reduce((sum, question) => sum + question.points, 0);
   const score =
     attempt.score ?? attempt.answers.reduce((sum, answer) => sum + (answer.pointsAwarded || 0), 0);
 
   const pdf = await buildStudentCorrectionPdf({
-    studentName: attempt.student.name,
-    churchName: attempt.student.church.name,
-    category: attempt.student.category,
+    studentName: participant.name,
+    churchName: participant.churchName,
+    category: participant.category,
     examTitle: attempt.application.exam.title,
     applicationTitle: attempt.application.title,
     submittedAt: attempt.submittedAt,
@@ -108,7 +141,7 @@ export async function GET(_request: Request, { params }: CorrectionPdfRouteConte
     })),
   });
 
-  const filename = makePdfFilename(`correcao-${attempt.student.name}-${attempt.application.exam.title}`);
+  const filename = makePdfFilename(`correcao-${participant.name}-${attempt.application.exam.title}`);
 
   return new Response(new Uint8Array(pdf), {
     headers: {

@@ -55,6 +55,7 @@ export default async function CorrectionPage({ searchParams }: CorrectionPagePro
         attempts: {
           some: {
             status: { in: finalStatuses },
+            eventRegistrationId: null,
             student: {
               churchId: churchFilterId,
             },
@@ -65,6 +66,7 @@ export default async function CorrectionPage({ searchParams }: CorrectionPagePro
         attempts: {
           some: {
             status: { in: finalStatuses },
+            eventRegistrationId: null,
           },
         },
       };
@@ -97,6 +99,7 @@ export default async function CorrectionPage({ searchParams }: CorrectionPagePro
     prisma.attempt.findMany({
       where: {
         status: { in: finalStatuses },
+        eventRegistrationId: null,
         ...(selectedApplicationId ? { applicationId: selectedApplicationId } : {}),
         ...(churchFilterId
           ? {
@@ -138,9 +141,17 @@ export default async function CorrectionPage({ searchParams }: CorrectionPagePro
             <h2 className="text-lg font-semibold">Provas recebidas</h2>
             <p className="text-sm text-[#5d6480]">O embaixador nao visualiza nota ao final.</p>
           </div>
-          <span className="rounded-full bg-[#effaf2] px-3 py-1 text-sm font-semibold text-[#1f623e]">
-            {attempts.length} envio(s)
-          </span>
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              href="/admin/correcao/eventos"
+              className="rounded-md border border-[#000060] px-3 py-2 text-sm font-semibold text-[#000060] hover:bg-[#effaf2]"
+            >
+              Correcao de eventos
+            </Link>
+            <span className="rounded-full bg-[#effaf2] px-3 py-1 text-sm font-semibold text-[#1f623e]">
+              {attempts.length} envio(s)
+            </span>
+          </div>
         </div>
 
         <form
@@ -216,9 +227,9 @@ export default async function CorrectionPage({ searchParams }: CorrectionPagePro
               <div key={attempt.id} className="rounded-md border border-[#e8ecf8] p-3">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="font-medium">{attempt.student.name}</p>
+                    <p className="font-medium">{attempt.student?.name || "-"}</p>
                     <p className="mt-1 text-sm text-[#5d6480]">
-                      {attempt.student.church.name} - {getCategoryLabel(attempt.student.category)}
+                      {attempt.student?.church.name || "-"} - {getCategoryLabel(attempt.student?.category || "")}
                     </p>
                   </div>
                   <span className="rounded-full bg-[#effaf2] px-2 py-1 text-xs font-medium text-[#1f623e]">
@@ -292,9 +303,9 @@ export default async function CorrectionPage({ searchParams }: CorrectionPagePro
                 return (
                   <tr key={attempt.id} className="border-b border-[#e8ecf8] last:border-0">
                     <td className="py-3 pr-4">
-                      <p className="font-medium">{attempt.student.name}</p>
+                      <p className="font-medium">{attempt.student?.name || "-"}</p>
                       <p className="text-xs text-[#5d6480]">
-                        {attempt.student.church.name} - {getCategoryLabel(attempt.student.category)}
+                        {attempt.student?.church.name || "-"} - {getCategoryLabel(attempt.student?.category || "")}
                       </p>
                     </td>
                     <td className="py-3 pr-4">

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { BrandLockup } from "@/components/BrandLockup";
+import { EventEntry } from "@/components/exam/EventEntry";
 import { StudentEntry } from "@/components/exam/StudentEntry";
 import { prisma } from "@/lib/prisma";
 
@@ -8,6 +9,7 @@ export const dynamic = "force-dynamic";
 type StudentEntryPageProps = {
   searchParams?: Promise<{
     erro?: string;
+    evento?: string;
   }>;
 };
 
@@ -43,7 +45,7 @@ export default async function StudentEntryPage({ searchParams }: StudentEntryPag
           </Link>
           <h1 className="mt-3 text-3xl font-semibold">Entrada do embaixador</h1>
           <p className="mt-2 text-sm leading-6 text-[#f8f9ff]">
-            Digite o numero da carteirinha para carregar seu cadastro e as provas disponiveis.
+            Use a carteirinha oficial para provas ER/MR ou o numero de inscricao para provas de evento.
           </p>
         </div>
       </header>
@@ -56,7 +58,10 @@ export default async function StudentEntryPage({ searchParams }: StudentEntryPag
 
       <section className="mt-4">
         {activeApplicationCount > 0 ? (
-          <StudentEntry />
+          <div className="grid gap-4">
+            <StudentEntry />
+            <EventEntry initialRegistrationCode={String(params.evento || "")} />
+          </div>
         ) : (
           <div className="rounded-lg border border-[#d8def0] bg-white p-6 text-sm text-[#5d6480]">
             Nenhuma prova ativa no momento.

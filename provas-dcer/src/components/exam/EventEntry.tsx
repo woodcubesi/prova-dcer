@@ -1,42 +1,35 @@
 "use client";
 
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 import { startAttemptAction } from "@/app/actions/student";
 
 type ApplicationOption = {
   id: string;
   title: string;
   examTitle: string;
-  eventTitle: string | null;
-  eventTypeLabel: string | null;
+  eventTypeLabel: string;
   durationMinutes: number;
   baseDurationMinutes: number;
   endsAt: string | null;
   alreadyStarted: boolean;
 };
 
-type StudentLookup = {
-  student: {
-    registrationNumber: string;
+type EventLookup = {
+  registration: {
+    registrationCode: string;
     name: string;
     category: string;
     categoryLabel: string;
     churchName: string;
-    embassyName: string | null;
-    registrationIssuedAt: string | null;
-    registrationExpiresAt: string | null;
-    birthDate: string | null;
-    embassyAdmissionDate: string | null;
-    hasMedicalReport: boolean;
-    extraTimePercent: number;
+    eventTitle: string;
   };
   applications: ApplicationOption[];
 };
 
-export function StudentEntry() {
-  const [registrationNumber, setRegistrationNumber] = useState("");
+export function EventEntry({ initialRegistrationCode = "" }: { initialRegistrationCode?: string }) {
+  const [registrationCode, setRegistrationCode] = useState(initialRegistrationCode);
   const [applicationId, setApplicationId] = useState("");
-  const [lookup, setLookup] = useState<StudentLookup | null>(null);
+  const [lookup, setLookup] = useState<EventLookup | null>(null);
   const [lookupError, setLookupError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
@@ -46,15 +39,13 @@ export function StudentEntry() {
   const application = lookup?.applications.find((item) => item.id === selectedApplicationId);
   const canStart = Boolean(lookup && selectedApplicationId);
 
-  async function handleLookup(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function lookupRegistration(nextRegistrationCode: string) {
+    const cleanRegistrationCode = nextRegistrationCode.trim();
 
-    const cleanRegistrationNumber = registrationNumber.trim();
-
-    if (cleanRegistrationNumber.length < 3) {
+    if (cleanRegistrationCode.length !== 6) {
       setLookup(null);
       setApplicationId("");
-      setLookupError("Informe o numero da carteirinha.");
+      setLookupError("Informe o numero de inscricao do evento com 6 caracteres.");
       return;
     }
 
@@ -64,52 +55,66 @@ export function StudentEntry() {
     setApplicationId("");
 
     try {
-      const response = await fetch("/prova/aluno", {
+      const response = await fetch("/prova/evento/aluno", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          registrationNumber: cleanRegistrationNumber,
+          registrationCode: cleanRegistrationCode,
         }),
       });
-      const data = (await response.json()) as StudentLookup | { message?: string };
+      const data = (await response.json()) as EventLookup | { message?: string };
 
       if (!response.ok) {
-        setLookupError("message" in data && data.message ? data.message : "Nao foi possivel localizar a carteirinha.");
+        setLookupError("message" in data && data.message ? data.message : "Nao foi possivel localizar a inscricao.");
         return;
       }
 
-      const nextLookup = data as StudentLookup;
+      const nextLookup = data as EventLookup;
       setLookup(nextLookup);
+      setRegistrationCode(nextLookup.registration.registrationCode);
       setApplicationId(nextLookup.applications.length === 1 ? nextLookup.applications[0].id : "");
     } catch {
-      setLookupError("Nao foi possivel consultar a carteirinha agora.");
+      setLookupError("Nao foi possivel consultar a inscricao agora.");
     } finally {
       setIsLoading(false);
     }
   }
 
-  function resetLookup(nextRegistrationNumber: string) {
-    setRegistrationNumber(nextRegistrationNumber);
-    setLookup(null);
-    setApplicationId("");
-    setLookupError("");
+  async function handleLookup(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await lookupRegistration(registrationCode);
   }
+
+  useEffect(() => {
+    if (initialRegistrationCode.trim().length === 6) {
+      const timer = window.setTimeout(() => {
+        void lookupRegistration(initialRegistrationCode);
+      }, 0);
+
+      return () => window.clearTimeout(timer);
+    }
+  }, [initialRegistrationCode]);
 
   return (
     <div className="rounded-lg border border-[#d8def0] bg-white p-4 shadow-sm sm:p-6">
       <form onSubmit={handleLookup} className="grid gap-4">
         <label className="block">
-          <span className="text-sm font-medium">Numero da carteirinha</span>
+          <span className="text-sm font-medium">Numero de inscricao do evento</span>
           <input
-            name="registrationNumberLookup"
-            value={registrationNumber}
-            onChange={(event) => resetLookup(event.target.value)}
-            className="mt-1 w-full rounded-md border border-[#c5cce4] px-3 py-3 font-mono outline-none focus:ring-2 focus:ring-[#000060]"
-            placeholder="Ex.: 210300100049"
+            name="eventRegistrationLookup"
+            value={registrationCode}
+            onChange={(event) => {
+              setRegistrationCode(event.target.value.toUpperCase());
+              setLookup(null);
+              setApplicationId("");
+              setLookupError("");
+            }}
+            className="mt-1 w-full rounded-md border border-[#c5cce4] px-3 py-3 font-mono uppercase outline-none focus:ring-2 focus:ring-[#000060]"
+            placeholder="Ex.: A7K2P9"
             autoComplete="off"
-            inputMode="numeric"
+            maxLength={6}
           />
         </label>
 
@@ -117,7 +122,7 @@ export function StudentEntry() {
           disabled={isLoading}
           className="rounded-md bg-[#000060] px-5 py-3 text-sm font-semibold text-white hover:bg-[#000044] disabled:cursor-not-allowed disabled:bg-[#888fa8]"
         >
-          {isLoading ? "Consultando..." : "Buscar meus dados"}
+          {isLoading ? "Consultando..." : "Buscar provas do evento"}
         </button>
       </form>
 
@@ -130,40 +135,21 @@ export function StudentEntry() {
       {lookup ? (
         <div className="mt-4 grid gap-4">
           <section className="rounded-md border border-[#d8def0] bg-[#f8faff] p-4">
-            <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <p className="text-xs uppercase tracking-[0.14em] text-[#5d6480]">Embaixador</p>
-                <h2 className="mt-1 text-xl font-semibold text-[#111827]">{lookup.student.name}</h2>
-              </div>
-              <span className="w-fit rounded-full bg-[#effaf2] px-3 py-1 text-xs font-semibold text-[#1f623e]">
-                {lookup.student.categoryLabel}
-              </span>
-            </div>
-
+            <p className="text-xs uppercase tracking-[0.14em] text-[#5d6480]">Evento</p>
+            <h2 className="mt-1 text-xl font-semibold text-[#111827]">{lookup.registration.eventTitle}</h2>
             <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
-              <StudentData label="Carteirinha" value={lookup.student.registrationNumber} mono />
-              <StudentData label="Igreja" value={lookup.student.churchName} />
-              <StudentData label="Embaixada" value={lookup.student.embassyName || "-"} />
-              <StudentData label="Emissao" value={formatDate(lookup.student.registrationIssuedAt)} />
-              <StudentData label="Validade" value={formatDate(lookup.student.registrationExpiresAt)} />
-              <StudentData label="Nascimento" value={formatDate(lookup.student.birthDate)} />
-              <StudentData label="Admissao na embaixada" value={formatDate(lookup.student.embassyAdmissionDate)} />
-              <StudentData
-                label="Laudo"
-                value={
-                  lookup.student.hasMedicalReport
-                    ? `Sim, ${lookup.student.extraTimePercent}% de tempo adicional`
-                    : "Nao informado"
-                }
-              />
+              <EventData label="Inscrito" value={lookup.registration.name} />
+              <EventData label="Inscricao" value={lookup.registration.registrationCode} mono />
+              <EventData label="Igreja" value={lookup.registration.churchName} />
+              <EventData label="Categoria" value={lookup.registration.categoryLabel} />
             </dl>
           </section>
 
           <form action={startAttemptAction} className="grid gap-4">
-            <input type="hidden" name="registrationNumber" value={lookup.student.registrationNumber} />
+            <input type="hidden" name="eventRegistrationCode" value={lookup.registration.registrationCode} />
 
             <label className="block">
-              <span className="text-sm font-medium">Prova disponivel</span>
+              <span className="text-sm font-medium">Prova do evento</span>
               <select
                 name="applicationId"
                 value={selectedApplicationId}
@@ -172,13 +158,12 @@ export function StudentEntry() {
                 className="mt-1 w-full rounded-md border border-[#c5cce4] bg-white px-3 py-3 outline-none focus:ring-2 focus:ring-[#000060] disabled:bg-[#f2f4fb] disabled:text-[#888fa8]"
               >
                 {!lookup.applications.length ? (
-                  <option value="">Nenhuma prova disponivel para este embaixador</option>
+                  <option value="">Nenhuma prova liberada para esta inscricao</option>
                 ) : (
                   <option value="">Selecione a prova</option>
                 )}
                 {lookup.applications.map((item) => (
                   <option key={item.id} value={item.id}>
-                    {item.eventTitle ? `${item.eventTitle} - ` : ""}
                     {item.title} - {item.examTitle}
                     {item.alreadyStarted ? " (continuar)" : ""}
                   </option>
@@ -188,17 +173,8 @@ export function StudentEntry() {
 
             {application ? (
               <div className="rounded-md bg-[#effaf2] px-3 py-2 text-sm text-[#1f623e]">
-                {application.eventTitle ? (
-                  <>
-                    Evento: <strong>{application.eventTitle}</strong>
-                    {application.eventTypeLabel ? ` (${application.eventTypeLabel})` : ""}.{" "}
-                  </>
-                ) : null}
-                Tempo total: <strong>{application.durationMinutes} minutos</strong>.
-                {application.durationMinutes !== application.baseDurationMinutes
-                  ? ` A prova possui ${application.baseDurationMinutes} minutos e recebeu o adicional do laudo.`
-                  : ""}
-                {" "}
+                Tipo: <strong>{application.eventTypeLabel}</strong>. Tempo total:{" "}
+                <strong>{application.durationMinutes} minutos</strong>.{" "}
                 {application.endsAt ? (
                   <>
                     Disponivel ate <strong>{formatApplicationDate(application.endsAt)}</strong>.
@@ -214,20 +190,20 @@ export function StudentEntry() {
               disabled={!canStart}
               className="rounded-md bg-[#000060] px-5 py-3 text-sm font-semibold text-white hover:bg-[#000044] disabled:cursor-not-allowed disabled:bg-[#888fa8]"
             >
-              Iniciar prova
+              Iniciar prova do evento
             </button>
           </form>
         </div>
       ) : (
         <p className="mt-4 text-sm leading-6 text-[#5d6480]">
-          Digite o numero da carteirinha para o sistema localizar seu cadastro, igreja, embaixada e provas liberadas.
+          Use o numero impresso no cracha do evento para carregar as provas liberadas para esta inscricao.
         </p>
       )}
     </div>
   );
 }
 
-function StudentData({
+function EventData({
   label,
   mono,
   value,
@@ -242,12 +218,6 @@ function StudentData({
       <dd className={`mt-1 font-semibold text-[#111827] ${mono ? "font-mono" : ""}`}>{value}</dd>
     </div>
   );
-}
-
-function formatDate(value: string | null) {
-  if (!value) return "-";
-
-  return new Intl.DateTimeFormat("pt-BR", { timeZone: "UTC" }).format(new Date(value));
 }
 
 function formatApplicationDate(value: string | null) {

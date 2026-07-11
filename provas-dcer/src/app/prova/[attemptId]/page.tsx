@@ -21,6 +21,12 @@ export default async function ExamPage({ params }: ExamPageProps) {
           church: true,
         },
       },
+      eventRegistration: {
+        include: {
+          church: true,
+          event: true,
+        },
+      },
       application: {
         include: {
           exam: {
@@ -58,21 +64,41 @@ export default async function ExamPage({ params }: ExamPageProps) {
 
   const questions = filterQuestionsForCategory(
     attempt.application.exam.questions,
-    attempt.student.category,
+    attempt.student?.category || attempt.eventRegistration?.category || "",
   );
 
   if (questions.length === 0) {
     redirect("/prova?erro=Esta prova nao possui questoes ativas para sua categoria.");
   }
 
+  const participant = attempt.student
+    ? {
+        name: attempt.student.name,
+        churchName: attempt.student.church.name,
+        embassyName: attempt.student.church.embassyName,
+        category: attempt.student.category,
+      }
+    : attempt.eventRegistration
+      ? {
+          name: attempt.eventRegistration.name,
+          churchName: attempt.eventRegistration.church.name,
+          embassyName: attempt.eventRegistration.church.embassyName,
+          category: attempt.eventRegistration.category,
+        }
+      : null;
+
+  if (!participant) {
+    redirect("/prova?erro=Participante da prova nao encontrado.");
+  }
+
   return (
     <main className="mx-auto min-h-screen w-full max-w-4xl px-4 py-4 sm:px-6">
       <ExamRunner
         attemptId={attempt.id}
-        studentName={attempt.student.name}
-        churchName={attempt.student.church.name}
-        embassyName={attempt.student.church.embassyName}
-        category={attempt.student.category}
+        studentName={participant.name}
+        churchName={participant.churchName}
+        embassyName={participant.embassyName}
+        category={participant.category}
         applicationTitle={attempt.application.title}
         examTitle={attempt.application.exam.title}
         expiresAt={attempt.expiresAt.toISOString()}

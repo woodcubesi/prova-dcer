@@ -41,6 +41,24 @@ enum AdminRole {
   ADMIN_TEACHER
 }
 
+enum StudentProgram {
+  ER
+  MR
+}
+
+enum EventApplicationType {
+  BIBLICA_ONLINE
+  BIBLICA_ORAL
+  ESPORTIVA_PROVA
+  ESPORTIVA_JOGOS
+  GERAL
+}
+
+enum EventLeaderRole {
+  CONSELHEIRO
+  ORIENTADOR
+}
+
 model AdminUser {
   id                  String                    @id @default(cuid())
   name                String
@@ -52,6 +70,7 @@ model AdminUser {
   churchId            String?
   church              Church?                   @relation(fields: [churchId], references: [id], onDelete: SetNull)
   passwordResetTokens AdminPasswordResetToken[]
+  eventRegistrations  EventRegistration[]       @relation("EventRegistrationLeader")
   createdAt           DateTime                  @default(now())
   updatedAt           DateTime                  @updatedAt
 
@@ -76,21 +95,23 @@ model AdminPasswordResetToken {
 }
 
 model Church {
-  id          String      @id @default(cuid())
-  name        String      @unique
-  embassyName String?
-  city        String?
-  active      Boolean     @default(true)
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-  students    Student[]
-  staffUsers  AdminUser[]
+  id                 String              @id @default(cuid())
+  name               String              @unique
+  embassyName        String?
+  city               String?
+  active             Boolean             @default(true)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  students           Student[]
+  staffUsers         AdminUser[]
+  eventRegistrations EventRegistration[]
 }
 
 model Student {
   id                    String                   @id @default(cuid())
   name                  String
   normalizedName        String
+  program               StudentProgram           @default(ER)
   category              Category
   externalId            String?
   registrationIssuedAt  DateTime?
@@ -106,8 +127,10 @@ model Student {
   church                Church                   @relation(fields: [churchId], references: [id], onDelete: Cascade)
   participants          ApplicationParticipant[]
   attempts              Attempt[]
+  eventRegistrations    EventRegistration[]
 
   @@unique([churchId, category, normalizedName])
+  @@index([program])
   @@index([category])
   @@index([externalId])
 }
@@ -166,6 +189,7 @@ model ExamApplication {
   examId              String
   exam                Exam                     @relation(fields: [examId], references: [id], onDelete: Cascade)
   title               String
+  program             StudentProgram           @default(ER)
   accessCode          String                   @unique
   active              Boolean                  @default(true)
   startsAt            DateTime?
@@ -176,8 +200,10 @@ model ExamApplication {
   updatedAt           DateTime                 @updatedAt
   participants        ApplicationParticipant[]
   attempts            Attempt[]
+  eventApplications   EventApplication[]
 
   @@index([active])
+  @@index([program])
   @@index([startsAt])
   @@index([endsAt])
   @@index([purgeAt])
@@ -194,23 +220,103 @@ model ApplicationParticipant {
   @@unique([applicationId, studentId])
 }
 
+model Event {
+  id                            String              @id @default(cuid())
+  title                         String
+  description                   String?
+  active                        Boolean             @default(true)
+  startsAt                      DateTime?
+  endsAt                        DateTime?
+  maxApplicationsPerParticipant Int                 @default(1)
+  createdAt                     DateTime            @default(now())
+  updatedAt                     DateTime            @updatedAt
+  applications                  EventApplication[]
+  registrations                 EventRegistration[]
+
+  @@index([active])
+  @@index([startsAt])
+  @@index([endsAt])
+}
+
+model EventApplication {
+  id            String                        @id @default(cuid())
+  eventId       String
+  event         Event                         @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  applicationId String
+  application   ExamApplication               @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  type          EventApplicationType          @default(BIBLICA_ONLINE)
+  createdAt     DateTime                      @default(now())
+  registrations EventRegistrationAssignment[]
+
+  @@unique([eventId, applicationId])
+  @@index([eventId])
+  @@index([applicationId])
+  @@index([type])
+}
+
+model EventRegistration {
+  id               String                        @id @default(cuid())
+  eventId          String
+  event            Event                         @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  registrationCode String                        @unique
+  studentId        String?
+  student          Student?                      @relation(fields: [studentId], references: [id], onDelete: SetNull)
+  name             String
+  normalizedName   String
+  category         Category
+  birthDate        DateTime?
+  churchId         String
+  church           Church                        @relation(fields: [churchId], references: [id], onDelete: Restrict)
+  leaderUserId     String?
+  leaderUser       AdminUser?                    @relation("EventRegistrationLeader", fields: [leaderUserId], references: [id], onDelete: SetNull)
+  leaderName       String
+  leaderRole       EventLeaderRole               @default(CONSELHEIRO)
+  createdAt        DateTime                      @default(now())
+  updatedAt        DateTime                      @updatedAt
+  assignments      EventRegistrationAssignment[]
+  attempts         Attempt[]
+
+  @@unique([eventId, studentId])
+  @@index([eventId])
+  @@index([studentId])
+  @@index([churchId])
+  @@index([registrationCode])
+  @@index([leaderUserId])
+}
+
+model EventRegistrationAssignment {
+  id                 String            @id @default(cuid())
+  registrationId     String
+  registration       EventRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  eventApplicationId String
+  eventApplication   EventApplication  @relation(fields: [eventApplicationId], references: [id], onDelete: Cascade)
+  createdAt          DateTime          @default(now())
+
+  @@unique([registrationId, eventApplicationId])
+  @@index([eventApplicationId])
+}
+
 model Attempt {
-  id              String          @id @default(cuid())
-  applicationId   String
-  application     ExamApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
-  studentId       String
-  student         Student         @relation(fields: [studentId], references: [id], onDelete: Restrict)
-  startedAt       DateTime        @default(now())
-  submittedAt     DateTime?
-  expiresAt       DateTime
-  status          AttemptStatus   @default(IN_PROGRESS)
-  score           Float?
-  totalPoints     Float?
-  timeUsedSeconds Int?
-  answers         Answer[]
+  id                  String             @id @default(cuid())
+  applicationId       String
+  application         ExamApplication    @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  studentId           String?
+  student             Student?           @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  eventRegistrationId String?
+  eventRegistration   EventRegistration? @relation(fields: [eventRegistrationId], references: [id], onDelete: Restrict)
+  startedAt           DateTime           @default(now())
+  submittedAt         DateTime?
+  expiresAt           DateTime
+  status              AttemptStatus      @default(IN_PROGRESS)
+  score               Float?
+  totalPoints         Float?
+  timeUsedSeconds     Int?
+  answers             Answer[]
 
   @@unique([applicationId, studentId])
+  @@unique([applicationId, eventRegistrationId])
   @@index([status])
+  @@index([eventRegistrationId])
 }
 
 model Answer {

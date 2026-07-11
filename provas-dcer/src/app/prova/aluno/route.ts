@@ -78,6 +78,9 @@ export async function POST(request: Request) {
           studentId: student.id,
         },
       },
+      eventApplications: {
+        none: {},
+      },
     },
     orderBy: { createdAt: "desc" },
     include: {
@@ -126,6 +129,8 @@ export async function POST(request: Request) {
       id: application.id,
       title: application.title,
       examTitle: application.exam.title,
+      eventTitle: null,
+      eventTypeLabel: null,
       durationMinutes: getEffectiveExamDurationMinutes(application.exam.durationMinutes, student),
       baseDurationMinutes: application.exam.durationMinutes,
       endsAt: isoDate(application.endsAt),
