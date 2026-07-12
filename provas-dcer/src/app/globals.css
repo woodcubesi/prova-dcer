@@ -1,8 +1,23 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f4f6fb;
-  --foreground: #11142f;
+  --background: #070b14;
+  --foreground: #eef3ff;
+  --surface: #111827;
+  --surface-elevated: #151f31;
+  --surface-muted: #1a263a;
+  --field: #0d1422;
+  --border: #2c3a55;
+  --border-strong: #49608b;
+  --muted: #aeb8d2;
+  --accent: #9db4ff;
+  --focus-ring: #8ea6ff;
+  --success-bg: #0f2d22;
+  --success-text: #86efac;
+  --danger-bg: #35151b;
+  --danger-text: #ff9aaa;
+  --warning-bg: #352915;
+  --warning-text: #f4d06f;
   --brand-blue: #000060;
   --brand-yellow: #fff200;
   --brand-red: #e00010;
@@ -20,6 +35,7 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
   overflow-x: hidden;
+  color-scheme: dark;
 }
 
 html {
@@ -50,4 +66,154 @@ input,
 select,
 textarea {
   font-size: 16px;
+}
+
+::selection {
+  background: rgba(157, 180, 255, 0.35);
+}
+
+::placeholder {
+  color: #7f8aa5;
+  opacity: 1;
+}
+
+input,
+select,
+textarea {
+  background-color: var(--field);
+  border-color: var(--border);
+  color: var(--foreground);
+}
+
+option {
+  background-color: var(--field);
+  color: var(--foreground);
+}
+
+table {
+  color: var(--foreground);
+}
+
+/* Compatibility layer for the existing light Tailwind palette. */
+.bg-white,
+[class*="bg-white/"] {
+  background-color: var(--surface) !important;
+  color: var(--foreground);
+}
+
+[class*="bg-[#f4f6fb]"],
+[class*="bg-[#fbfcff]"],
+[class*="bg-[#f8faff]"],
+[class*="bg-[#f3f4f6]"],
+[class*="bg-[#f2f4fb]"] {
+  background-color: var(--surface-muted) !important;
+}
+
+[class*="bg-[#effaf2]"] {
+  background-color: var(--success-bg) !important;
+}
+
+[class*="bg-[#fff4f2]"] {
+  background-color: var(--danger-bg) !important;
+}
+
+[class*="bg-[#fff9e6]"],
+[class*="bg-[#fff9e8]"] {
+  background-color: var(--warning-bg) !important;
+}
+
+[class*="disabled:bg-[#f8faff]"]:disabled,
+[class*="disabled:bg-[#f2f4fb]"]:disabled,
+[class*="disabled:bg-[#888fa8]"]:disabled {
+  background-color: #263047 !important;
+  color: #7f8aa5 !important;
+}
+
+[class*="text-[#11142f]"],
+[class*="text-[#111827]"] {
+  color: var(--foreground) !important;
+}
+
+[class*="text-[#5d6480]"],
+[class*="text-[#5f6684]"],
+[class*="text-[#6b7280]"],
+[class*="text-[#9ca3af]"],
+[class*="text-[#888fa8]"],
+[class*="text-[#8a91aa]"] {
+  color: var(--muted) !important;
+}
+
+[class*="text-[#000060]"] {
+  color: var(--accent) !important;
+}
+
+[class*="bg-[#fff200]"][class*="text-[#000060]"],
+[class*="bg-[#fff200]"] [class*="text-[#000060]"] {
+  color: var(--brand-blue) !important;
+}
+
+[class*="text-[#1f623e]"] {
+  color: var(--success-text) !important;
+}
+
+[class*="text-[#b00018]"] {
+  color: var(--danger-text) !important;
+}
+
+[class*="text-[#73510a]"],
+[class*="text-[#6f5714]"] {
+  color: var(--warning-text) !important;
+}
+
+[class*="border-[#d8def0]"],
+[class*="border-[#e8ecf8]"],
+[class*="border-[#c5cce4]"] {
+  border-color: var(--border) !important;
+}
+
+[class*="border-[#000060]"],
+[class*="border-[#ffd500]"] {
+  border-color: var(--border-strong) !important;
+}
+
+[class*="border-[#b9dfc7]"] {
+  border-color: #2f6d50 !important;
+}
+
+[class*="border-[#f2b8bf]"],
+[class*="border-[#efb6bf]"],
+[class*="border-[#b00018]"] {
+  border-color: #8a3340 !important;
+}
+
+[class*="border-[#f5d58c]"] {
+  border-color: #8d6b26 !important;
+}
+
+[class*="ring-[#d8def0]"] {
+  --tw-ring-color: var(--border) !important;
+}
+
+[class*="ring-[#000060]"],
+[class*="focus:ring-[#000060]"]:focus,
+[class*="focus-within:ring-[#000060]"]:focus-within {
+  --tw-ring-color: var(--focus-ring) !important;
+}
+
+[class*="hover:bg-[#f7f8ff]"]:hover,
+[class*="hover:bg-[#effaf2]"]:hover {
+  background-color: var(--surface-muted) !important;
+}
+
+[class*="hover:bg-[#fff4f2]"]:hover {
+  background-color: rgba(138, 51, 64, 0.25) !important;
+}
+
+a[class*="text-[#000060]"]:hover {
+  color: #c7d2ff !important;
+}
+
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: var(--focus-ring);
 }

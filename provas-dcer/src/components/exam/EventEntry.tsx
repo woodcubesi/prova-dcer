@@ -194,11 +194,7 @@ export function EventEntry({ initialRegistrationCode = "" }: { initialRegistrati
             </button>
           </form>
         </div>
-      ) : (
-        <p className="mt-4 text-sm leading-6 text-[#5d6480]">
-          Use o numero impresso no cracha do evento para carregar as provas liberadas para esta inscricao.
-        </p>
-      )}
+      ) : null}
     </div>
   );
 }

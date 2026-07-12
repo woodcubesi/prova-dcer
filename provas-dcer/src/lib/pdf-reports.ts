@@ -86,6 +86,7 @@ const successColor = "#1f623e";
 const dangerColor = "#b00018";
 const dcerLogoPath = join(process.cwd(), "public", "brand", "dcer-paulista-logo.png");
 const erInsigniaPath = join(process.cwd(), "public", "brand", "embaixadores-rei-insignia.png");
+const mrLogoPath = join(process.cwd(), "public", "brand", "mensageiras-rei-logo.png");
 const pointsPerMillimeter = 72 / 25.4;
 const creditCardPortraitSize: [number, number] = [
   53.98 * pointsPerMillimeter,
@@ -381,7 +382,8 @@ function drawHeader(doc: PDFKit.PDFDocument, title: string, subtitle: string) {
   const textWidth = contentWidth(doc) - 225;
 
   drawImageIfExists(doc, dcerLogoPath, pageMargin, headerY, { width: 148 });
-  drawImageIfExists(doc, erInsigniaPath, doc.page.width - pageMargin - 42, headerY + 4, { width: 42 });
+  drawImageIfExists(doc, erInsigniaPath, doc.page.width - pageMargin - 88, headerY + 4, { width: 38 });
+  drawImageIfExists(doc, mrLogoPath, doc.page.width - pageMargin - 42, headerY + 5, { width: 42 });
 
   doc
     .font("Helvetica-Bold")

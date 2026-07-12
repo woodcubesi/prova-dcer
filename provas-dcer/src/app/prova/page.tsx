@@ -44,9 +44,6 @@ export default async function StudentEntryPage({ searchParams }: StudentEntryPag
             Provas DCER Paulista
           </Link>
           <h1 className="mt-3 text-3xl font-semibold">Entrada do embaixador</h1>
-          <p className="mt-2 text-sm leading-6 text-[#f8f9ff]">
-            Use a carteirinha oficial para provas ER/MR ou o numero de inscricao para provas de evento.
-          </p>
         </div>
       </header>
 

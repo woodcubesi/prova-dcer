@@ -29,44 +29,19 @@ export default function Home() {
           href="/prova"
           className="rounded-lg border border-[#d8def0] bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-[#ffd500] hover:shadow-md"
         >
-          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[#000060]">Embaixador</p>
+          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[#000060]">Espaço do Aluno</p>
           <h2 className="mt-3 text-2xl font-semibold">Entrar na prova</h2>
-          <p className="mt-2 text-sm leading-6 text-[#5d6480]">
-            O embaixador escolhe a prova, igreja e categoria, depois digita o nome conforme o cadastro.
-          </p>
         </Link>
 
-        <section className="rounded-lg border border-[#d8def0] bg-white p-5 shadow-sm">
+        <Link
+          href="/admin/login"
+          className="rounded-lg border border-[#d8def0] bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-[#ffd500] hover:shadow-md"
+        >
           <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[#000060]">Administrativo</p>
-          <h2 className="mt-3 text-2xl font-semibold">Acesso da equipe</h2>
-          <p className="mt-2 text-sm leading-6 text-[#5d6480]">
-            Administradores e conselheiros entram aqui para montar provas, cadastrar pessoas e conferir resultados.
-          </p>
-
-          <Link
-            href="/admin/login"
-            className="mt-4 inline-flex rounded-md bg-[#000060] px-4 py-3 text-sm font-semibold text-white hover:bg-[#000044]"
-          >
-            Entrar no painel
-          </Link>
-
-          <div className="mt-5 grid gap-2 border-t border-[#e8ecf8] pt-4 text-sm">
-            <Link className="font-medium text-[#000060] hover:underline" href="/admin/equipe">
-              Cadastrar administradores e conselheiros
-            </Link>
-            <Link className="font-medium text-[#000060] hover:underline" href="/admin/provas/nova">
-              Montar prova de multipla escolha
-            </Link>
-            <Link className="font-medium text-[#000060] hover:underline" href="/admin/correcao">
-              Conferir provas enviadas
-            </Link>
-          </div>
-        </section>
+          <h2 className="mt-3 text-2xl font-semibold">Entrar no painel</h2>
+        </Link>
       </section>
 
-      <footer className="py-6 text-center text-xs text-[#5f6684]">
-        Primeira versao local. Banco PostgreSQL em Docker, pronto para migrar para Linux.
-      </footer>
     </main>
   );
 }

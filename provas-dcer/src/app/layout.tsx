@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Provas DCER Paulista",
-  description: "Aplicacao web do DCER Paulista para avaliacoes dos Embaixadores do Rei.",
+  description: "Aplicacao web do DCER Paulista para avaliacoes dos Embaixadores e Mensageiras do Rei.",
 };
 
 export default function RootLayout({
@@ -13,7 +13,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="pt-BR" className="h-full antialiased">
-      <body className="min-h-full bg-[#f4f6fb] text-[#11142f]">{children}</body>
+      <body className="min-h-full bg-background text-foreground">{children}</body>
     </html>
   );
 }

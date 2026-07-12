@@ -218,11 +218,7 @@ export function StudentEntry() {
             </button>
           </form>
         </div>
-      ) : (
-        <p className="mt-4 text-sm leading-6 text-[#5d6480]">
-          Digite o numero da carteirinha para o sistema localizar seu cadastro, igreja, embaixada e provas liberadas.
-        </p>
-      )}
+      ) : null}
     </div>
   );
 }
