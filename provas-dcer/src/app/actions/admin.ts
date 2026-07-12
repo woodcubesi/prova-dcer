@@ -31,7 +31,7 @@ import {
   requireAdminRole,
   verifyPassword,
 } from "@/lib/auth";
-import { getAppUrl, sendAdminPasswordResetEmail } from "@/lib/mail";
+import { getAppUrl, sendAdminMfaResetEmail, sendAdminPasswordResetEmail } from "@/lib/mail";
 import { deleteExamApplicationRecords } from "@/lib/exam-application-retention";
 import { prisma } from "@/lib/prisma";
 import {
@@ -82,6 +82,7 @@ const staffUpdateSchema = staffUserSchema.extend({
 const passwordResetExpirationMinutes = 30;
 const passwordResetMinIntervalSeconds = 60;
 const passwordResetMaxRequestsPerIpHour = 10;
+const mfaResetExpirationMinutes = 30;
 const passwordResetRequestSchema = z.object({
   email: z.string().trim().email("Informe um e-mail valido.").transform((email) => email.toLowerCase()),
 });
@@ -100,6 +101,9 @@ const passwordResetSchema = z
     message: "As senhas nao conferem.",
     path: ["confirmPassword"],
   });
+const resetTokenSchema = z.object({
+  token: z.string().trim().min(20, "Link de redefinicao invalido."),
+});
 
 const optionSchema = z.object({
   label: z.string().trim().min(1).max(3),
@@ -368,12 +372,30 @@ function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
 }
 
-function hashPasswordResetToken(token: string) {
+function isAdministratorProfile(role: AdminRole) {
+  return role === AdminRole.ADMIN || role === AdminRole.ADMIN_TEACHER;
+}
+
+function hashResetToken(token: string) {
   return createHash("sha256").update(token).digest("hex");
+}
+
+function hashPasswordResetToken(token: string) {
+  return hashResetToken(token);
+}
+
+function hashMfaResetToken(token: string) {
+  return hashResetToken(token);
 }
 
 function buildPasswordResetUrl(token: string) {
   const url = new URL("/admin/redefinir-senha", getAppUrl());
+  url.searchParams.set("token", token);
+  return url.toString();
+}
+
+function buildMfaResetUrl(token: string) {
+  const url = new URL("/admin/redefinir-mfa/confirmar", getAppUrl());
   url.searchParams.set("token", token);
   return url.toString();
 }
@@ -398,6 +420,22 @@ function passwordResetErrorRedirect(token: string, message: string): never {
   }
 
   redirect(`/admin/redefinir-senha?${params.toString()}`);
+}
+
+function mfaResetDoneRedirect(): never {
+  redirect("/admin/redefinir-mfa?ok=1");
+}
+
+function mfaResetErrorRedirect(token: string, message: string): never {
+  const params = new URLSearchParams({
+    erro: message,
+  });
+
+  if (token) {
+    params.set("token", token);
+  }
+
+  redirect(`/admin/redefinir-mfa/confirmar?${params.toString()}`);
 }
 
 async function resolveStaffChurch(role: AdminRole, churchId: string | null) {
@@ -769,6 +807,160 @@ export async function resetAdminPasswordAction(formData: FormData) {
   redirect("/admin/login?senha=alterada");
 }
 
+export async function requestAdminMfaResetAction(formData: FormData) {
+  const parsed = passwordResetRequestSchema.safeParse({
+    email: String(formData.get("email") || ""),
+  });
+
+  if (!parsed.success) {
+    redirect("/admin/redefinir-mfa?erro=email");
+  }
+
+  const email = parsed.data.email;
+  const requestedIp = await getRequestIp();
+  const now = new Date();
+  const recentRequestDate = new Date(now.getTime() - passwordResetMinIntervalSeconds * 1000);
+  const recentIpDate = new Date(now.getTime() - 60 * 60 * 1000);
+
+  const user = await prisma.adminUser.findFirst({
+    where: {
+      email,
+      active: true,
+    },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+    },
+  });
+
+  if (!user) {
+    mfaResetDoneRedirect();
+  }
+
+  await prisma.adminMfaResetToken.deleteMany({
+    where: {
+      adminUserId: user.id,
+      OR: [{ expiresAt: { lte: now } }, { usedAt: { not: null } }],
+    },
+  });
+
+  const recentRequest = await prisma.adminMfaResetToken.findFirst({
+    where: {
+      adminUserId: user.id,
+      createdAt: { gte: recentRequestDate },
+      usedAt: null,
+    },
+    select: { id: true },
+  });
+
+  if (recentRequest) {
+    mfaResetDoneRedirect();
+  }
+
+  if (requestedIp) {
+    const recentIpRequests = await prisma.adminMfaResetToken.count({
+      where: {
+        requestedIp,
+        createdAt: { gte: recentIpDate },
+      },
+    });
+
+    if (recentIpRequests >= passwordResetMaxRequestsPerIpHour) {
+      mfaResetDoneRedirect();
+    }
+  }
+
+  const token = randomBytes(32).toString("base64url");
+  const tokenHash = hashMfaResetToken(token);
+  const expiresAt = new Date(now.getTime() + mfaResetExpirationMinutes * 60 * 1000);
+
+  await prisma.adminMfaResetToken.create({
+    data: {
+      adminUserId: user.id,
+      tokenHash,
+      requestedIp,
+      expiresAt,
+    },
+  });
+
+  try {
+    await sendAdminMfaResetEmail({
+      to: user.email,
+      name: user.name,
+      resetUrl: buildMfaResetUrl(token),
+      expiresInMinutes: mfaResetExpirationMinutes,
+    });
+  } catch (error) {
+    console.error("Admin MFA reset email failed", error);
+    await prisma.adminMfaResetToken.deleteMany({
+      where: {
+        tokenHash,
+        usedAt: null,
+      },
+    });
+  }
+
+  mfaResetDoneRedirect();
+}
+
+export async function confirmAdminMfaResetAction(formData: FormData) {
+  const rawToken = String(formData.get("token") || "").trim();
+  const parsed = resetTokenSchema.safeParse({
+    token: rawToken,
+  });
+
+  if (!parsed.success) {
+    mfaResetErrorRedirect(rawToken, parsed.error.issues[0]?.message || "Link de redefinicao invalido.");
+  }
+
+  const tokenHash = hashMfaResetToken(parsed.data.token);
+  const now = new Date();
+  const resetToken = await prisma.adminMfaResetToken.findFirst({
+    where: {
+      tokenHash,
+      usedAt: null,
+      expiresAt: { gt: now },
+      adminUser: {
+        active: true,
+      },
+    },
+    select: {
+      id: true,
+      adminUserId: true,
+    },
+  });
+
+  if (!resetToken) {
+    mfaResetErrorRedirect("", "Link de redefinicao invalido ou expirado.");
+  }
+
+  await prisma.$transaction([
+    prisma.adminUser.update({
+      where: { id: resetToken.adminUserId },
+      data: {
+        mfaEnabled: false,
+        mfaSecretEncrypted: null,
+        mfaConfirmedAt: null,
+        mfaLastUsedStep: null,
+        sessionVersion: { increment: 1 },
+      },
+    }),
+    prisma.adminMfaResetToken.updateMany({
+      where: {
+        adminUserId: resetToken.adminUserId,
+        usedAt: null,
+      },
+      data: {
+        usedAt: now,
+      },
+    }),
+  ]);
+
+  await clearAdminSession();
+  redirect("/admin/login?mfa=redefinido");
+}
+
 export async function createStaffUserAction(formData: FormData) {
   const context = await requireAdminContext();
 
@@ -854,11 +1046,11 @@ export async function updateStaffUserAction(formData: FormData) {
   const target = await prisma.adminUser.findFirst({
     where: {
       id,
-      active: true,
     },
     select: {
       role: true,
       churchId: true,
+      active: true,
     },
   });
 
@@ -887,7 +1079,6 @@ export async function updateStaffUserAction(formData: FormData) {
       email: staffUser.email,
       role,
       churchId,
-      active: true,
       ...(password
         ? {
             passwordHash: hashPassword(password),
@@ -900,6 +1091,60 @@ export async function updateStaffUserAction(formData: FormData) {
   revalidatePath("/admin");
   revalidatePath("/admin/equipe");
   redirect("/admin/equipe?ok=equipe");
+}
+
+export async function setStaffUserActiveAction(formData: FormData) {
+  const context = await requireAdminRole([AdminRole.ADMIN, AdminRole.ADMIN_TEACHER]);
+  const id = String(formData.get("id") || "");
+  const active = String(formData.get("active") || "") === "true";
+
+  if (!id) {
+    errorRedirect("/admin/equipe", "Cadastro de equipe nao encontrado.");
+  }
+
+  if (!active && context.user?.id === id) {
+    errorRedirect("/admin/equipe", "Voce nao pode desativar seu proprio usuario.");
+  }
+
+  const target = await prisma.adminUser.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      role: true,
+      active: true,
+    },
+  });
+
+  if (!target) {
+    errorRedirect("/admin/equipe", "Cadastro de equipe nao encontrado.");
+  }
+
+  if (!active && isAdministratorProfile(target.role)) {
+    const remainingAdministrators = await prisma.adminUser.count({
+      where: {
+        id: { not: id },
+        active: true,
+        role: {
+          in: [AdminRole.ADMIN, AdminRole.ADMIN_TEACHER],
+        },
+      },
+    });
+
+    if (remainingAdministrators === 0) {
+      errorRedirect("/admin/equipe", "Mantenha pelo menos um administrador ativo.");
+    }
+  }
+
+  await prisma.adminUser.update({
+    where: { id },
+    data: {
+      active,
+      ...(active ? {} : { sessionVersion: { increment: 1 } }),
+    },
+  });
+
+  revalidatePath("/admin/equipe");
+  redirect(`/admin/equipe?ok=${active ? "ativado" : "desativado"}`);
 }
 
 export async function resetStaffMfaAction(formData: FormData) {

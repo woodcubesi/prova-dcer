@@ -17,15 +17,12 @@ export function AdminShell({ title, description, children }: AdminShellProps) {
       <header className="overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-[#d8def0]">
         <div className="h-1.5 bg-[#000060]" />
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex min-w-0 flex-col gap-3 p-3 sm:flex-row sm:items-center sm:p-4">
+          <div className="flex min-w-0 flex-col gap-5 p-3 sm:flex-row sm:items-center sm:gap-7 sm:p-4">
             <Link href="/" aria-label="Inicio">
               <BrandLockup compact />
             </Link>
             <div className="min-w-0">
-              <Link href="/" className="text-sm font-semibold text-[#000060]">
-                Provas DCER Paulista
-              </Link>
-              <h1 className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">{title}</h1>
+              <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{title}</h1>
               {description ? <p className="mt-1 text-sm text-[#5d6480]">{description}</p> : null}
             </div>
           </div>
