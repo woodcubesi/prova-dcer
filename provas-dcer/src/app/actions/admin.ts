@@ -11,6 +11,7 @@ import {
   EventApplicationType,
   EventLeaderRole,
   ExamStatus,
+  StudentProgram,
 } from "@/generated/prisma/client";
 import {
   addYearsToDateInput,
@@ -55,6 +56,7 @@ const eventApplicationTypeSchema = z.enum([
   "GERAL",
 ]);
 const eventLeaderRoleSchema = z.enum(["CONSELHEIRO", "ORIENTADOR"]);
+const eventRegistrationProgramSchema = z.enum(["ER", "MR"]);
 const categoryLabels: Record<Category, string> = {
   JUNIOR: "Junior",
   ADOLESCENTES: "Adolescentes",
@@ -1556,6 +1558,7 @@ function eventRegistrationRedirect(
       ["leaderRole", "funcao"],
       ["name", "nome"],
       ["category", "categoria"],
+      ["program", "programa"],
       ["birthDate", "nascimento"],
     ];
 
@@ -1644,17 +1647,15 @@ function parseEventOptionalDate(
   return date;
 }
 
-const eventRegistrationCodeAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-
-function buildEventRegistrationCode() {
-  return Array.from({ length: 6 }, () =>
-    eventRegistrationCodeAlphabet[randomInt(0, eventRegistrationCodeAlphabet.length)],
-  ).join("");
+function buildEventRegistrationCode(program: StudentProgram) {
+  const prefix = program === StudentProgram.MR ? "MR" : "ER";
+  const suffix = randomInt(0, 10000).toString().padStart(4, "0");
+  return `${prefix}${suffix}`;
 }
 
-async function buildUniqueEventRegistrationCode() {
+async function buildUniqueEventRegistrationCode(program: StudentProgram) {
   for (let attempt = 0; attempt < 30; attempt += 1) {
-    const registrationCode = buildEventRegistrationCode();
+    const registrationCode = buildEventRegistrationCode(program);
     const existing = await prisma.eventRegistration.findUnique({
       where: { registrationCode },
       select: { id: true },
@@ -1822,6 +1823,8 @@ export async function createEventRegistrationAction(formData: FormData) {
   const name = String(formData.get("name") || "").trim();
   const churchId = String(formData.get("churchId") || "").trim();
   const category = String(formData.get("category") || "") as Category;
+  const parsedProgram = eventRegistrationProgramSchema.safeParse(String(formData.get("program") || ""));
+  const adhocProgram = parsedProgram.success ? (parsedProgram.data as StudentProgram) : null;
   const selectedEventApplicationIds = Array.from(
     new Set(formData.getAll("eventApplicationIds").map((value) => String(value)).filter(Boolean)),
   );
@@ -1844,6 +1847,10 @@ export async function createEventRegistrationAction(formData: FormData) {
 
   if (registrationMode === "adhoc" && (name.length < 3 || !categorySchema.safeParse(category).success)) {
     failRegistration("Preencha nome e categoria do inscrito avulso.");
+  }
+
+  if (registrationMode === "adhoc" && !adhocProgram) {
+    failRegistration("Selecione se o inscrito avulso e ER ou MR.");
   }
 
   if (!leaderUserId) {
@@ -1873,6 +1880,7 @@ export async function createEventRegistrationAction(formData: FormData) {
             name: true,
             normalizedName: true,
             category: true,
+            program: true,
             birthDate: true,
             churchId: true,
           },
@@ -1941,6 +1949,7 @@ export async function createEventRegistrationAction(formData: FormData) {
   const registrationName = student?.name || name;
   const registrationNormalizedName = student?.normalizedName || normalizeName(name);
   const registrationCategory = student?.category || category;
+  const registrationProgram = student?.program || adhocProgram || StudentProgram.ER;
   const registrationBirthDate = student?.birthDate || birthDate;
 
   await prisma.$transaction(async (tx) => {
@@ -1962,6 +1971,7 @@ export async function createEventRegistrationAction(formData: FormData) {
             name: registrationName,
             normalizedName: registrationNormalizedName,
             category: registrationCategory,
+            program: registrationProgram,
             birthDate: registrationBirthDate,
             churchId: registrationChurchId,
             leaderUserId: selectedLeader.id,
@@ -1973,11 +1983,12 @@ export async function createEventRegistrationAction(formData: FormData) {
       : await tx.eventRegistration.create({
           data: {
             eventId,
-            registrationCode: await buildUniqueEventRegistrationCode(),
+            registrationCode: await buildUniqueEventRegistrationCode(registrationProgram),
             studentId: student?.id || null,
             name: registrationName,
             normalizedName: registrationNormalizedName,
             category: registrationCategory,
+            program: registrationProgram,
             birthDate: registrationBirthDate,
             churchId: registrationChurchId,
             leaderUserId: selectedLeader.id,

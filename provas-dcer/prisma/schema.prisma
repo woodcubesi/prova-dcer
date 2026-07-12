@@ -269,6 +269,7 @@ model EventRegistration {
   name             String
   normalizedName   String
   category         Category
+  program          StudentProgram                @default(ER)
   birthDate        DateTime?
   churchId         String
   church           Church                        @relation(fields: [churchId], references: [id], onDelete: Restrict)
@@ -285,6 +286,7 @@ model EventRegistration {
   @@index([eventId])
   @@index([studentId])
   @@index([churchId])
+  @@index([program])
   @@index([registrationCode])
   @@index([leaderUserId])
 }

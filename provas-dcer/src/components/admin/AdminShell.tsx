@@ -48,6 +48,9 @@ export function AdminShell({ title, description, children }: AdminShellProps) {
             <Link className={navLinkClass} href="/admin/correcao">
               Correcao
             </Link>
+            <Link className={navLinkClass} href="/admin/seguranca">
+              Seguranca
+            </Link>
             <form action={logoutAdminAction} className="col-span-2 sm:col-span-1">
               <button className="w-full rounded-md bg-[#000060] px-3 py-2 font-medium text-white hover:bg-[#000044]">
                 Sair

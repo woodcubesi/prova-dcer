@@ -5,6 +5,7 @@ import { createEventRegistrationAction } from "@/app/actions/admin";
 import { CATEGORIES, getCategoryLabel } from "@/lib/categories";
 
 type RegistrationMode = "existing" | "adhoc";
+type ParticipantProgram = "ER" | "MR";
 
 type ChurchOption = {
   id: string;
@@ -16,6 +17,7 @@ type StudentOption = {
   id: string;
   name: string;
   category: string;
+  program: ParticipantProgram;
   churchId: string;
   churchName: string;
   alreadyRegistered: boolean;
@@ -41,6 +43,7 @@ export type EventRegistrationInitialValues = {
   studentId: string;
   name: string;
   category: string;
+  program: ParticipantProgram;
   birthDate: string;
   leaderUserId: string;
   leaderRole: string;
@@ -61,6 +64,10 @@ const leaderRoles = [
   { value: "CONSELHEIRO", label: "Conselheiro" },
   { value: "ORIENTADOR", label: "Orientador" },
 ] as const;
+const participantPrograms = [
+  { value: "ER", label: "Embaixador (ER)" },
+  { value: "MR", label: "Mensageira (MR)" },
+] as const;
 
 function churchLabel(church: ChurchOption) {
   return church.embassyName ? `${church.name} - ${church.embassyName}` : church.name;
@@ -78,6 +85,7 @@ export function EventRegistrationForm({
   const [mode, setMode] = useState<RegistrationMode>(initialValues.mode);
   const [churchId, setChurchId] = useState(initialValues.churchId);
   const [studentId, setStudentId] = useState(initialValues.studentId);
+  const [program, setProgram] = useState<ParticipantProgram>(initialValues.program);
   const [leaderUserId, setLeaderUserId] = useState(initialValues.leaderUserId);
 
   const filteredStudents = useMemo(
@@ -169,7 +177,7 @@ export function EventRegistrationForm({
               <option value="">{churchId ? "Selecione o ER/MR" : "Escolha uma igreja primeiro"}</option>
               {filteredStudents.map((student) => (
                 <option key={student.id} value={student.id}>
-                  {student.name} - {getCategoryLabel(student.category)}
+                  {student.program} - {student.name} - {getCategoryLabel(student.category)}
                   {student.alreadyRegistered ? " (ja inscrito)" : ""}
                 </option>
               ))}
@@ -203,6 +211,27 @@ export function EventRegistrationForm({
                 ))}
               </select>
             </label>
+            <fieldset className="block">
+              <legend className="text-sm font-medium">Tipo do inscrito</legend>
+              <div className="mt-1 grid gap-2 sm:grid-cols-2">
+                {participantPrograms.map((participantProgram) => (
+                  <label
+                    key={participantProgram.value}
+                    className="flex items-center gap-3 rounded-md border border-[#c5cce4] px-3 py-3"
+                  >
+                    <input
+                      type="radio"
+                      name="program"
+                      value={participantProgram.value}
+                      checked={program === participantProgram.value}
+                      onChange={() => setProgram(participantProgram.value)}
+                      className="h-5 w-5 accent-[#000060]"
+                    />
+                    <span className="text-sm font-semibold">{participantProgram.label}</span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
             <label className="block">
               <span className="text-sm font-medium">Nascimento opcional</span>
               <input

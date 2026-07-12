@@ -28,6 +28,7 @@ type EventRegistrationsPageProps = {
     funcao?: string;
     nome?: string;
     categoria?: string;
+    programa?: string;
     nascimento?: string;
     provas?: string;
   }>;
@@ -50,6 +51,7 @@ function getInitialValues(
     studentId: params.aluno || "",
     name: params.nome || "",
     category: params.categoria || "",
+    program: params.programa === "MR" ? "MR" : "ER",
     birthDate: params.nascimento || "",
     leaderUserId: params.lider || fallbackLeaderUserId,
     leaderRole: params.funcao || "CONSELHEIRO",
@@ -226,6 +228,7 @@ export default async function EventRegistrationsPage({ params, searchParams }: E
               id: student.id,
               name: student.name,
               category: student.category,
+              program: student.program,
               churchId: student.churchId,
               churchName: student.church.name,
               alreadyRegistered: registeredStudentIds.has(student.id),

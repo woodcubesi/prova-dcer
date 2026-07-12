@@ -9,6 +9,7 @@ type EventRegistrationListItem = {
   name: string;
   registrationCode: string;
   category: string;
+  program: string;
   leaderName: string;
   leaderRole: string;
   church: {
@@ -38,6 +39,9 @@ export function EventRegistrationsList({ eventId, registrations }: EventRegistra
             <div>
               <div className="flex flex-wrap items-center gap-2">
                 <p className="font-semibold">{registration.name}</p>
+                <span className="rounded-full bg-[#f8faff] px-2 py-1 text-xs font-semibold text-[#000060]">
+                  {registration.program}
+                </span>
                 <span className="rounded-full bg-[#effaf2] px-2 py-1 font-mono text-xs font-semibold text-[#1f623e]">
                   {registration.registrationCode}
                 </span>

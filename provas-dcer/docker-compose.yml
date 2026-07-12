@@ -19,8 +19,13 @@ services:
       SMTP_SECURE: "false"
       SMTP_REQUIRE_TLS: "false"
       SMTP_IGNORE_TLS: "false"
+      SYSTEM_BACKUP_DIR: /app/system-backups
+      SYSTEM_RESTORE_DIR: /app/system-backups/restores
+      SYSTEM_APP_ROOT: /app
     ports:
       - "127.0.0.1:3002:3002"
+    volumes:
+      - system_backups:/app/system-backups
     depends_on:
       db:
         condition: service_healthy
@@ -46,3 +51,5 @@ services:
 volumes:
   postgres_data:
     name: provas_dcer_data
+  system_backups:
+    name: provas_dcer_system_backups
