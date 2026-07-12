@@ -23,7 +23,7 @@ export default async function AdminLoginPage({ searchParams }: LoginPageProps) {
           </Link>
           <h1 className="mt-4 text-2xl font-semibold">Acesso administrativo</h1>
           <p className="mt-2 text-sm leading-6 text-[#5d6480]">
-            Entre com e-mail e senha cadastrados. No primeiro acesso, deixe o e-mail em branco e use a senha do ambiente.
+            Entre com e-mail e senha cadastrados.
           </p>
 
           {params.erro ? (

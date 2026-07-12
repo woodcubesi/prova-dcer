@@ -1,4 +1,4 @@
-import { createStaffUserAction, updateStaffUserAction } from "@/app/actions/admin";
+import { createStaffUserAction, resetStaffMfaAction, updateStaffUserAction } from "@/app/actions/admin";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { AdminRole } from "@/generated/prisma/client";
 import { requireAdminContext } from "@/lib/auth";
@@ -220,7 +220,7 @@ export default async function StaffPage({ searchParams }: StaffPageProps) {
       ) : null}
       {params.ok ? (
         <div className="mb-4 rounded-md border border-[#b9dfc7] bg-[#effaf2] px-4 py-3 text-sm text-[#1f623e]">
-          Cadastro salvo.
+          {params.ok === "mfa" ? "MFA redefinido. O usuario configurara um novo autenticador no proximo login." : "Cadastro salvo."}
         </div>
       ) : null}
       {params.editar && !editingUser ? (
@@ -267,15 +267,28 @@ export default async function StaffPage({ searchParams }: StaffPageProps) {
                     {getRoleLabel(user.role)}
                   </span>
                   <span className="rounded-full bg-[#f8faff] px-2 py-1 text-[#5d6480]">
+                    MFA {user.mfaEnabled ? "ativo" : "pendente"}
+                  </span>
+                  <span className="rounded-full bg-[#f8faff] px-2 py-1 text-[#5d6480]">
                     {user.church?.name || "Geral"}
                   </span>
                 </div>
-                <a
-                  href={`/admin/equipe?editar=${user.id}`}
-                  className="mt-3 inline-flex rounded-md border border-[#000060] px-3 py-2 text-sm font-semibold text-[#000060]"
-                >
-                  Editar
-                </a>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <a
+                    href={`/admin/equipe?editar=${user.id}`}
+                    className="inline-flex rounded-md border border-[#000060] px-3 py-2 text-sm font-semibold text-[#000060]"
+                  >
+                    Editar
+                  </a>
+                  {!isTeacherOnly ? (
+                    <form action={resetStaffMfaAction}>
+                      <input type="hidden" name="id" value={user.id} />
+                      <button className="rounded-md border border-[#d8def0] px-3 py-2 text-sm font-semibold text-[#000060]">
+                        Redefinir MFA
+                      </button>
+                    </form>
+                  ) : null}
+                </div>
               </div>
             ))}
           </div>
@@ -292,6 +305,7 @@ export default async function StaffPage({ searchParams }: StaffPageProps) {
                   <th className="py-3 pr-4">Nome</th>
                   <th className="py-3 pr-4">E-mail</th>
                   <th className="py-3 pr-4">Perfil</th>
+                  <th className="py-3 pr-4">MFA</th>
                   <th className="py-3 pr-4">Igreja</th>
                   <th className="py-3 pr-4">Cadastro</th>
                   <th className="py-3 pr-4">Acao</th>
@@ -307,21 +321,36 @@ export default async function StaffPage({ searchParams }: StaffPageProps) {
                         {getRoleLabel(user.role)}
                       </span>
                     </td>
+                    <td className="py-3 pr-4">
+                      <span className="rounded-full bg-[#f8faff] px-2 py-1 text-xs text-[#5d6480]">
+                        {user.mfaEnabled ? "Ativo" : "Pendente"}
+                      </span>
+                    </td>
                     <td className="py-3 pr-4">{user.church?.name || "Geral"}</td>
                     <td className="py-3 pr-4">{user.createdAt.toLocaleDateString("pt-BR")}</td>
                     <td className="py-3 pr-4">
-                      <a
-                        href={`/admin/equipe?editar=${user.id}`}
-                        className="rounded-md border border-[#000060] px-3 py-2 text-sm font-semibold text-[#000060] hover:bg-[#effaf2]"
-                      >
-                        Editar
-                      </a>
+                      <div className="flex flex-wrap gap-2">
+                        <a
+                          href={`/admin/equipe?editar=${user.id}`}
+                          className="rounded-md border border-[#000060] px-3 py-2 text-sm font-semibold text-[#000060] hover:bg-[#effaf2]"
+                        >
+                          Editar
+                        </a>
+                        {!isTeacherOnly ? (
+                          <form action={resetStaffMfaAction}>
+                            <input type="hidden" name="id" value={user.id} />
+                            <button className="rounded-md border border-[#d8def0] px-3 py-2 text-sm font-semibold text-[#000060] hover:bg-[#f7f8ff]">
+                              Redefinir MFA
+                            </button>
+                          </form>
+                        ) : null}
+                      </div>
                     </td>
                   </tr>
                 ))}
                 {staffUsers.length === 0 ? (
                   <tr>
-                    <td className="py-6 pr-4 text-sm text-[#5d6480]" colSpan={6}>
+                    <td className="py-6 pr-4 text-sm text-[#5d6480]" colSpan={7}>
                       Nenhum administrador ou conselheiro cadastrado ainda.
                     </td>
                   </tr>

@@ -21,10 +21,11 @@ import {
 import {
   clearAdminSession,
   createAdminSession,
-  getAdminPassword,
+  createAdminMfaChallenge,
   getScopedChurchId,
   hasAdministratorAccess,
   hashPassword,
+  requireAdminMfaChallenge,
   requireAdminContext,
   requireAdminRole,
   verifyPassword,
@@ -32,6 +33,12 @@ import {
 import { getAppUrl, sendAdminPasswordResetEmail } from "@/lib/mail";
 import { deleteExamApplicationRecords } from "@/lib/exam-application-retention";
 import { prisma } from "@/lib/prisma";
+import {
+  createTotpSecret,
+  decryptTotpSecret,
+  encryptTotpSecret,
+  verifyTotpCode,
+} from "@/lib/mfa";
 import {
   findActiveStudentsByRegistrationNumber,
   normalizeRegistrationNumber,
@@ -76,6 +83,11 @@ const passwordResetMaxRequestsPerIpHour = 10;
 const passwordResetRequestSchema = z.object({
   email: z.string().trim().email("Informe um e-mail valido.").transform((email) => email.toLowerCase()),
 });
+const mfaCodeSchema = z
+  .string()
+  .trim()
+  .transform((code) => code.replace(/\s+/g, ""))
+  .refine((code) => /^\d{6}$/.test(code), "Informe o codigo de 6 digitos.");
 const passwordResetSchema = z
   .object({
     token: z.string().trim().min(20, "Link de redefinicao invalido."),
@@ -480,36 +492,120 @@ export async function loginAdminAction(formData: FormData) {
   const email = normalizeEmail(String(formData.get("email") || ""));
   const password = String(formData.get("password") || "");
 
-  if (email) {
-    let user: { id: string; active: boolean; passwordHash: string } | null = null;
-
-    try {
-      user = await prisma.adminUser.findUnique({
-        where: { email },
-        select: {
-          id: true,
-          active: true,
-          passwordHash: true,
-        },
-      });
-    } catch (error) {
-      console.error("Admin login lookup failed", error);
-      redirect("/admin/login?erro=senha");
-    }
-
-    if (!user || !user.active || !verifyPassword(password, user.passwordHash)) {
-      redirect("/admin/login?erro=senha");
-    }
-
-    await createAdminSession(user.id);
-    redirect("/admin");
-  }
-
-  if (!password || password !== getAdminPassword()) {
+  if (!email || !password) {
     redirect("/admin/login?erro=senha");
   }
 
-  await createAdminSession();
+  let user: {
+    id: string;
+    active: boolean;
+    passwordHash: string;
+    mfaEnabled: boolean;
+    mfaSecretEncrypted: string | null;
+  } | null = null;
+
+  try {
+    user = await prisma.adminUser.findUnique({
+      where: { email },
+      select: {
+        id: true,
+        active: true,
+        passwordHash: true,
+        mfaEnabled: true,
+        mfaSecretEncrypted: true,
+      },
+    });
+  } catch (error) {
+    console.error("Admin login lookup failed", error);
+    redirect("/admin/login?erro=senha");
+  }
+
+  if (!user || !user.active || !verifyPassword(password, user.passwordHash)) {
+    redirect("/admin/login?erro=senha");
+  }
+
+  if (!user.mfaEnabled && !user.mfaSecretEncrypted) {
+    await prisma.adminUser.update({
+      where: { id: user.id },
+      data: {
+        mfaSecretEncrypted: encryptTotpSecret(createTotpSecret()),
+        mfaConfirmedAt: null,
+        mfaLastUsedStep: null,
+      },
+    });
+  }
+
+  await createAdminMfaChallenge(user.id);
+  redirect(user.mfaEnabled ? "/admin/mfa" : "/admin/mfa/configurar");
+}
+
+export async function verifyAdminMfaAction(formData: FormData) {
+  const challenge = await requireAdminMfaChallenge();
+  const parsed = mfaCodeSchema.safeParse(String(formData.get("code") || ""));
+
+  if (!parsed.success || !challenge.mfaEnabled || !challenge.mfaSecretEncrypted) {
+    redirect("/admin/mfa?erro=codigo");
+  }
+
+  let secret = "";
+
+  try {
+    secret = decryptTotpSecret(challenge.mfaSecretEncrypted);
+  } catch (error) {
+    console.error("MFA secret decrypt failed", error);
+    redirect("/admin/login?erro=senha");
+  }
+
+  const verification = verifyTotpCode(secret, parsed.data, challenge.mfaLastUsedStep);
+
+  if (!verification.valid || typeof verification.timeStep !== "number") {
+    redirect("/admin/mfa?erro=codigo");
+  }
+
+  await prisma.adminUser.update({
+    where: { id: challenge.id },
+    data: {
+      mfaLastUsedStep: verification.timeStep,
+    },
+  });
+
+  await createAdminSession(challenge.id);
+  redirect("/admin");
+}
+
+export async function confirmAdminMfaSetupAction(formData: FormData) {
+  const challenge = await requireAdminMfaChallenge();
+  const parsed = mfaCodeSchema.safeParse(String(formData.get("code") || ""));
+
+  if (!parsed.success || !challenge.mfaSecretEncrypted) {
+    redirect("/admin/mfa/configurar?erro=codigo");
+  }
+
+  let secret = "";
+
+  try {
+    secret = decryptTotpSecret(challenge.mfaSecretEncrypted);
+  } catch (error) {
+    console.error("MFA setup secret decrypt failed", error);
+    redirect("/admin/mfa/configurar?erro=codigo");
+  }
+
+  const verification = verifyTotpCode(secret, parsed.data, null);
+
+  if (!verification.valid || typeof verification.timeStep !== "number") {
+    redirect("/admin/mfa/configurar?erro=codigo");
+  }
+
+  await prisma.adminUser.update({
+    where: { id: challenge.id },
+    data: {
+      mfaEnabled: true,
+      mfaConfirmedAt: new Date(),
+      mfaLastUsedStep: verification.timeStep,
+    },
+  });
+
+  await createAdminSession(challenge.id);
   redirect("/admin");
 }
 
@@ -802,6 +898,43 @@ export async function updateStaffUserAction(formData: FormData) {
   revalidatePath("/admin");
   revalidatePath("/admin/equipe");
   redirect("/admin/equipe?ok=equipe");
+}
+
+export async function resetStaffMfaAction(formData: FormData) {
+  await requireAdminRole([AdminRole.ADMIN, AdminRole.ADMIN_TEACHER]);
+  const id = String(formData.get("id") || "");
+
+  if (!id) {
+    errorRedirect("/admin/equipe", "Cadastro de equipe nao encontrado.");
+  }
+
+  const target = await prisma.adminUser.findFirst({
+    where: {
+      id,
+      active: true,
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (!target) {
+    errorRedirect("/admin/equipe", "Cadastro de equipe nao encontrado.");
+  }
+
+  await prisma.adminUser.update({
+    where: { id },
+    data: {
+      mfaEnabled: false,
+      mfaSecretEncrypted: null,
+      mfaConfirmedAt: null,
+      mfaLastUsedStep: null,
+      sessionVersion: { increment: 1 },
+    },
+  });
+
+  revalidatePath("/admin/equipe");
+  redirect("/admin/equipe?ok=mfa");
 }
 
 export async function createChurchAction(formData: FormData) {
@@ -1407,6 +1540,41 @@ function eventRedirect(eventId: string, params: Record<string, string>): never {
   redirect(`/admin/eventos/${eventId}?${query.toString()}`);
 }
 
+function eventRegistrationRedirect(
+  eventId: string,
+  params: Record<string, string>,
+  formData?: FormData,
+): never {
+  const query = new URLSearchParams(params);
+
+  if (formData) {
+    const fieldMap: [string, string][] = [
+      ["registrationMode", "modo"],
+      ["churchId", "igreja"],
+      ["studentId", "aluno"],
+      ["leaderUserId", "lider"],
+      ["leaderRole", "funcao"],
+      ["name", "nome"],
+      ["category", "categoria"],
+      ["birthDate", "nascimento"],
+    ];
+
+    for (const [field, param] of fieldMap) {
+      const value = String(formData.get(field) || "").trim();
+      if (value) {
+        query.set(param, value);
+      }
+    }
+
+    const applicationIds = formData.getAll("eventApplicationIds").map((value) => String(value)).filter(Boolean);
+    if (applicationIds.length > 0) {
+      query.set("provas", applicationIds.join(","));
+    }
+  }
+
+  redirect(`/admin/eventos/${eventId}/inscricoes?${query.toString()}`);
+}
+
 function parseEventWindow(formData: FormData, errorPath: string) {
   const startsAt = parsePayloadDate(String(formData.get("startsAt") || ""), "inicio do evento", errorPath);
   const endsAt = parsePayloadDate(String(formData.get("endsAt") || ""), "fim do evento", errorPath, true);
@@ -1428,11 +1596,15 @@ function parseEventApplicationType(value: FormDataEntryValue | null, errorPath: 
   return parsed.data as EventApplicationType;
 }
 
-function parseEventLeaderRole(value: FormDataEntryValue | null, eventId: string) {
+function parseEventLeaderRole(
+  value: FormDataEntryValue | null,
+  eventId: string,
+  fail: (message: string) => never = (message) => eventRedirect(eventId, { erro: message }),
+) {
   const parsed = eventLeaderRoleSchema.safeParse(String(value || ""));
 
   if (!parsed.success) {
-    eventRedirect(eventId, { erro: "Selecione se o lider e conselheiro ou orientador." });
+    fail("Selecione se o lider e conselheiro ou orientador.");
   }
 
   return parsed.data as EventLeaderRole;
@@ -1448,19 +1620,25 @@ function parseEventLimit(formData: FormData, errorPath: string) {
   return rawLimit;
 }
 
-function parseEventOptionalDate(formData: FormData, field: string, label: string, eventId: string) {
+function parseEventOptionalDate(
+  formData: FormData,
+  field: string,
+  label: string,
+  eventId: string,
+  fail: (message: string) => never = (message) => eventRedirect(eventId, { erro: message }),
+) {
   const value = String(formData.get(field) || "").trim();
 
   if (!value) return null;
 
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    eventRedirect(eventId, { erro: `Informe uma data valida para ${label}.` });
+    fail(`Informe uma data valida para ${label}.`);
   }
 
   const date = new Date(`${value}T00:00:00.000Z`);
 
   if (Number.isNaN(date.getTime())) {
-    eventRedirect(eventId, { erro: `Informe uma data valida para ${label}.` });
+    fail(`Informe uma data valida para ${label}.`);
   }
 
   return date;
@@ -1638,13 +1816,12 @@ export async function removeEventApplicationAction(formData: FormData) {
 export async function createEventRegistrationAction(formData: FormData) {
   const context = await requireAdminContext();
   const eventId = String(formData.get("eventId") || "");
+  const registrationMode = String(formData.get("registrationMode") || "existing") === "adhoc" ? "adhoc" : "existing";
   const studentId = String(formData.get("studentId") || "").trim();
   const leaderUserId = String(formData.get("leaderUserId") || "").trim();
-  const leaderRole = parseEventLeaderRole(formData.get("leaderRole"), eventId);
   const name = String(formData.get("name") || "").trim();
   const churchId = String(formData.get("churchId") || "").trim();
   const category = String(formData.get("category") || "") as Category;
-  const birthDate = parseEventOptionalDate(formData, "birthDate", "nascimento", eventId);
   const selectedEventApplicationIds = Array.from(
     new Set(formData.getAll("eventApplicationIds").map((value) => String(value)).filter(Boolean)),
   );
@@ -1653,12 +1830,24 @@ export async function createEventRegistrationAction(formData: FormData) {
     errorRedirect("/admin/eventos", "Evento nao encontrado.");
   }
 
-  if (!studentId && (name.length < 3 || !churchId || !categorySchema.safeParse(category).success)) {
-    eventRedirect(eventId, { erro: "Selecione um ER/MR existente ou preencha nome, igreja e categoria do inscrito." });
+  const failRegistration = (message: string): never => eventRegistrationRedirect(eventId, { erro: message }, formData);
+  const leaderRole = parseEventLeaderRole(formData.get("leaderRole"), eventId, failRegistration);
+  const birthDate = parseEventOptionalDate(formData, "birthDate", "nascimento", eventId, failRegistration);
+
+  if (!churchId) {
+    failRegistration("Selecione a igreja ou embaixada da inscricao.");
+  }
+
+  if (registrationMode === "existing" && !studentId) {
+    failRegistration("Selecione o ER/MR da igreja ou altere para inscrito avulso.");
+  }
+
+  if (registrationMode === "adhoc" && (name.length < 3 || !categorySchema.safeParse(category).success)) {
+    failRegistration("Preencha nome e categoria do inscrito avulso.");
   }
 
   if (!leaderUserId) {
-    eventRedirect(eventId, { erro: "Selecione o conselheiro ou orientador responsavel." });
+    failRegistration("Selecione o conselheiro ou orientador responsavel.");
   }
 
   const [event, student, leader] = await Promise.all([
@@ -1673,7 +1862,7 @@ export async function createEventRegistrationAction(formData: FormData) {
         },
       },
     }),
-    studentId
+    registrationMode === "existing" && studentId
       ? prisma.student.findFirst({
           where: {
             id: studentId,
@@ -1706,40 +1895,47 @@ export async function createEventRegistrationAction(formData: FormData) {
     errorRedirect("/admin/eventos", "Evento nao encontrado.");
   }
 
-  if (studentId && !student) {
-    eventRedirect(eventId, { erro: "Embaixador nao encontrado." });
+  if (registrationMode === "existing" && !student) {
+    failRegistration("ER/MR nao encontrado.");
+  }
+
+  if (student && student.churchId !== churchId) {
+    failRegistration("O ER/MR selecionado nao pertence a igreja escolhida.");
   }
 
   const scopedChurchId = getScopedChurchId(context);
   const registrationChurchId = student?.churchId || churchId;
 
   if (scopedChurchId && registrationChurchId !== scopedChurchId) {
-    eventRedirect(eventId, { erro: "Conselheiros so podem inscrever embaixadores da propria igreja." });
+    failRegistration("Conselheiros so podem inscrever embaixadores da propria igreja.");
   }
 
   if (!leader) {
-    eventRedirect(eventId, { erro: "Conselheiro ou orientador nao encontrado no cadastro de equipe." });
+    failRegistration("Conselheiro ou orientador nao encontrado no cadastro de equipe.");
+  }
+  const selectedLeader = leader!;
+
+  if (scopedChurchId && selectedLeader.churchId && selectedLeader.churchId !== scopedChurchId) {
+    failRegistration("Selecione um lider da sua igreja.");
   }
 
-  if (scopedChurchId && leader.churchId && leader.churchId !== scopedChurchId) {
-    eventRedirect(eventId, { erro: "Selecione um lider da sua igreja." });
+  if (selectedLeader.churchId && selectedLeader.churchId !== registrationChurchId) {
+    failRegistration("Selecione um lider da mesma igreja da inscricao.");
   }
 
   if (selectedEventApplicationIds.length === 0) {
-    eventRedirect(eventId, { erro: "Selecione pelo menos uma prova para esta inscricao." });
+    failRegistration("Selecione pelo menos uma prova para esta inscricao.");
   }
 
   if (selectedEventApplicationIds.length > event.maxApplicationsPerParticipant) {
-    eventRedirect(eventId, {
-      erro: `Este evento permite no maximo ${event.maxApplicationsPerParticipant} prova(s) por inscrito.`,
-    });
+    failRegistration(`Este evento permite no maximo ${event.maxApplicationsPerParticipant} prova(s) por inscrito.`);
   }
 
   const eventApplicationById = new Map(event.applications.map((application) => [application.id, application]));
   const selectedEventApplications = selectedEventApplicationIds.map((id) => eventApplicationById.get(id));
 
   if (selectedEventApplications.some((application) => !application)) {
-    eventRedirect(eventId, { erro: "Selecione apenas provas vinculadas a este evento." });
+    failRegistration("Selecione apenas provas vinculadas a este evento.");
   }
 
   const registrationName = student?.name || name;
@@ -1768,8 +1964,8 @@ export async function createEventRegistrationAction(formData: FormData) {
             category: registrationCategory,
             birthDate: registrationBirthDate,
             churchId: registrationChurchId,
-            leaderUserId: leader.id,
-            leaderName: leader.name,
+            leaderUserId: selectedLeader.id,
+            leaderName: selectedLeader.name,
             leaderRole,
           },
           select: { id: true },
@@ -1784,8 +1980,8 @@ export async function createEventRegistrationAction(formData: FormData) {
             category: registrationCategory,
             birthDate: registrationBirthDate,
             churchId: registrationChurchId,
-            leaderUserId: leader.id,
-            leaderName: leader.name,
+            leaderUserId: selectedLeader.id,
+            leaderName: selectedLeader.name,
             leaderRole,
           },
           select: { id: true },
@@ -1807,17 +2003,18 @@ export async function createEventRegistrationAction(formData: FormData) {
 
   revalidatePath("/admin/eventos");
   revalidatePath(`/admin/eventos/${eventId}`);
+  revalidatePath(`/admin/eventos/${eventId}/inscricoes`);
   revalidatePath("/admin/correcao");
   revalidatePath("/admin/correcao/eventos");
   revalidatePath("/prova");
-  eventRedirect(eventId, { ok: "inscricao" });
+  eventRegistrationRedirect(eventId, { ok: "inscricao" });
 }
 
 export async function deleteEventRegistrationAction(formData: FormData) {
   const context = await requireAdminContext();
   const eventId = String(formData.get("eventId") || "");
   const registrationId = String(formData.get("registrationId") || "");
-  const errorPath = eventId ? `/admin/eventos/${eventId}` : "/admin/eventos";
+  const errorPath = eventId ? `/admin/eventos/${eventId}/inscricoes` : "/admin/eventos";
 
   if (!eventId || !registrationId) {
     errorRedirect(errorPath, "Inscricao do evento nao encontrada.");
@@ -1843,11 +2040,11 @@ export async function deleteEventRegistrationAction(formData: FormData) {
   const scopedChurchId = getScopedChurchId(context);
 
   if (scopedChurchId && registration.churchId !== scopedChurchId) {
-    eventRedirect(eventId, { erro: "Conselheiros so podem excluir inscricoes da propria igreja." });
+    eventRegistrationRedirect(eventId, { erro: "Conselheiros so podem excluir inscricoes da propria igreja." });
   }
 
   if (registration.attempts.length > 0) {
-    eventRedirect(eventId, { erro: "Esta inscricao ja possui prova iniciada e nao pode ser excluida." });
+    eventRegistrationRedirect(eventId, { erro: "Esta inscricao ja possui prova iniciada e nao pode ser excluida." });
   }
 
   await prisma.eventRegistration.delete({
@@ -1856,7 +2053,8 @@ export async function deleteEventRegistrationAction(formData: FormData) {
 
   revalidatePath("/admin/eventos");
   revalidatePath(`/admin/eventos/${eventId}`);
+  revalidatePath(`/admin/eventos/${eventId}/inscricoes`);
   revalidatePath("/admin/correcao/eventos");
   revalidatePath("/prova");
-  eventRedirect(eventId, { ok: "inscricao-removida" });
+  eventRegistrationRedirect(eventId, { ok: "inscricao-removida" });
 }

@@ -58,9 +58,7 @@ export default async function EventsPage({ searchParams }: EventsPageProps) {
           registrations: isTeacher
             ? {
                 where: {
-                  student: {
-                    churchId: scopedChurchFilter,
-                  },
+                  churchId: scopedChurchFilter,
                 },
               }
             : true,
@@ -146,7 +144,9 @@ export default async function EventsPage({ searchParams }: EventsPageProps) {
           <div>
             <h2 className="text-lg font-semibold">Eventos cadastrados</h2>
             <p className="text-sm text-[#5d6480]">
-              Abra um evento para vincular provas e cadastrar as inscricoes.
+              {canManageEvents
+                ? "Abra um evento para configurar provas ou gerenciar as inscricoes."
+                : "Escolha um evento para cadastrar os ER/MR da sua igreja."}
             </p>
           </div>
         </div>
@@ -155,7 +155,7 @@ export default async function EventsPage({ searchParams }: EventsPageProps) {
           {events.map((event) => (
             <Link
               key={event.id}
-              href={`/admin/eventos/${event.id}`}
+              href={canManageEvents ? `/admin/eventos/${event.id}` : `/admin/eventos/${event.id}/inscricoes`}
               className="grid gap-3 rounded-md border border-[#e8ecf8] p-4 transition hover:border-[#000060] lg:grid-cols-[1fr_auto]"
             >
               <div>

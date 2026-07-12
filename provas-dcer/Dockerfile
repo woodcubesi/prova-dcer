@@ -20,7 +20,7 @@ FROM base AS builder
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN pnpm build
+RUN ./node_modules/.bin/prisma generate && ./node_modules/.bin/next build
 
 FROM base AS runner
 
@@ -44,4 +44,4 @@ RUN sed -i 's/\r$//' ./docker-entrypoint.sh \
 EXPOSE 3001
 
 ENTRYPOINT ["./docker-entrypoint.sh"]
-CMD ["pnpm", "start"]
+CMD ["./node_modules/.bin/next", "start", "--hostname", "0.0.0.0"]

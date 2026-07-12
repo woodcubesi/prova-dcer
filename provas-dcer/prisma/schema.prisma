@@ -65,6 +65,10 @@ model AdminUser {
   email               String                    @unique
   passwordHash        String
   sessionVersion      Int                       @default(0)
+  mfaEnabled          Boolean                   @default(false)
+  mfaSecretEncrypted  String?
+  mfaConfirmedAt      DateTime?
+  mfaLastUsedStep     Int?
   role                AdminRole                 @default(TEACHER)
   active              Boolean                   @default(true)
   churchId            String?
@@ -77,6 +81,7 @@ model AdminUser {
   @@index([role])
   @@index([active])
   @@index([churchId])
+  @@index([mfaEnabled])
 }
 
 model AdminPasswordResetToken {
