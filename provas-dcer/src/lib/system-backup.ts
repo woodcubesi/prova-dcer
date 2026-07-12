@@ -145,6 +145,12 @@ export async function resolveSystemBackupArchive(fileName: string) {
   return archivePath;
 }
 
+export async function deleteSystemBackupArchive(fileName: string) {
+  const archivePath = await resolveSystemBackupArchive(fileName);
+  await fs.rm(archivePath, { force: false });
+  return archivePath;
+}
+
 async function readPackageInfo() {
   try {
     const raw = await fs.readFile(path.join(/*turbopackIgnore: true*/ getSystemAppRoot(), "package.json"), "utf8");

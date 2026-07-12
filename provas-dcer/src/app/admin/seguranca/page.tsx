@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { AdminShell } from "@/components/admin/AdminShell";
+import { ConfirmSubmitButton } from "@/components/admin/ConfirmSubmitButton";
 import { AdminRole } from "@/generated/prisma/client";
 import { requireAdminRole } from "@/lib/auth";
 import { listSystemBackups } from "@/lib/system-backup";
@@ -64,6 +65,11 @@ export default async function SecurityPage({ searchParams }: SecurityPageProps) 
         <div className="mb-5 rounded-md border border-[#b9dfc7] bg-[#effaf2] px-4 py-3 text-sm text-[#1f623e]">
           Backup restaurado. Banco: {params.banco === "1" ? "sim" : "nao"}. Aplicacao:{" "}
           {params.aplicacao === "1" ? "snapshot salvo em staging" : "nao"}.
+        </div>
+      ) : null}
+      {params.ok === "backup-excluido" ? (
+        <div className="mb-5 rounded-md border border-[#b9dfc7] bg-[#effaf2] px-4 py-3 text-sm text-[#1f623e]">
+          Backup excluido com sucesso.
         </div>
       ) : null}
 
@@ -138,12 +144,23 @@ export default async function SecurityPage({ searchParams }: SecurityPageProps) 
                     {formatDate(backup.createdAt)} - {formatBytes(backup.size)}
                   </p>
                 </div>
-                <Link
-                  href={`/admin/seguranca/backup?arquivo=${encodeURIComponent(backup.fileName)}`}
-                  className="rounded-md border border-[#000060] px-3 py-2 text-center text-sm font-semibold text-[#000060] hover:bg-[#f7f8ff]"
-                >
-                  Baixar
-                </Link>
+                <div className="flex flex-col gap-2 sm:flex-row lg:justify-end">
+                  <Link
+                    href={`/admin/seguranca/backup?arquivo=${encodeURIComponent(backup.fileName)}`}
+                    className="rounded-md border border-[#000060] px-3 py-2 text-center text-sm font-semibold text-[#000060] hover:bg-[#f7f8ff]"
+                  >
+                    Baixar
+                  </Link>
+                  <form action="/admin/seguranca/backup/excluir" method="post">
+                    <input type="hidden" name="backupFileName" value={backup.fileName} />
+                    <ConfirmSubmitButton
+                      message={`Excluir o backup "${backup.fileName}"? Esta acao nao pode ser desfeita.`}
+                      className="w-full rounded-md border border-[#efb6bf] px-3 py-2 text-sm font-semibold text-[#b00018] hover:bg-[#fff4f2]"
+                    >
+                      Excluir
+                    </ConfirmSubmitButton>
+                  </form>
+                </div>
               </div>
               <form action="/admin/seguranca/restaurar" method="post" className="mt-4 grid gap-3">
                 <input type="hidden" name="source" value="server" />
