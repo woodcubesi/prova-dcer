@@ -464,6 +464,20 @@ async function getApplicationParticipantStudentIds(applicationId: string, church
   );
 }
 
+function getApplicationParticipantReturnPath(applicationId: string, formData: FormData) {
+  return String(formData.get("returnView") || "") === "participantes"
+    ? `/admin/provas/${applicationId}/participantes`
+    : `/admin/provas/${applicationId}/editar`;
+}
+
+function revalidateApplicationParticipantPaths(applicationId: string) {
+  revalidatePath("/admin");
+  revalidatePath("/admin/provas");
+  revalidatePath(`/admin/provas/${applicationId}/editar`);
+  revalidatePath(`/admin/provas/${applicationId}/participantes`);
+  revalidatePath("/prova");
+}
+
 function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
 }
@@ -1768,6 +1782,7 @@ export async function updateExamAction(formData: FormData) {
   revalidatePath("/admin");
   revalidatePath("/admin/provas");
   revalidatePath(`/admin/provas/${application.id}/editar`);
+  revalidatePath(`/admin/provas/${application.id}/participantes`);
   revalidatePath("/prova");
   redirect("/admin/provas?ok=editada");
 }
@@ -1776,7 +1791,8 @@ export async function linkApplicationParticipantAction(formData: FormData) {
   const context = await requireAdminContext();
   const applicationId = String(formData.get("applicationId") || "");
   const studentId = String(formData.get("studentId") || "");
-  const errorPath = applicationId ? `/admin/provas/${applicationId}/editar` : "/admin/provas";
+  const returnPath = applicationId ? getApplicationParticipantReturnPath(applicationId, formData) : "/admin/provas";
+  const errorPath = returnPath;
 
   if (!applicationId || !studentId) {
     errorRedirect(errorPath, "Selecione a prova e o aluno para vincular.");
@@ -1831,18 +1847,16 @@ export async function linkApplicationParticipantAction(formData: FormData) {
     }),
   ]);
 
-  revalidatePath("/admin");
-  revalidatePath("/admin/provas");
-  revalidatePath(`/admin/provas/${applicationId}/editar`);
-  revalidatePath("/prova");
-  redirect(`/admin/provas/${applicationId}/editar?ok=aluno-vinculado`);
+  revalidateApplicationParticipantPaths(applicationId);
+  redirect(`${returnPath}?ok=aluno-vinculado`);
 }
 
 export async function unlinkApplicationParticipantAction(formData: FormData) {
   const context = await requireAdminContext();
   const applicationId = String(formData.get("applicationId") || "");
   const studentId = String(formData.get("studentId") || "");
-  const errorPath = applicationId ? `/admin/provas/${applicationId}/editar` : "/admin/provas";
+  const returnPath = applicationId ? getApplicationParticipantReturnPath(applicationId, formData) : "/admin/provas";
+  const errorPath = returnPath;
 
   if (!applicationId || !studentId) {
     errorRedirect(errorPath, "Selecione a prova e o aluno para desvincular.");
@@ -1905,11 +1919,8 @@ export async function unlinkApplicationParticipantAction(formData: FormData) {
     }),
   ]);
 
-  revalidatePath("/admin");
-  revalidatePath("/admin/provas");
-  revalidatePath(`/admin/provas/${applicationId}/editar`);
-  revalidatePath("/prova");
-  redirect(`/admin/provas/${applicationId}/editar?ok=aluno-desvinculado`);
+  revalidateApplicationParticipantPaths(applicationId);
+  redirect(`${returnPath}?ok=aluno-desvinculado`);
 }
 
 export async function deleteExamApplicationAction(formData: FormData) {
