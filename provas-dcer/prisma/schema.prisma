@@ -59,6 +59,11 @@ enum EventLeaderRole {
   ORIENTADOR
 }
 
+enum ApplicationParticipantOverrideMode {
+  INCLUDE
+  EXCLUDE
+}
+
 model AdminUser {
   id                  String                    @id @default(cuid())
   name                String
@@ -149,6 +154,7 @@ model Student {
   participants          ApplicationParticipant[]
   attempts              Attempt[]
   eventRegistrations    EventRegistration[]
+  applicationOverrides  ExamApplicationParticipantOverride[]
 
   @@unique([churchId, category, normalizedName])
   @@index([program])
@@ -222,6 +228,7 @@ model ExamApplication {
   participants        ApplicationParticipant[]
   attempts            Attempt[]
   eventApplications   EventApplication[]
+  participantOverrides ExamApplicationParticipantOverride[]
 
   @@index([active])
   @@index([program])
@@ -239,6 +246,21 @@ model ApplicationParticipant {
   createdAt     DateTime        @default(now())
 
   @@unique([applicationId, studentId])
+}
+
+model ExamApplicationParticipantOverride {
+  id            String                             @id @default(cuid())
+  applicationId String
+  application   ExamApplication                    @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  studentId     String
+  student       Student                            @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  mode          ApplicationParticipantOverrideMode
+  createdAt     DateTime                           @default(now())
+  updatedAt     DateTime                           @updatedAt
+
+  @@unique([applicationId, studentId])
+  @@index([studentId])
+  @@index([mode])
 }
 
 model Event {

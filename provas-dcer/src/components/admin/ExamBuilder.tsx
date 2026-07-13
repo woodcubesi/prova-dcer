@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createExamAction, updateExamAction } from "@/app/actions/admin";
 import { addYearsToDateInput, formatDateInput } from "@/lib/application-availability";
 import { CATEGORIES, type CategoryCode } from "@/lib/categories";
@@ -78,6 +78,11 @@ type ExamBuilderProps = {
   initialData?: ExamBuilderInitialData;
   locked?: boolean;
   mode?: "create" | "edit";
+};
+
+type ExamBuilderDraft = ExamBuilderInitialData & {
+  associateWithEvent: boolean;
+  noExpiration: boolean;
 };
 
 function newQuestion(): QuestionDraft {
@@ -173,9 +178,77 @@ export function ExamBuilder({ churches, events = [], initialData, locked = false
   const [isImporting, setIsImporting] = useState(false);
   const [importError, setImportError] = useState("");
   const [importWarnings, setImportWarnings] = useState<string[]>([]);
+  const draftKey = `provas-dcer:exam-builder:${mode}:${initialData?.applicationId || "nova"}`;
 
   const totalPoints = questions.reduce((sum, question) => sum + Number(question.points || 0), 0);
   const minimumPoints = (totalPoints * Number(passingPercent || 0)) / 100;
+
+  function getDraft(): ExamBuilderDraft {
+    return {
+      applicationId: initialData?.applicationId,
+      title,
+      description,
+      durationMinutes,
+      passingPercent,
+      applicationTitle,
+      accessCode,
+      eventId,
+      eventApplicationType,
+      startsAt,
+      endsAt,
+      purgeAt,
+      churchIds: selectedChurchIds,
+      categories: selectedCategories,
+      questions,
+      associateWithEvent,
+      noExpiration,
+    };
+  }
+
+  function saveDraft() {
+    window.localStorage.setItem(draftKey, JSON.stringify(getDraft()));
+  }
+
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    if (!searchParams.has("erro")) return;
+
+    const rawDraft = window.localStorage.getItem(draftKey);
+    if (!rawDraft) return;
+
+    try {
+      const draft = JSON.parse(rawDraft) as ExamBuilderDraft;
+      const restoreFrame = window.requestAnimationFrame(() => {
+        setTitle(draft.title || "Nova prova");
+        setDescription(draft.description || "");
+        setDurationMinutes(draft.durationMinutes || 60);
+        setPassingPercent(draft.passingPercent ?? 70);
+        setApplicationTitle(draft.applicationTitle || "Aplicacao principal");
+        setAccessCode(draft.accessCode || "");
+        setAssociateWithEvent(Boolean(draft.associateWithEvent));
+        setEventId(draft.eventId || "");
+        setEventApplicationType(draft.eventApplicationType || "GERAL");
+        setStartsAt(draft.startsAt || "");
+        setEndsAt(draft.endsAt || getDefaultEndsAtInput());
+        setNoExpiration(Boolean(draft.noExpiration));
+        setPurgeAt(
+          normalizePurgeInput(
+            draft.purgeAt || "",
+            draft.startsAt || "",
+            draft.endsAt || getDefaultEndsAtInput(),
+            Boolean(draft.noExpiration),
+          ),
+        );
+        setSelectedChurchIds(draft.churchIds || []);
+        setSelectedCategories(draft.categories || []);
+        setQuestions(draft.questions?.length ? draft.questions : [newQuestion()]);
+      });
+
+      return () => window.cancelAnimationFrame(restoreFrame);
+    } catch {
+      window.localStorage.removeItem(draftKey);
+    }
+  }, [draftKey]);
 
   const payload = useMemo(
     () =>
@@ -346,7 +419,12 @@ export function ExamBuilder({ churches, events = [], initialData, locked = false
   const maxPurgeAt = getPurgeLimitInput(startsAt, endsAt, noExpiration);
 
   return (
-    <form action={isEditing ? updateExamAction : createExamAction} className="space-y-5">
+    <form
+      action={isEditing ? updateExamAction : createExamAction}
+      className="space-y-5"
+      data-form-draft="off"
+      onSubmit={saveDraft}
+    >
       <input type="hidden" name="payload" value={payload} />
       {initialData?.applicationId ? (
         <input type="hidden" name="applicationId" value={initialData.applicationId} />
@@ -355,7 +433,7 @@ export function ExamBuilder({ churches, events = [], initialData, locked = false
       {locked ? (
         <div className="rounded-lg border border-[#f2b8bf] bg-[#fff4f2] p-4 text-sm text-[#b00018]">
           Esta prova ja foi iniciada por embaixadores. Para preservar respostas e gabaritos, crie uma nova aplicacao se
-          precisar mudar perguntas, alternativas ou participantes.
+          precisar mudar perguntas ou alternativas. Participantes podem ser ajustados na secao acima.
         </div>
       ) : null}
 

@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import {
   AdminRole,
+  ApplicationParticipantOverrideMode,
   Category,
   EventApplicationType,
   EventLeaderRole,
@@ -366,6 +367,101 @@ async function ensureAccessCodeAvailable(accessCode: string, errorPath: string, 
   if (existingApplication && existingApplication.id !== ignoredApplicationId) {
     errorRedirect(errorPath, "Este codigo de aplicacao ja esta em uso.");
   }
+}
+
+async function getManageableExamApplication(applicationId: string, context: Awaited<ReturnType<typeof requireAdminContext>>, errorPath: string) {
+  const scopedChurchId = getScopedChurchId(context);
+  const application = await prisma.examApplication.findFirst({
+    where: {
+      id: applicationId,
+      ...(scopedChurchId
+        ? {
+            participants: {
+              some: {
+                student: {
+                  churchId: scopedChurchId,
+                },
+              },
+            },
+          }
+        : {}),
+    },
+    select: {
+      id: true,
+      exam: {
+        select: {
+          title: true,
+        },
+      },
+      participants: {
+        select: {
+          studentId: true,
+          student: {
+            select: {
+              churchId: true,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (!application) {
+    errorRedirect(errorPath, "Aplicacao de prova nao encontrada.");
+  }
+
+  if (!hasAdministratorAccess(context)) {
+    if (!context.churchId) {
+      errorRedirect(errorPath, "Seu usuario de conselheiro ainda nao esta vinculado a uma igreja.");
+    }
+
+    const hasOutsideChurch = application.participants.some(
+      (participant) => participant.student.churchId !== context.churchId,
+    );
+
+    if (hasOutsideChurch) {
+      errorRedirect(errorPath, "Conselheiros so podem gerenciar provas exclusivas da propria igreja.");
+    }
+  }
+
+  return application;
+}
+
+async function getApplicationParticipantStudentIds(applicationId: string, churchIds: string[], categories: Category[], scopedChurchId: string | null) {
+  const baseStudents = await prisma.student.findMany({
+    where: {
+      active: true,
+      churchId: { in: churchIds },
+      category: { in: categories },
+      ...(scopedChurchId ? { churchId: scopedChurchId } : {}),
+    },
+    select: { id: true },
+  });
+  const overrides = await prisma.examApplicationParticipantOverride.findMany({
+    where: {
+      applicationId,
+      student: {
+        active: true,
+        ...(scopedChurchId ? { churchId: scopedChurchId } : {}),
+      },
+    },
+    select: {
+      studentId: true,
+      mode: true,
+    },
+  });
+  const includedIds = overrides
+    .filter((override) => override.mode === ApplicationParticipantOverrideMode.INCLUDE)
+    .map((override) => override.studentId);
+  const excludedIds = new Set(
+    overrides
+      .filter((override) => override.mode === ApplicationParticipantOverrideMode.EXCLUDE)
+      .map((override) => override.studentId),
+  );
+
+  return Array.from(new Set([...baseStudents.map((student) => student.id), ...includedIds])).filter(
+    (studentId) => !excludedIds.has(studentId),
+  );
 }
 
 function normalizeEmail(email: string) {
@@ -1582,16 +1678,14 @@ export async function updateExamAction(formData: FormData) {
     redirect("/admin/provas?ok=editada");
   }
 
-  const students = await prisma.student.findMany({
-    where: {
-      active: true,
-      churchId: { in: churchIds },
-      category: { in: payload.categories as Category[] },
-    },
-    select: { id: true },
-  });
+  const studentIds = await getApplicationParticipantStudentIds(
+    application.id,
+    churchIds,
+    payload.categories as Category[],
+    scopedChurchId,
+  );
 
-  if (!eventAssociation && students.length === 0) {
+  if (!eventAssociation && studentIds.length === 0) {
     errorRedirect(errorPath, "Nao ha embaixadores cadastrados para os filtros escolhidos.");
   }
 
@@ -1660,8 +1754,8 @@ export async function updateExamAction(formData: FormData) {
           ? {}
           : {
               participants: {
-                create: students.map((student) => ({
-                  studentId: student.id,
+                create: studentIds.map((studentId) => ({
+                  studentId,
                 })),
               },
             }),
@@ -1676,6 +1770,146 @@ export async function updateExamAction(formData: FormData) {
   revalidatePath(`/admin/provas/${application.id}/editar`);
   revalidatePath("/prova");
   redirect("/admin/provas?ok=editada");
+}
+
+export async function linkApplicationParticipantAction(formData: FormData) {
+  const context = await requireAdminContext();
+  const applicationId = String(formData.get("applicationId") || "");
+  const studentId = String(formData.get("studentId") || "");
+  const errorPath = applicationId ? `/admin/provas/${applicationId}/editar` : "/admin/provas";
+
+  if (!applicationId || !studentId) {
+    errorRedirect(errorPath, "Selecione a prova e o aluno para vincular.");
+  }
+
+  await getManageableExamApplication(applicationId, context, errorPath);
+
+  const student = await prisma.student.findFirst({
+    where: {
+      id: studentId,
+      active: true,
+      ...(context.role === AdminRole.TEACHER ? { churchId: context.churchId || "__missing_church__" } : {}),
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (!student) {
+    errorRedirect(errorPath, "Aluno nao encontrado ou fora do seu escopo.");
+  }
+
+  await prisma.$transaction([
+    prisma.examApplicationParticipantOverride.upsert({
+      where: {
+        applicationId_studentId: {
+          applicationId,
+          studentId,
+        },
+      },
+      update: {
+        mode: ApplicationParticipantOverrideMode.INCLUDE,
+      },
+      create: {
+        applicationId,
+        studentId,
+        mode: ApplicationParticipantOverrideMode.INCLUDE,
+      },
+    }),
+    prisma.applicationParticipant.upsert({
+      where: {
+        applicationId_studentId: {
+          applicationId,
+          studentId,
+        },
+      },
+      update: {},
+      create: {
+        applicationId,
+        studentId,
+      },
+    }),
+  ]);
+
+  revalidatePath("/admin");
+  revalidatePath("/admin/provas");
+  revalidatePath(`/admin/provas/${applicationId}/editar`);
+  revalidatePath("/prova");
+  redirect(`/admin/provas/${applicationId}/editar?ok=aluno-vinculado`);
+}
+
+export async function unlinkApplicationParticipantAction(formData: FormData) {
+  const context = await requireAdminContext();
+  const applicationId = String(formData.get("applicationId") || "");
+  const studentId = String(formData.get("studentId") || "");
+  const errorPath = applicationId ? `/admin/provas/${applicationId}/editar` : "/admin/provas";
+
+  if (!applicationId || !studentId) {
+    errorRedirect(errorPath, "Selecione a prova e o aluno para desvincular.");
+  }
+
+  await getManageableExamApplication(applicationId, context, errorPath);
+
+  const participant = await prisma.applicationParticipant.findFirst({
+    where: {
+      applicationId,
+      studentId,
+      student: {
+        active: true,
+        ...(context.role === AdminRole.TEACHER ? { churchId: context.churchId || "__missing_church__" } : {}),
+      },
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (!participant) {
+    errorRedirect(errorPath, "Aluno nao esta vinculado a esta prova ou esta fora do seu escopo.");
+  }
+
+  const attempt = await prisma.attempt.findFirst({
+    where: {
+      applicationId,
+      studentId,
+    },
+    select: { id: true },
+  });
+
+  if (attempt) {
+    errorRedirect(errorPath, "Nao e possivel desvincular aluno que ja iniciou esta prova.");
+  }
+
+  await prisma.$transaction([
+    prisma.examApplicationParticipantOverride.upsert({
+      where: {
+        applicationId_studentId: {
+          applicationId,
+          studentId,
+        },
+      },
+      update: {
+        mode: ApplicationParticipantOverrideMode.EXCLUDE,
+      },
+      create: {
+        applicationId,
+        studentId,
+        mode: ApplicationParticipantOverrideMode.EXCLUDE,
+      },
+    }),
+    prisma.applicationParticipant.deleteMany({
+      where: {
+        applicationId,
+        studentId,
+      },
+    }),
+  ]);
+
+  revalidatePath("/admin");
+  revalidatePath("/admin/provas");
+  revalidatePath(`/admin/provas/${applicationId}/editar`);
+  revalidatePath("/prova");
+  redirect(`/admin/provas/${applicationId}/editar?ok=aluno-desvinculado`);
 }
 
 export async function deleteExamApplicationAction(formData: FormData) {
