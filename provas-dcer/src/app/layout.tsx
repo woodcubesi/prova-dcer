@@ -17,6 +17,12 @@ export default function RootLayout({
       <body className="min-h-full bg-background text-foreground">
         <FormDraftManager />
         {children}
+        <footer className="px-3 pb-3 text-center text-[10px] leading-relaxed text-[#7f8aa5]">
+          Desenvolvido por Josu&eacute; Sampaio Lopes Coutinho -{" "}
+          <a className="hover:text-[#c7d2ff]" href="mailto:josue@woodcube.com.br">
+            josue@woodcube.com.br
+          </a>
+        </footer>
       </body>
     </html>
   );
