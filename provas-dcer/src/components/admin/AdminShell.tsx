@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { logoutAdminAction } from "@/app/actions/admin";
 import { BrandLockup } from "@/components/BrandLockup";
+import { AdminRole } from "@/generated/prisma/client";
+import { getAdminContext } from "@/lib/auth";
 
 type AdminShellProps = {
   title: string;
@@ -8,9 +10,21 @@ type AdminShellProps = {
   children: React.ReactNode;
 };
 
-export function AdminShell({ title, description, children }: AdminShellProps) {
+export async function AdminShell({ title, description, children }: AdminShellProps) {
+  const context = await getAdminContext();
+  const isTeacher = context?.role === AdminRole.TEACHER;
   const navLinkClass =
     "rounded-md border border-[#d8def0] px-3 py-2 text-center hover:bg-[#f7f8ff]";
+  const navLinks = [
+    { href: "/admin", label: "Painel", visible: true },
+    { href: "/admin/cadastros", label: "Cadastros", visible: true },
+    { href: "/admin/equipe", label: "Equipe", visible: !isTeacher },
+    { href: "/admin/eventos", label: "Eventos", visible: true },
+    { href: "/admin/provas", label: "Provas", visible: !isTeacher },
+    { href: "/admin/correcao", label: "Correcao", visible: true },
+    { href: "/admin/relatorios", label: "Relatorios", visible: true },
+    { href: "/admin/seguranca", label: "Seguranca", visible: !isTeacher },
+  ];
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-7xl px-3 py-4 sm:px-6 lg:px-8">
@@ -27,27 +41,13 @@ export function AdminShell({ title, description, children }: AdminShellProps) {
             </div>
           </div>
           <nav className="grid grid-cols-2 gap-2 p-3 text-sm sm:flex sm:flex-wrap sm:p-4">
-            <Link className={navLinkClass} href="/admin">
-              Painel
-            </Link>
-            <Link className={navLinkClass} href="/admin/cadastros">
-              Cadastros
-            </Link>
-            <Link className={navLinkClass} href="/admin/equipe">
-              Equipe
-            </Link>
-            <Link className={navLinkClass} href="/admin/eventos">
-              Eventos
-            </Link>
-            <Link className={navLinkClass} href="/admin/provas">
-              Provas
-            </Link>
-            <Link className={navLinkClass} href="/admin/correcao">
-              Correcao
-            </Link>
-            <Link className={navLinkClass} href="/admin/seguranca">
-              Seguranca
-            </Link>
+            {navLinks
+              .filter((link) => link.visible)
+              .map((link) => (
+                <Link key={link.href} className={navLinkClass} href={link.href}>
+                  {link.label}
+                </Link>
+              ))}
             <form action={logoutAdminAction} className="col-span-2 sm:col-span-1">
               <button className="w-full rounded-md bg-[#000060] px-3 py-2 font-medium text-white hover:bg-[#000044]">
                 Sair

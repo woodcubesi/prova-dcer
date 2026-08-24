@@ -1072,7 +1072,7 @@ export async function confirmAdminMfaResetAction(formData: FormData) {
 }
 
 export async function createStaffUserAction(formData: FormData) {
-  const context = await requireAdminContext();
+  const context = await requireAdminRole([AdminRole.ADMIN, AdminRole.ADMIN_TEACHER]);
 
   const parsed = staffUserSchema.safeParse({
     name: String(formData.get("name") || ""),
@@ -1134,7 +1134,7 @@ export async function createStaffUserAction(formData: FormData) {
 }
 
 export async function updateStaffUserAction(formData: FormData) {
-  const context = await requireAdminContext();
+  const context = await requireAdminRole([AdminRole.ADMIN, AdminRole.ADMIN_TEACHER]);
   const id = String(formData.get("id") || "");
 
   const parsed = staffUpdateSchema.safeParse({
@@ -1506,7 +1506,7 @@ export async function updateStudentAction(formData: FormData) {
 }
 
 export async function createExamAction(formData: FormData) {
-  const context = await requireAdminContext();
+  const context = await requireAdminRole([AdminRole.ADMIN, AdminRole.ADMIN_TEACHER]);
   const errorPath = "/admin/provas/nova";
   const payload = parseExamPayload(formData, errorPath);
   validateQuestionAudience(payload, errorPath);
@@ -1598,7 +1598,7 @@ export async function createExamAction(formData: FormData) {
 }
 
 export async function updateExamAction(formData: FormData) {
-  const context = await requireAdminContext();
+  const context = await requireAdminRole([AdminRole.ADMIN, AdminRole.ADMIN_TEACHER]);
   const applicationId = String(formData.get("applicationId") || "");
   const errorPath = applicationId ? `/admin/provas/${applicationId}/editar` : "/admin/provas";
 
@@ -1788,7 +1788,7 @@ export async function updateExamAction(formData: FormData) {
 }
 
 export async function linkApplicationParticipantAction(formData: FormData) {
-  const context = await requireAdminContext();
+  const context = await requireAdminRole([AdminRole.ADMIN, AdminRole.ADMIN_TEACHER]);
   const applicationId = String(formData.get("applicationId") || "");
   const studentId = String(formData.get("studentId") || "");
   const returnPath = applicationId ? getApplicationParticipantReturnPath(applicationId, formData) : "/admin/provas";
@@ -1852,7 +1852,7 @@ export async function linkApplicationParticipantAction(formData: FormData) {
 }
 
 export async function unlinkApplicationParticipantAction(formData: FormData) {
-  const context = await requireAdminContext();
+  const context = await requireAdminRole([AdminRole.ADMIN, AdminRole.ADMIN_TEACHER]);
   const applicationId = String(formData.get("applicationId") || "");
   const studentId = String(formData.get("studentId") || "");
   const returnPath = applicationId ? getApplicationParticipantReturnPath(applicationId, formData) : "/admin/provas";
@@ -1924,7 +1924,7 @@ export async function unlinkApplicationParticipantAction(formData: FormData) {
 }
 
 export async function deleteExamApplicationAction(formData: FormData) {
-  const context = await requireAdminContext();
+  const context = await requireAdminRole([AdminRole.ADMIN, AdminRole.ADMIN_TEACHER]);
   const applicationId = String(formData.get("applicationId") || "");
 
   if (!applicationId) {

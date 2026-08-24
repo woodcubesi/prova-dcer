@@ -71,7 +71,7 @@ export default async function CorrectionPage({ searchParams }: CorrectionPagePro
         },
       };
 
-  const [churches, applications, attempts] = await Promise.all([
+  const [churches, applications, attempts, eventAttemptCount] = await Promise.all([
     prisma.church.findMany({
       where: {
         active: true,
@@ -124,6 +124,19 @@ export default async function CorrectionPage({ searchParams }: CorrectionPagePro
         answers: true,
       },
     }),
+    prisma.attempt.count({
+      where: {
+        status: { in: finalStatuses },
+        eventRegistrationId: { not: null },
+        ...(churchFilterId
+          ? {
+              eventRegistration: {
+                churchId: churchFilterId,
+              },
+            }
+          : {}),
+      },
+    }),
   ]);
   const selectedApplication = applications.find((application) => application.id === selectedApplicationId) || null;
 
@@ -146,7 +159,7 @@ export default async function CorrectionPage({ searchParams }: CorrectionPagePro
               href="/admin/correcao/eventos"
               className="rounded-md border border-[#000060] px-3 py-2 text-sm font-semibold text-[#000060] hover:bg-[#effaf2]"
             >
-              Correcao de eventos
+              Correcao de eventos{eventAttemptCount > 0 ? ` (${eventAttemptCount})` : ""}
             </Link>
             <span className="rounded-full bg-[#effaf2] px-3 py-1 text-sm font-semibold text-[#1f623e]">
               {attempts.length} envio(s)

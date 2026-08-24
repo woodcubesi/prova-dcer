@@ -6,7 +6,7 @@ import {
 } from "@/app/actions/admin";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { AdminRole } from "@/generated/prisma/client";
-import { requireAdminContext } from "@/lib/auth";
+import { requireAdminRole } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -68,6 +68,8 @@ function StaffForm({ canChooseProfile, churches, fixedChurch, editingUser }: Sta
     <form
       action={isEditing ? updateStaffUserAction : createStaffUserAction}
       className="rounded-lg border border-[#d8def0] bg-white p-4"
+      autoComplete="off"
+      data-form-draft-id={isEditing ? `staff-${editingUser?.id}` : "staff-new"}
     >
       {editingUser ? <input type="hidden" name="id" value={editingUser.id} /> : null}
       <h2 className="text-lg font-semibold">{isEditing ? "Editar pessoa da equipe" : "Nova pessoa da equipe"}</h2>
@@ -85,6 +87,7 @@ function StaffForm({ canChooseProfile, churches, fixedChurch, editingUser }: Sta
           <input
             name="name"
             defaultValue={editingUser?.name || ""}
+            autoComplete="off"
             className="mt-1 w-full rounded-md border border-[#c5cce4] px-3 py-3 outline-none focus:ring-2 focus:ring-[#000060]"
             placeholder="Ex.: Maria Oliveira"
           />
@@ -96,6 +99,7 @@ function StaffForm({ canChooseProfile, churches, fixedChurch, editingUser }: Sta
             name="email"
             type="email"
             defaultValue={editingUser?.email || ""}
+            autoComplete="new-email"
             className="mt-1 w-full rounded-md border border-[#c5cce4] px-3 py-3 outline-none focus:ring-2 focus:ring-[#000060]"
             placeholder="nome@email.com"
           />
@@ -106,6 +110,7 @@ function StaffForm({ canChooseProfile, churches, fixedChurch, editingUser }: Sta
           <input
             name="password"
             type="password"
+            autoComplete="new-password"
             className="mt-1 w-full rounded-md border border-[#c5cce4] px-3 py-3 outline-none focus:ring-2 focus:ring-[#000060]"
             placeholder={isEditing ? "Deixe em branco para manter" : "Minimo 6 caracteres"}
           />
@@ -173,7 +178,7 @@ function StaffForm({ canChooseProfile, churches, fixedChurch, editingUser }: Sta
 }
 
 export default async function StaffPage({ searchParams }: StaffPageProps) {
-  const context = await requireAdminContext();
+  const context = await requireAdminRole([AdminRole.ADMIN, AdminRole.ADMIN_TEACHER]);
   const params = searchParams ? await searchParams : {};
   const isTeacherOnly = context.role === AdminRole.TEACHER;
   const scopedChurchId = isTeacherOnly ? context.churchId : null;

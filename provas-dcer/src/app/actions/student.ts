@@ -142,6 +142,7 @@ async function startEventAttempt(applicationId: string, registrationCode: string
     where: { registrationCode },
     include: {
       event: true,
+      student: true,
       assignments: {
         where: {
           eventApplication: {
@@ -224,7 +225,7 @@ async function startEventAttempt(applicationId: string, registrationCode: string
     data: {
       applicationId,
       eventRegistrationId: registration.id,
-      expiresAt: getAttemptExpirationDate(now, application.exam.durationMinutes, {}),
+      expiresAt: getAttemptExpirationDate(now, application.exam.durationMinutes, registration.student || {}),
       totalPoints: 0,
     },
   });

@@ -1,7 +1,7 @@
 import { AdminShell } from "@/components/admin/AdminShell";
 import { ExamBuilder } from "@/components/admin/ExamBuilder";
 import { AdminRole } from "@/generated/prisma/client";
-import { requireAdminContext } from "@/lib/auth";
+import { requireAdminRole } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -13,7 +13,7 @@ type NewExamPageProps = {
 };
 
 export default async function NewExamPage({ searchParams }: NewExamPageProps) {
-  const context = await requireAdminContext();
+  const context = await requireAdminRole([AdminRole.ADMIN, AdminRole.ADMIN_TEACHER]);
   const params = searchParams ? await searchParams : {};
   const isTeacher = context.role === AdminRole.TEACHER;
   const scopedChurchId = isTeacher ? context.churchId : null;

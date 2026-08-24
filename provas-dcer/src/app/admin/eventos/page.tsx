@@ -33,23 +33,7 @@ export default async function EventsPage({ searchParams }: EventsPageProps) {
   const canManageEvents = isEventManager(context.role);
 
   const events = await prisma.event.findMany({
-    where: isTeacher
-      ? {
-          applications: {
-            some: {
-              application: {
-                participants: {
-                  some: {
-                    student: {
-                      churchId: scopedChurchFilter,
-                    },
-                  },
-                },
-              },
-            },
-          },
-        }
-      : {},
+    where: isTeacher ? { active: true } : {},
     orderBy: { createdAt: "desc" },
     include: {
       _count: {

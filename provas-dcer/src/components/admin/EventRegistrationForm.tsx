@@ -82,11 +82,14 @@ export function EventRegistrationForm({
   applications,
   initialValues,
 }: EventRegistrationFormProps) {
+  const fixedChurch = churches.length === 1 ? churches[0] : null;
+  const initialChurchId = initialValues.churchId || fixedChurch?.id || "";
+  const initialLeaderUserId = initialValues.leaderUserId || (leaders.length === 1 ? leaders[0].id : "");
   const [mode, setMode] = useState<RegistrationMode>(initialValues.mode);
-  const [churchId, setChurchId] = useState(initialValues.churchId);
+  const [churchId, setChurchId] = useState(initialChurchId);
   const [studentId, setStudentId] = useState(initialValues.studentId);
   const [program, setProgram] = useState<ParticipantProgram>(initialValues.program);
-  const [leaderUserId, setLeaderUserId] = useState(initialValues.leaderUserId);
+  const [leaderUserId, setLeaderUserId] = useState(initialLeaderUserId);
 
   const filteredStudents = useMemo(
     () => students.filter((student) => !churchId || student.churchId === churchId),
@@ -101,7 +104,7 @@ export function EventRegistrationForm({
   const selectedApplicationIds = new Set(initialValues.eventApplicationIds);
 
   return (
-    <form action={createEventRegistrationAction} className="grid gap-4">
+    <form action={createEventRegistrationAction} className="grid gap-4" data-form-draft-id={`event-registration-${eventId}`}>
       <input type="hidden" name="eventId" value={eventId} />
       <input type="hidden" name="registrationMode" value={mode} />
 
@@ -143,26 +146,36 @@ export function EventRegistrationForm({
       </fieldset>
 
       <div className="grid gap-3 lg:grid-cols-2">
-        <label className="block">
-          <span className="text-sm font-medium">Igreja ou embaixada</span>
-          <select
-            name="churchId"
-            value={churchId}
-            onChange={(event) => {
-              setChurchId(event.target.value);
-              setStudentId("");
-              setLeaderUserId("");
-            }}
-            className="mt-1 w-full rounded-md border border-[#c5cce4] bg-white px-3 py-3 outline-none focus:ring-2 focus:ring-[#000060]"
-          >
-            <option value="">Selecione a igreja</option>
-            {churches.map((church) => (
-              <option key={church.id} value={church.id}>
-                {churchLabel(church)}
-              </option>
-            ))}
-          </select>
-        </label>
+        {fixedChurch ? (
+          <label className="block">
+            <span className="text-sm font-medium">Igreja ou embaixada</span>
+            <input type="hidden" name="churchId" value={fixedChurch.id} />
+            <div className="mt-1 rounded-md border border-[#c5cce4] bg-[#f8faff] px-3 py-3 text-sm">
+              {churchLabel(fixedChurch)}
+            </div>
+          </label>
+        ) : (
+          <label className="block">
+            <span className="text-sm font-medium">Igreja ou embaixada</span>
+            <select
+              name="churchId"
+              value={churchId}
+              onChange={(event) => {
+                setChurchId(event.target.value);
+                setStudentId("");
+                setLeaderUserId("");
+              }}
+              className="mt-1 w-full rounded-md border border-[#c5cce4] bg-white px-3 py-3 outline-none focus:ring-2 focus:ring-[#000060]"
+            >
+              <option value="">Selecione a igreja</option>
+              {churches.map((church) => (
+                <option key={church.id} value={church.id}>
+                  {churchLabel(church)}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
 
         {mode === "existing" ? (
           <label className="block">

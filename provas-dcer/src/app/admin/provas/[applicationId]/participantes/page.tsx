@@ -5,7 +5,7 @@ import { AdminShell } from "@/components/admin/AdminShell";
 import { ConfirmSubmitButton } from "@/components/admin/ConfirmSubmitButton";
 import { AdminRole, ApplicationParticipantOverrideMode } from "@/generated/prisma/client";
 import { getCategoryLabel, type CategoryCode } from "@/lib/categories";
-import { requireAdminContext } from "@/lib/auth";
+import { requireAdminRole } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -21,7 +21,7 @@ type ParticipantsPageProps = {
 };
 
 export default async function ExamParticipantsPage({ params, searchParams }: ParticipantsPageProps) {
-  const context = await requireAdminContext();
+  const context = await requireAdminRole([AdminRole.ADMIN, AdminRole.ADMIN_TEACHER]);
   const { applicationId } = await params;
   const query = searchParams ? await searchParams : {};
   const isTeacher = context.role === AdminRole.TEACHER;

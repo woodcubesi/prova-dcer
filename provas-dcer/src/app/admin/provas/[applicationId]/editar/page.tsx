@@ -7,7 +7,7 @@ import { ExamBuilder, type ExamBuilderInitialData } from "@/components/admin/Exa
 import { AdminRole } from "@/generated/prisma/client";
 import { formatDateInput } from "@/lib/application-availability";
 import { type CategoryCode } from "@/lib/categories";
-import { requireAdminContext } from "@/lib/auth";
+import { requireAdminRole } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -27,7 +27,7 @@ function uniqueValues<T>(values: T[]) {
 }
 
 export default async function EditExamPage({ params, searchParams }: EditExamPageProps) {
-  const context = await requireAdminContext();
+  const context = await requireAdminRole([AdminRole.ADMIN, AdminRole.ADMIN_TEACHER]);
   const { applicationId } = await params;
   const query = searchParams ? await searchParams : {};
   const isTeacher = context.role === AdminRole.TEACHER;

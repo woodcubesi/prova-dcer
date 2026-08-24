@@ -9,6 +9,7 @@ type ApplicationOption = {
   examTitle: string;
   eventTitle: string | null;
   eventTypeLabel: string | null;
+  eventRegistrationCode: string | null;
   durationMinutes: number;
   baseDurationMinutes: number;
   endsAt: string | null;
@@ -161,6 +162,7 @@ export function StudentEntry() {
 
           <form action={startAttemptAction} className="grid gap-4">
             <input type="hidden" name="registrationNumber" value={lookup.student.registrationNumber} />
+            <input type="hidden" name="eventRegistrationCode" value={application?.eventRegistrationCode || ""} />
 
             <label className="block">
               <span className="text-sm font-medium">Prova disponivel</span>

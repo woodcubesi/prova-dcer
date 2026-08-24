@@ -72,23 +72,7 @@ export default async function EventRegistrationsPage({ params, searchParams }: E
     prisma.event.findFirst({
       where: {
         id: eventId,
-        ...(isTeacher
-          ? {
-              applications: {
-                some: {
-                  application: {
-                    participants: {
-                      some: {
-                        student: {
-                          churchId: scopedChurchFilter,
-                        },
-                      },
-                    },
-                  },
-                },
-              },
-            }
-          : {}),
+        ...(isTeacher ? { active: true } : {}),
       },
       include: {
         applications: {

@@ -66,6 +66,26 @@ export type ApplicationSummaryPdfData = {
   }>;
 };
 
+export type EventRankingPdfData = {
+  eventTitle: string;
+  applicationTitle?: string | null;
+  category?: string | null;
+  churchName?: string | null;
+  generatedAt: Date;
+  rows: Array<{
+    participantName: string;
+    registrationCode: string;
+    churchName: string;
+    category: string;
+    applicationTitle: string;
+    examTitle: string;
+    status: string;
+    score?: number | null;
+    totalPoints?: number | null;
+    timeUsedSeconds?: number | null;
+  }>;
+};
+
 export type EventBadgePdfData = {
   eventTitle: string;
   participantName: string;
@@ -272,6 +292,47 @@ export function buildApplicationSummaryPdf(data: ApplicationSummaryPdfData) {
           drawStudentRow(doc, row);
         });
     }
+  });
+}
+
+export function buildEventRankingPdf(data: EventRankingPdfData) {
+  return createPdfBuffer((doc) => {
+    doc.info.Title = `Ranking - ${data.eventTitle}`;
+    drawHeader(doc, "Ranking geral do evento", data.eventTitle);
+
+    const rowResults = data.rows.map((row) => {
+      const result = getApprovalResult(row.score ?? 0, row.totalPoints ?? 0, 0);
+
+      return {
+        ...row,
+        ...result,
+        label: getStatusLabel(row.status),
+      };
+    });
+    const rankedRows = [...rowResults].sort(compareEventRankingRows);
+    const average = rankedRows.length
+      ? rankedRows.reduce((sum, row) => sum + (row.percent ?? 0), 0) / rankedRows.length
+      : 0;
+
+    drawMetaGrid(doc, [
+      ["Evento", data.eventTitle],
+      ["Prova", data.applicationTitle || "Todas as provas do evento"],
+      ["Categoria", data.category ? getCategoryLabel(data.category) : "Todas as categorias"],
+      ["Igreja", data.churchName || "Todas as igrejas"],
+      ["Gerado em", data.generatedAt.toLocaleString("pt-BR")],
+      ["Provas concluidas", String(rankedRows.length)],
+      ["Media", formatPercent(average)],
+    ]);
+
+    sectionTitle(doc, "Classificacao");
+
+    if (rankedRows.length === 0) {
+      doc.font("Helvetica").fontSize(10).fillColor(mutedColor).text("Nenhuma prova finalizada para este filtro.");
+      return;
+    }
+
+    drawEventRankingTableHeader(doc);
+    rankedRows.forEach((row, index) => drawEventRankingRow(doc, row, index + 1));
   });
 }
 
@@ -546,6 +607,57 @@ function drawStudentRow(
   doc.y = y + 34;
 }
 
+function drawEventRankingTableHeader(doc: PDFKit.PDFDocument) {
+  ensureSpace(doc, 42);
+  const y = doc.y;
+  doc.roundedRect(pageMargin, y, contentWidth(doc), 24, 4).fill(brandColor);
+  doc.font("Helvetica-Bold").fontSize(7.5).fillColor("#ffffff");
+  doc.text("Pos.", pageMargin + 8, y + 8, { width: 26 });
+  doc.text("Inscrito", pageMargin + 40, y + 8, { width: 108 });
+  doc.text("Igreja", pageMargin + 154, y + 8, { width: 90 });
+  doc.text("Prova", pageMargin + 250, y + 8, { width: 86 });
+  doc.text("Pontos", pageMargin + 342, y + 8, { width: 46 });
+  doc.text("Acertos", pageMargin + 394, y + 8, { width: 46 });
+  doc.text("Tempo", pageMargin + 446, y + 8, { width: 44 });
+  doc.text("Status", pageMargin + 496, y + 8, { width: 44 });
+  doc.y = y + 30;
+}
+
+function drawEventRankingRow(
+  doc: PDFKit.PDFDocument,
+  row: EventRankingPdfData["rows"][number] & {
+    percent: number | null;
+    passed: boolean;
+    label: string;
+  },
+  rank: number,
+) {
+  ensureSpace(doc, 38);
+  const y = doc.y;
+  const score = `${formatScore(row.score ?? 0)}/${formatScore(row.totalPoints ?? 0)}`;
+  const participantLine = `${row.participantName} (${row.registrationCode})`;
+
+  doc.roundedRect(pageMargin, y, contentWidth(doc), 32, 3).fillAndStroke("#ffffff", borderColor);
+  doc.font("Helvetica-Bold").fontSize(8).fillColor("#111827").text(`${rank}.`, pageMargin + 8, y + 7, { width: 26 });
+  doc.font("Helvetica").text(participantLine, pageMargin + 40, y + 7, { width: 108, ellipsis: true });
+  doc.fontSize(7).fillColor(mutedColor).text(getCategoryLabel(row.category), pageMargin + 40, y + 18, {
+    width: 108,
+    ellipsis: true,
+  });
+  doc.font("Helvetica").fontSize(8).fillColor("#111827").text(row.churchName, pageMargin + 154, y + 7, {
+    width: 90,
+    ellipsis: true,
+  });
+  doc.text(row.applicationTitle || row.examTitle, pageMargin + 250, y + 7, { width: 86, ellipsis: true });
+  doc.text(score, pageMargin + 342, y + 7, { width: 46 });
+  doc.text(formatPercent(row.percent ?? 0), pageMargin + 394, y + 7, { width: 46 });
+  doc.text(row.timeUsedSeconds ? formatDuration(row.timeUsedSeconds) : "-", pageMargin + 446, y + 7, { width: 44 });
+  doc.font("Helvetica-Bold").fillColor(getResultColor(row)).text(row.label, pageMargin + 496, y + 7, {
+    width: 44,
+  });
+  doc.y = y + 38;
+}
+
 function addPageNumbers(doc: PDFKit.PDFDocument) {
   const range = doc.bufferedPageRange();
 
@@ -593,4 +705,22 @@ function compareRankingRows(
   if (timeDiff !== 0) return timeDiff;
 
   return first.studentName.localeCompare(second.studentName, "pt-BR");
+}
+
+function compareEventRankingRows(
+  first: EventRankingPdfData["rows"][number] & { percent: number | null },
+  second: EventRankingPdfData["rows"][number] & { percent: number | null },
+) {
+  const percentDiff = (second.percent ?? 0) - (first.percent ?? 0);
+  if (percentDiff !== 0) return percentDiff;
+
+  const scoreDiff = (second.score ?? 0) - (first.score ?? 0);
+  if (scoreDiff !== 0) return scoreDiff;
+
+  const firstTime = first.timeUsedSeconds ?? Number.MAX_SAFE_INTEGER;
+  const secondTime = second.timeUsedSeconds ?? Number.MAX_SAFE_INTEGER;
+  const timeDiff = firstTime - secondTime;
+  if (timeDiff !== 0) return timeDiff;
+
+  return first.participantName.localeCompare(second.participantName, "pt-BR");
 }
