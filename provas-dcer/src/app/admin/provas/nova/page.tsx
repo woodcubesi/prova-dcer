@@ -1,7 +1,7 @@
 import { AdminShell } from "@/components/admin/AdminShell";
 import { ExamBuilder } from "@/components/admin/ExamBuilder";
 import { AdminRole } from "@/generated/prisma/client";
-import { requireAdminContext } from "@/lib/auth";
+import { requireAdminRole } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -13,23 +13,33 @@ type NewExamPageProps = {
 };
 
 export default async function NewExamPage({ searchParams }: NewExamPageProps) {
-  const context = await requireAdminContext();
+  const context = await requireAdminRole([AdminRole.ADMIN, AdminRole.ADMIN_TEACHER]);
   const params = searchParams ? await searchParams : {};
   const isTeacher = context.role === AdminRole.TEACHER;
   const scopedChurchId = isTeacher ? context.churchId : null;
 
-  const churches = await prisma.church.findMany({
-    where: {
-      active: true,
-      ...(isTeacher ? { id: scopedChurchId || "__missing_church__" } : {}),
-    },
-    orderBy: { name: "asc" },
-    include: {
-      _count: {
-        select: { students: true },
+  const [churches, events] = await Promise.all([
+    prisma.church.findMany({
+      where: {
+        active: true,
+        ...(isTeacher ? { id: scopedChurchId || "__missing_church__" } : {}),
       },
-    },
-  });
+      orderBy: { name: "asc" },
+      include: {
+        _count: {
+          select: { students: true },
+        },
+      },
+    }),
+    prisma.event.findMany({
+      where: { active: true },
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        title: true,
+      },
+    }),
+  ]);
 
   return (
     <AdminShell
@@ -59,6 +69,7 @@ export default async function NewExamPage({ searchParams }: NewExamPageProps) {
             name: church.name,
             students: church._count.students,
           }))}
+          events={events}
         />
       )}
     </AdminShell>

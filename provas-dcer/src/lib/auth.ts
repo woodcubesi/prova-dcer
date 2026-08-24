@@ -5,8 +5,9 @@ import { AdminRole } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 
 const COOKIE_NAME = "provas_admin";
-const LEGACY_SESSION_VALUE = "admin";
+const MFA_COOKIE_NAME = "provas_admin_mfa";
 const USER_SESSION_PREFIX = "user:";
+const MFA_SESSION_PREFIX = "mfa:";
 const PASSWORD_HASH_PREFIX = "scrypt";
 
 type CurrentAdminUser = {
@@ -37,11 +38,11 @@ function sign(value: string) {
   return createHmac("sha256", sessionSecret()).update(value).digest("hex");
 }
 
-function buildToken(value = LEGACY_SESSION_VALUE) {
+function buildToken(value: string) {
   return `${value}.${sign(value)}`;
 }
 
-function readSignedValue(token?: string) {
+function readSignedToken(token?: string) {
   if (!token) return null;
 
   const [value, signature] = token.split(".");
@@ -58,11 +59,19 @@ function readSignedValue(token?: string) {
     return null;
   }
 
-  if (value === LEGACY_SESSION_VALUE || value.startsWith(USER_SESSION_PREFIX)) {
-    return value;
-  }
+  return value;
+}
 
-  return null;
+function readAdminSessionValue(token?: string) {
+  const value = readSignedToken(token);
+
+  return value?.startsWith(USER_SESSION_PREFIX) ? value : null;
+}
+
+function readMfaSessionValue(token?: string) {
+  const value = readSignedToken(token);
+
+  return value?.startsWith(MFA_SESSION_PREFIX) ? value : null;
 }
 
 function getUserSessionIdentity(value: string | null) {
@@ -97,22 +106,18 @@ export function verifyPassword(password: string, storedHash: string) {
   );
 }
 
-export async function createAdminSession(userId?: string) {
+export async function createAdminSession(userId: string) {
   const cookieStore = await cookies();
-  let value = LEGACY_SESSION_VALUE;
+  const sessionUser = await prisma.adminUser.findUnique({
+    where: { id: userId },
+    select: { sessionVersion: true },
+  });
 
-  if (userId) {
-    const sessionUser = await prisma.adminUser.findUnique({
-      where: { id: userId },
-      select: { sessionVersion: true },
-    });
-
-    if (!sessionUser) {
-      throw new Error("Admin user not found for session creation.");
-    }
-
-    value = `${USER_SESSION_PREFIX}${userId}:${sessionUser.sessionVersion}`;
+  if (!sessionUser) {
+    throw new Error("Admin user not found for session creation.");
   }
+
+  const value = `${USER_SESSION_PREFIX}${userId}:${sessionUser.sessionVersion}`;
 
   cookieStore.set(COOKIE_NAME, buildToken(value), {
     httpOnly: true,
@@ -121,16 +126,18 @@ export async function createAdminSession(userId?: string) {
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
   });
+  cookieStore.delete(MFA_COOKIE_NAME);
 }
 
 export async function clearAdminSession() {
   const cookieStore = await cookies();
   cookieStore.delete(COOKIE_NAME);
+  cookieStore.delete(MFA_COOKIE_NAME);
 }
 
 export async function getAdminSessionValue() {
   const cookieStore = await cookies();
-  return readSignedValue(cookieStore.get(COOKIE_NAME)?.value);
+  return readAdminSessionValue(cookieStore.get(COOKIE_NAME)?.value);
 }
 
 export async function getCurrentAdminUser() {
@@ -160,15 +167,6 @@ export async function getAdminContext() {
   const sessionValue = await getAdminSessionValue();
 
   if (!sessionValue) return null;
-
-  if (sessionValue === LEGACY_SESSION_VALUE) {
-    return {
-      user: null,
-      role: AdminRole.ADMIN,
-      churchId: null,
-      isLegacy: true,
-    } satisfies AdminContext;
-  }
 
   const user = await getCurrentAdminUser();
 
@@ -212,6 +210,75 @@ export async function requireAdminRole(roles: AdminRole[]) {
   return context;
 }
 
+export async function createAdminMfaChallenge(userId: string) {
+  const cookieStore = await cookies();
+  const sessionUser = await prisma.adminUser.findUnique({
+    where: { id: userId },
+    select: { sessionVersion: true },
+  });
+
+  if (!sessionUser) {
+    throw new Error("Admin user not found for MFA challenge creation.");
+  }
+
+  const value = `${MFA_SESSION_PREFIX}${userId}:${sessionUser.sessionVersion}`;
+
+  cookieStore.delete(COOKIE_NAME);
+  cookieStore.set(MFA_COOKIE_NAME, buildToken(value), {
+    httpOnly: true,
+    maxAge: 10 * 60,
+    path: "/",
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+  });
+}
+
+export async function clearAdminMfaChallenge() {
+  const cookieStore = await cookies();
+  cookieStore.delete(MFA_COOKIE_NAME);
+}
+
+export async function getAdminMfaChallenge() {
+  const cookieStore = await cookies();
+  const sessionValue = readMfaSessionValue(cookieStore.get(MFA_COOKIE_NAME)?.value);
+
+  if (!sessionValue) return null;
+
+  const [id, sessionVersionValue] = sessionValue.slice(MFA_SESSION_PREFIX.length).split(":");
+  const sessionVersion = Number(sessionVersionValue);
+
+  if (!id || !Number.isInteger(sessionVersion) || sessionVersion < 0) {
+    return null;
+  }
+
+  return prisma.adminUser.findFirst({
+    where: {
+      id,
+      sessionVersion,
+      active: true,
+    },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      mfaEnabled: true,
+      mfaSecretEncrypted: true,
+      mfaLastUsedStep: true,
+      sessionVersion: true,
+    },
+  });
+}
+
+export async function requireAdminMfaChallenge() {
+  const user = await getAdminMfaChallenge();
+
+  if (!user) {
+    redirect("/admin/login");
+  }
+
+  return user;
+}
+
 export function getScopedChurchId(context: AdminContext) {
   return context.role === AdminRole.TEACHER ? context.churchId : null;
 }
@@ -222,8 +289,4 @@ export function hasAdministratorAccess(context: AdminContext) {
 
 export function isTeacherOnly(context: AdminContext) {
   return context.role === AdminRole.TEACHER;
-}
-
-export function getAdminPassword() {
-  return process.env.ADMIN_PASSWORD || "admin123";
 }

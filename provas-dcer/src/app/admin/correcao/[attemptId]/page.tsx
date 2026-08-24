@@ -35,9 +35,18 @@ export default async function CorrectionDetailPage({ params }: CorrectionDetailP
       id: attemptId,
       ...(isTeacher
         ? {
-            student: {
-              churchId: scopedChurchId || "__missing_church__",
-            },
+            OR: [
+              {
+                student: {
+                  churchId: scopedChurchId || "__missing_church__",
+                },
+              },
+              {
+                eventRegistration: {
+                  churchId: scopedChurchId || "__missing_church__",
+                },
+              },
+            ],
           }
         : {}),
     },
@@ -45,6 +54,12 @@ export default async function CorrectionDetailPage({ params }: CorrectionDetailP
       student: {
         include: {
           church: true,
+        },
+      },
+      eventRegistration: {
+        include: {
+          church: true,
+          event: true,
         },
       },
       application: {
@@ -75,8 +90,28 @@ export default async function CorrectionDetailPage({ params }: CorrectionDetailP
     notFound();
   }
 
+  const participant = attempt.student
+    ? {
+        name: attempt.student.name,
+        churchName: attempt.student.church.name,
+        category: attempt.student.category,
+        eventTitle: null as string | null,
+      }
+    : attempt.eventRegistration
+      ? {
+          name: attempt.eventRegistration.name,
+          churchName: attempt.eventRegistration.church.name,
+          category: attempt.eventRegistration.category,
+          eventTitle: attempt.eventRegistration.event.title,
+        }
+      : null;
+
+  if (!participant) {
+    notFound();
+  }
+
   const answerByQuestion = new Map(attempt.answers.map((answer) => [answer.questionId, answer]));
-  const questions = filterQuestionsForCategory(attempt.application.exam.questions, attempt.student.category);
+  const questions = filterQuestionsForCategory(attempt.application.exam.questions, participant.category);
   const totalPoints = questions.reduce((sum, question) => sum + question.points, 0);
   const score = attempt.answers.reduce((sum, answer) => sum + (answer.pointsAwarded || 0), 0);
   const passingPercent = attempt.application.exam.passingPercent ?? 70;
@@ -93,7 +128,8 @@ export default async function CorrectionDetailPage({ params }: CorrectionDetailP
             </Link>
             <h2 className="mt-2 text-2xl font-semibold">{attempt.application.exam.title}</h2>
             <p className="mt-1 text-sm text-[#5d6480]">
-              {attempt.student.name} - {attempt.student.church.name} - {getCategoryLabel(attempt.student.category)}
+              {participant.name} - {participant.churchName} - {getCategoryLabel(participant.category)}
+              {participant.eventTitle ? ` - ${participant.eventTitle}` : ""}
             </p>
             <Link
               href={`/admin/correcao/${attempt.id}/pdf`}

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import * as XLSX from "xlsx";
-import { requireAdminContext } from "@/lib/auth";
+import { AdminRole } from "@/generated/prisma/client";
+import { requireAdminRole } from "@/lib/auth";
 import type { CategoryCode } from "@/lib/categories";
 
 export const runtime = "nodejs";
@@ -163,7 +164,7 @@ type ImportColumns = {
 };
 
 export async function GET(request: Request) {
-  await requireAdminContext();
+  await requireAdminRole([AdminRole.ADMIN, AdminRole.ADMIN_TEACHER]);
 
   const url = new URL(request.url);
   const format = url.searchParams.get("formato")?.toLowerCase() === "csv" ? "csv" : "xlsx";
@@ -172,7 +173,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  await requireAdminContext();
+  await requireAdminRole([AdminRole.ADMIN, AdminRole.ADMIN_TEACHER]);
 
   try {
     const formData = await request.formData();

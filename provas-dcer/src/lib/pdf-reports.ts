@@ -2,6 +2,7 @@ import { existsSync } from "fs";
 import { join } from "path";
 import PDFDocument from "pdfkit";
 import type PDFKit from "pdfkit";
+import QRCode from "qrcode";
 import { getCategoryLabel } from "@/lib/categories";
 import { formatPercent, formatScore, getApprovalResult } from "@/lib/report-metrics";
 import { formatAvailabilityWindow, formatPurgeDate } from "@/lib/application-availability";
@@ -65,6 +66,35 @@ export type ApplicationSummaryPdfData = {
   }>;
 };
 
+export type EventRankingPdfData = {
+  eventTitle: string;
+  applicationTitle?: string | null;
+  category?: string | null;
+  churchName?: string | null;
+  generatedAt: Date;
+  rows: Array<{
+    participantName: string;
+    registrationCode: string;
+    churchName: string;
+    category: string;
+    applicationTitle: string;
+    examTitle: string;
+    status: string;
+    score?: number | null;
+    totalPoints?: number | null;
+    timeUsedSeconds?: number | null;
+  }>;
+};
+
+export type EventBadgePdfData = {
+  eventTitle: string;
+  participantName: string;
+  churchName: string;
+  category: string;
+  registrationCode: string;
+  qrTargetUrl: string;
+};
+
 const pageMargin = 48;
 const brandColor = "#000060";
 const brandYellow = "#fff200";
@@ -76,6 +106,12 @@ const successColor = "#1f623e";
 const dangerColor = "#b00018";
 const dcerLogoPath = join(process.cwd(), "public", "brand", "dcer-paulista-logo.png");
 const erInsigniaPath = join(process.cwd(), "public", "brand", "embaixadores-rei-insignia.png");
+const mrLogoPath = join(process.cwd(), "public", "brand", "mensageiras-rei-logo.png");
+const pointsPerMillimeter = 72 / 25.4;
+const creditCardPortraitSize: [number, number] = [
+  53.98 * pointsPerMillimeter,
+  85.6 * pointsPerMillimeter,
+];
 
 export async function createPdfBuffer(build: (doc: PDFKit.PDFDocument) => void) {
   const doc = new PDFDocument({
@@ -259,6 +295,138 @@ export function buildApplicationSummaryPdf(data: ApplicationSummaryPdfData) {
   });
 }
 
+export function buildEventRankingPdf(data: EventRankingPdfData) {
+  return createPdfBuffer((doc) => {
+    doc.info.Title = `Ranking - ${data.eventTitle}`;
+    drawHeader(doc, "Ranking geral do evento", data.eventTitle);
+
+    const rowResults = data.rows.map((row) => {
+      const result = getApprovalResult(row.score ?? 0, row.totalPoints ?? 0, 0);
+
+      return {
+        ...row,
+        ...result,
+        label: getStatusLabel(row.status),
+      };
+    });
+    const rankedRows = [...rowResults].sort(compareEventRankingRows);
+    const average = rankedRows.length
+      ? rankedRows.reduce((sum, row) => sum + (row.percent ?? 0), 0) / rankedRows.length
+      : 0;
+
+    drawMetaGrid(doc, [
+      ["Evento", data.eventTitle],
+      ["Prova", data.applicationTitle || "Todas as provas do evento"],
+      ["Categoria", data.category ? getCategoryLabel(data.category) : "Todas as categorias"],
+      ["Igreja", data.churchName || "Todas as igrejas"],
+      ["Gerado em", data.generatedAt.toLocaleString("pt-BR")],
+      ["Provas concluidas", String(rankedRows.length)],
+      ["Media", formatPercent(average)],
+    ]);
+
+    sectionTitle(doc, "Classificacao");
+
+    if (rankedRows.length === 0) {
+      doc.font("Helvetica").fontSize(10).fillColor(mutedColor).text("Nenhuma prova finalizada para este filtro.");
+      return;
+    }
+
+    drawEventRankingTableHeader(doc);
+    rankedRows.forEach((row, index) => drawEventRankingRow(doc, row, index + 1));
+  });
+}
+
+export async function buildEventBadgePdf(data: EventBadgePdfData) {
+  const doc = new PDFDocument({
+    size: creditCardPortraitSize,
+    margin: 0,
+    bufferPages: false,
+    info: {
+      Producer: "Provas DCER Paulista",
+      Creator: "Provas DCER Paulista",
+      Title: `Cracha - ${data.participantName}`,
+    },
+  });
+  const qrBuffer = await QRCode.toBuffer(data.qrTargetUrl, {
+    errorCorrectionLevel: "M",
+    margin: 1,
+    width: 256,
+  });
+  const chunks: Buffer[] = [];
+  const done = new Promise<Buffer>((resolve, reject) => {
+    doc.on("data", (chunk: Buffer) => chunks.push(chunk));
+    doc.on("end", () => resolve(Buffer.concat(chunks)));
+    doc.on("error", reject);
+  });
+  const width = doc.page.width;
+  const height = doc.page.height;
+  const cardInset = 4;
+  const contentX = 11;
+  const contentWidth = width - contentX * 2;
+  const qrSize = 88;
+  const registrationBoxWidth = width - 26;
+
+  doc.roundedRect(cardInset, cardInset, width - cardInset * 2, height - cardInset * 2, 7).fillAndStroke("#ffffff", borderColor);
+  doc.rect(cardInset, cardInset, width - cardInset * 2, 15).fill(brandColor);
+  doc.rect(cardInset, 19, width - cardInset * 2, 3).fill(brandYellow);
+  doc.rect(cardInset + (width - cardInset * 2) * 0.72, 19, (width - cardInset * 2) * 0.28, 3).fill(brandRed);
+
+  drawImageIfExists(doc, dcerLogoPath, (width - 54) / 2, 29, { width: 54 });
+
+  drawCenteredFittedText(doc, "PROVAS DCER PAULISTA", contentX, 58, contentWidth, 8, {
+    font: "Helvetica-Bold",
+    fontSize: 5.4,
+    minFontSize: 4.8,
+    color: brandColor,
+  });
+  drawCenteredFittedText(doc, data.eventTitle, contentX, 68, contentWidth, 20, {
+    font: "Helvetica-Bold",
+    fontSize: 7.8,
+    minFontSize: 5.6,
+    color: "#111827",
+  });
+  drawCenteredFittedText(doc, data.participantName, contentX, 91, contentWidth, 17, {
+    font: "Helvetica-Bold",
+    fontSize: 9.2,
+    minFontSize: 6.4,
+    color: "#111827",
+  });
+  drawCenteredFittedText(doc, `${data.churchName} - ${getCategoryLabel(data.category)}`, contentX, 109, contentWidth, 9, {
+    font: "Helvetica",
+    fontSize: 5.2,
+    minFontSize: 4.3,
+    color: mutedColor,
+  });
+
+  doc.image(qrBuffer, (width - qrSize) / 2, 122, { width: qrSize, height: qrSize });
+
+  doc
+    .roundedRect((width - registrationBoxWidth) / 2, 215, registrationBoxWidth, 18, 4)
+    .fillAndStroke(lightFill, borderColor);
+  doc
+    .font("Helvetica-Bold")
+    .fontSize(4.8)
+    .fillColor(mutedColor)
+    .text("INSCRICAO", (width - registrationBoxWidth) / 2, 218, {
+      width: registrationBoxWidth,
+      align: "center",
+      lineBreak: false,
+    });
+  doc
+    .font("Helvetica-Bold")
+    .fontSize(11.5)
+    .fillColor(brandColor)
+    .text(data.registrationCode.toUpperCase(), (width - registrationBoxWidth) / 2, 222.2, {
+      width: registrationBoxWidth,
+      align: "center",
+      lineBreak: false,
+    });
+
+  doc.end();
+
+  return done;
+}
+
 function contentWidth(doc: PDFKit.PDFDocument) {
   return doc.page.width - doc.page.margins.left - doc.page.margins.right;
 }
@@ -275,7 +443,8 @@ function drawHeader(doc: PDFKit.PDFDocument, title: string, subtitle: string) {
   const textWidth = contentWidth(doc) - 225;
 
   drawImageIfExists(doc, dcerLogoPath, pageMargin, headerY, { width: 148 });
-  drawImageIfExists(doc, erInsigniaPath, doc.page.width - pageMargin - 42, headerY + 4, { width: 42 });
+  drawImageIfExists(doc, erInsigniaPath, doc.page.width - pageMargin - 88, headerY + 4, { width: 38 });
+  drawImageIfExists(doc, mrLogoPath, doc.page.width - pageMargin - 42, headerY + 5, { width: 42 });
 
   doc
     .font("Helvetica-Bold")
@@ -306,6 +475,37 @@ function drawImageIfExists(
   } catch {
     // PDF generation should continue even if an optional brand asset cannot be read.
   }
+}
+
+function drawCenteredFittedText(
+  doc: PDFKit.PDFDocument,
+  text: string,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  options: {
+    font: string;
+    fontSize: number;
+    minFontSize: number;
+    color: string;
+  },
+) {
+  let fontSize = options.fontSize;
+
+  doc.font(options.font).fontSize(fontSize);
+  while (fontSize > options.minFontSize && doc.heightOfString(text, { width, align: "center" }) > height) {
+    fontSize -= 0.4;
+    doc.fontSize(fontSize);
+  }
+
+  doc.fillColor(options.color).text(text, x, y, {
+    width,
+    height,
+    align: "center",
+    ellipsis: true,
+    lineGap: 0,
+  });
 }
 
 function drawMetaGrid(doc: PDFKit.PDFDocument, entries: Array<[string, string]>) {
@@ -407,6 +607,57 @@ function drawStudentRow(
   doc.y = y + 34;
 }
 
+function drawEventRankingTableHeader(doc: PDFKit.PDFDocument) {
+  ensureSpace(doc, 42);
+  const y = doc.y;
+  doc.roundedRect(pageMargin, y, contentWidth(doc), 24, 4).fill(brandColor);
+  doc.font("Helvetica-Bold").fontSize(7.5).fillColor("#ffffff");
+  doc.text("Pos.", pageMargin + 8, y + 8, { width: 26 });
+  doc.text("Inscrito", pageMargin + 40, y + 8, { width: 108 });
+  doc.text("Igreja", pageMargin + 154, y + 8, { width: 90 });
+  doc.text("Prova", pageMargin + 250, y + 8, { width: 86 });
+  doc.text("Pontos", pageMargin + 342, y + 8, { width: 46 });
+  doc.text("Acertos", pageMargin + 394, y + 8, { width: 46 });
+  doc.text("Tempo", pageMargin + 446, y + 8, { width: 44 });
+  doc.text("Status", pageMargin + 496, y + 8, { width: 44 });
+  doc.y = y + 30;
+}
+
+function drawEventRankingRow(
+  doc: PDFKit.PDFDocument,
+  row: EventRankingPdfData["rows"][number] & {
+    percent: number | null;
+    passed: boolean;
+    label: string;
+  },
+  rank: number,
+) {
+  ensureSpace(doc, 38);
+  const y = doc.y;
+  const score = `${formatScore(row.score ?? 0)}/${formatScore(row.totalPoints ?? 0)}`;
+  const participantLine = `${row.participantName} (${row.registrationCode})`;
+
+  doc.roundedRect(pageMargin, y, contentWidth(doc), 32, 3).fillAndStroke("#ffffff", borderColor);
+  doc.font("Helvetica-Bold").fontSize(8).fillColor("#111827").text(`${rank}.`, pageMargin + 8, y + 7, { width: 26 });
+  doc.font("Helvetica").text(participantLine, pageMargin + 40, y + 7, { width: 108, ellipsis: true });
+  doc.fontSize(7).fillColor(mutedColor).text(getCategoryLabel(row.category), pageMargin + 40, y + 18, {
+    width: 108,
+    ellipsis: true,
+  });
+  doc.font("Helvetica").fontSize(8).fillColor("#111827").text(row.churchName, pageMargin + 154, y + 7, {
+    width: 90,
+    ellipsis: true,
+  });
+  doc.text(row.applicationTitle || row.examTitle, pageMargin + 250, y + 7, { width: 86, ellipsis: true });
+  doc.text(score, pageMargin + 342, y + 7, { width: 46 });
+  doc.text(formatPercent(row.percent ?? 0), pageMargin + 394, y + 7, { width: 46 });
+  doc.text(row.timeUsedSeconds ? formatDuration(row.timeUsedSeconds) : "-", pageMargin + 446, y + 7, { width: 44 });
+  doc.font("Helvetica-Bold").fillColor(getResultColor(row)).text(row.label, pageMargin + 496, y + 7, {
+    width: 44,
+  });
+  doc.y = y + 38;
+}
+
 function addPageNumbers(doc: PDFKit.PDFDocument) {
   const range = doc.bufferedPageRange();
 
@@ -454,4 +705,22 @@ function compareRankingRows(
   if (timeDiff !== 0) return timeDiff;
 
   return first.studentName.localeCompare(second.studentName, "pt-BR");
+}
+
+function compareEventRankingRows(
+  first: EventRankingPdfData["rows"][number] & { percent: number | null },
+  second: EventRankingPdfData["rows"][number] & { percent: number | null },
+) {
+  const percentDiff = (second.percent ?? 0) - (first.percent ?? 0);
+  if (percentDiff !== 0) return percentDiff;
+
+  const scoreDiff = (second.score ?? 0) - (first.score ?? 0);
+  if (scoreDiff !== 0) return scoreDiff;
+
+  const firstTime = first.timeUsedSeconds ?? Number.MAX_SAFE_INTEGER;
+  const secondTime = second.timeUsedSeconds ?? Number.MAX_SAFE_INTEGER;
+  const timeDiff = firstTime - secondTime;
+  if (timeDiff !== 0) return timeDiff;
+
+  return first.participantName.localeCompare(second.participantName, "pt-BR");
 }

@@ -7,7 +7,7 @@ import { ExamBuilder, type ExamBuilderInitialData } from "@/components/admin/Exa
 import { AdminRole } from "@/generated/prisma/client";
 import { formatDateInput } from "@/lib/application-availability";
 import { type CategoryCode } from "@/lib/categories";
-import { requireAdminContext } from "@/lib/auth";
+import { requireAdminRole } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -18,6 +18,7 @@ type EditExamPageProps = {
   }>;
   searchParams?: Promise<{
     erro?: string;
+    ok?: string;
   }>;
 };
 
@@ -26,13 +27,13 @@ function uniqueValues<T>(values: T[]) {
 }
 
 export default async function EditExamPage({ params, searchParams }: EditExamPageProps) {
-  const context = await requireAdminContext();
+  const context = await requireAdminRole([AdminRole.ADMIN, AdminRole.ADMIN_TEACHER]);
   const { applicationId } = await params;
   const query = searchParams ? await searchParams : {};
   const isTeacher = context.role === AdminRole.TEACHER;
   const scopedChurchId = isTeacher ? context.churchId : null;
 
-  const [application, churches] = await Promise.all([
+  const [application, churches, events] = await Promise.all([
     prisma.examApplication.findFirst({
       where: {
         id: applicationId,
@@ -71,9 +72,17 @@ export default async function EditExamPage({ params, searchParams }: EditExamPag
             },
           },
         },
+        eventApplications: {
+          take: 1,
+          select: {
+            eventId: true,
+            type: true,
+          },
+        },
         _count: {
           select: {
             attempts: true,
+            participants: true,
           },
         },
       },
@@ -88,6 +97,14 @@ export default async function EditExamPage({ params, searchParams }: EditExamPag
         _count: {
           select: { students: true },
         },
+      },
+    }),
+    prisma.event.findMany({
+      where: { active: true },
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        title: true,
       },
     }),
   ]);
@@ -111,6 +128,8 @@ export default async function EditExamPage({ params, searchParams }: EditExamPag
     passingPercent: application.exam.passingPercent ?? 70,
     applicationTitle: application.title,
     accessCode: application.accessCode,
+    eventId: application.eventApplications[0]?.eventId || "",
+    eventApplicationType: application.eventApplications[0]?.type || "GERAL",
     startsAt: formatDateInput(application.startsAt),
     endsAt: formatDateInput(application.endsAt),
     purgeAt: formatDateInput(application.purgeAt),
@@ -180,6 +199,34 @@ export default async function EditExamPage({ params, searchParams }: EditExamPag
           {query.erro}
         </div>
       ) : null}
+      {query.ok === "aluno-vinculado" ? (
+        <div className="mb-4 rounded-md border border-[#b9dfc7] bg-[#effaf2] px-4 py-3 text-sm text-[#1f623e]">
+          Aluno vinculado a esta prova.
+        </div>
+      ) : null}
+      {query.ok === "aluno-desvinculado" ? (
+        <div className="mb-4 rounded-md border border-[#b9dfc7] bg-[#effaf2] px-4 py-3 text-sm text-[#1f623e]">
+          Aluno desvinculado desta prova.
+        </div>
+      ) : null}
+
+      <section className="mb-5 rounded-lg border border-[#d8def0] bg-white p-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold">Participantes da prova</h2>
+            <p className="text-sm text-[#5d6480]">
+              {application._count.participants} aluno(s) vinculado(s). Gerencie a lista em uma tela separada para manter
+              este cadastro limpo.
+            </p>
+          </div>
+          <Link
+            href={`/admin/provas/${application.id}/participantes`}
+            className="rounded-md bg-[#000060] px-4 py-3 text-center text-sm font-semibold text-white hover:bg-[#000044]"
+          >
+            Ver alunos vinculados
+          </Link>
+        </div>
+      </section>
 
       <ExamBuilder
         mode="edit"
@@ -190,6 +237,7 @@ export default async function EditExamPage({ params, searchParams }: EditExamPag
           name: church.name,
           students: church._count.students,
         }))}
+        events={events}
       />
     </AdminShell>
   );

@@ -1,15 +1,10 @@
 import type { Metadata } from "next";
-import { Geist } from "next/font/google";
+import { FormDraftManager } from "@/components/FormDraftManager";
 import "./globals.css";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
 
 export const metadata: Metadata = {
   title: "Provas DCER Paulista",
-  description: "Aplicacao web do DCER Paulista para avaliacoes dos Embaixadores do Rei.",
+  description: "Aplicacao web do DCER Paulista para avaliacoes dos Embaixadores e Mensageiras do Rei.",
 };
 
 export default function RootLayout({
@@ -18,8 +13,17 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="pt-BR" className={`${geistSans.variable} h-full antialiased`}>
-      <body className="min-h-full bg-[#f4f6fb] text-[#11142f]">{children}</body>
+    <html lang="pt-BR" className="h-full antialiased">
+      <body className="min-h-full bg-background text-foreground">
+        <FormDraftManager />
+        {children}
+        <footer className="pointer-events-none fixed inset-x-0 bottom-1 z-40 px-3 text-center text-[10px] leading-relaxed text-[#7f8aa5]">
+          Desenvolvido por Josu&eacute; Sampaio Lopes Coutinho -{" "}
+          <a className="pointer-events-auto hover:text-[#c7d2ff]" href="mailto:josue@woodcube.com.br">
+            josue@woodcube.com.br
+          </a>
+        </footer>
+      </body>
     </html>
   );
 }
