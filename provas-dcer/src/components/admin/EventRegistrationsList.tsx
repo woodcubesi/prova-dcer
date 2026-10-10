@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { deleteEventRegistrationAction } from "@/app/actions/admin";
+import { deleteEventRegistrationAction, removeEventRegistrationAssignmentAction } from "@/app/actions/admin";
 import { ConfirmSubmitButton } from "@/components/admin/ConfirmSubmitButton";
 import { getCategoryLabel } from "@/lib/categories";
 import { getEventLeaderRoleLabel } from "@/lib/events";
@@ -74,10 +74,22 @@ export function EventRegistrationsList({ eventId, registrations }: EventRegistra
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
             {registration.assignments.map((assignment) => (
-              <span key={assignment.id} className="rounded-full bg-[#f8faff] px-3 py-1 text-xs font-semibold text-[#000060]">
-                {assignment.eventApplication.application.title}
-              </span>
+              <form key={assignment.id} action={removeEventRegistrationAssignmentAction}>
+                <input type="hidden" name="eventId" value={eventId} />
+                <input type="hidden" name="assignmentId" value={assignment.id} />
+                <ConfirmSubmitButton
+                  message={`Desvincular "${assignment.eventApplication.application.title}" de "${registration.name}"?`}
+                  className="rounded-full bg-[#f8faff] px-3 py-1 text-xs font-semibold text-[#000060] hover:bg-[#eef3ff]"
+                >
+                  {assignment.eventApplication.application.title} x
+                </ConfirmSubmitButton>
+              </form>
             ))}
+            {registration.assignments.length === 0 ? (
+              <span className="rounded-full bg-[#fff4f2] px-3 py-1 text-xs font-semibold text-[#b00018]">
+                Sem prova vinculada
+              </span>
+            ) : null}
           </div>
         </div>
       ))}

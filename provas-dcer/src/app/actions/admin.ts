@@ -2559,3 +2559,257 @@ export async function deleteEventRegistrationAction(formData: FormData) {
   revalidatePath("/prova");
   eventRegistrationRedirect(eventId, { ok: "inscricao-removida" });
 }
+
+export async function bulkAssignEventStudentsAction(formData: FormData) {
+  const context = await requireAdminContext();
+  const eventId = String(formData.get("eventId") || "");
+  const churchId = String(formData.get("churchId") || "").trim();
+  const eventApplicationId = String(formData.get("eventApplicationId") || "").trim();
+  const leaderUserId = String(formData.get("leaderUserId") || "").trim();
+  const studentIds = Array.from(new Set(formData.getAll("studentIds").map((value) => String(value)).filter(Boolean)));
+  const errorPath = eventId ? `/admin/eventos/${eventId}/inscricoes` : "/admin/eventos";
+
+  if (!eventId) {
+    errorRedirect("/admin/eventos", "Evento nao encontrado.");
+  }
+
+  const fail = (message: string): never => eventRegistrationRedirect(eventId, { erro: message });
+  const leaderRole = parseEventLeaderRole(formData.get("leaderRole"), eventId, fail);
+
+  if (!churchId) {
+    fail("Selecione a igreja dos alunos.");
+  }
+
+  if (!eventApplicationId) {
+    fail("Selecione a prova que sera vinculada.");
+  }
+
+  if (!leaderUserId) {
+    fail("Selecione o conselheiro ou orientador responsavel.");
+  }
+
+  if (studentIds.length === 0) {
+    fail("Selecione pelo menos um aluno para vincular a prova.");
+  }
+
+  const scopedChurchId = getScopedChurchId(context);
+
+  if (scopedChurchId && churchId !== scopedChurchId) {
+    fail("Conselheiros so podem vincular alunos da propria igreja.");
+  }
+
+  const [event, eventApplication, leader, students, existingRegistrations] = await Promise.all([
+    prisma.event.findUnique({
+      where: { id: eventId },
+      select: {
+        id: true,
+        maxApplicationsPerParticipant: true,
+      },
+    }),
+    prisma.eventApplication.findFirst({
+      where: {
+        id: eventApplicationId,
+        eventId,
+      },
+      select: {
+        id: true,
+      },
+    }),
+    prisma.adminUser.findFirst({
+      where: {
+        id: leaderUserId,
+        active: true,
+      },
+      select: {
+        id: true,
+        name: true,
+        churchId: true,
+      },
+    }),
+    prisma.student.findMany({
+      where: {
+        id: { in: studentIds },
+        active: true,
+        churchId,
+      },
+      select: {
+        id: true,
+        name: true,
+        normalizedName: true,
+        category: true,
+        program: true,
+        birthDate: true,
+        churchId: true,
+      },
+    }),
+    prisma.eventRegistration.findMany({
+      where: {
+        eventId,
+        studentId: { in: studentIds },
+      },
+      include: {
+        assignments: {
+          select: {
+            eventApplicationId: true,
+          },
+        },
+      },
+    }),
+  ]);
+
+  if (!event) {
+    errorRedirect(errorPath, "Evento nao encontrado.");
+  }
+
+  if (!eventApplication) {
+    fail("Prova nao encontrada neste evento.");
+  }
+
+  if (!leader) {
+    fail("Conselheiro ou orientador nao encontrado no cadastro de equipe.");
+  }
+
+  const selectedLeader = leader!;
+
+  if (selectedLeader.churchId && selectedLeader.churchId !== churchId) {
+    fail("Selecione um lider da mesma igreja dos alunos.");
+  }
+
+  if (students.length !== studentIds.length) {
+    fail("Um ou mais alunos selecionados nao pertencem a igreja escolhida.");
+  }
+
+  const registrationByStudentId = new Map(
+    existingRegistrations
+      .filter((registration) => registration.studentId)
+      .map((registration) => [registration.studentId!, registration]),
+  );
+  const studentsOverLimit = students.filter((student) => {
+    const registration = registrationByStudentId.get(student.id);
+    if (!registration) return false;
+
+    const alreadyLinked = registration.assignments.some((assignment) => assignment.eventApplicationId === eventApplicationId);
+    return !alreadyLinked && registration.assignments.length >= event.maxApplicationsPerParticipant;
+  });
+
+  if (studentsOverLimit.length > 0) {
+    fail(
+      `Um ou mais alunos ja atingiram o limite de ${event.maxApplicationsPerParticipant} prova(s) neste evento.`,
+    );
+  }
+
+  await prisma.$transaction(async (tx) => {
+    for (const student of students) {
+      const existingRegistration = registrationByStudentId.get(student.id);
+      const registration = existingRegistration
+        ? existingRegistration
+        : await tx.eventRegistration.create({
+            data: {
+              eventId,
+              registrationCode: await buildUniqueEventRegistrationCode(student.program),
+              studentId: student.id,
+              name: student.name,
+              normalizedName: student.normalizedName,
+              category: student.category,
+              program: student.program,
+              birthDate: student.birthDate,
+              churchId: student.churchId,
+              leaderUserId: selectedLeader.id,
+              leaderName: selectedLeader.name,
+              leaderRole,
+            },
+            include: {
+              assignments: {
+                select: {
+                  eventApplicationId: true,
+                },
+              },
+            },
+          });
+
+      const alreadyLinked = registration.assignments.some((assignment) => assignment.eventApplicationId === eventApplicationId);
+      if (alreadyLinked) continue;
+
+      await tx.eventRegistrationAssignment.create({
+        data: {
+          registrationId: registration.id,
+          eventApplicationId,
+        },
+      });
+    }
+  });
+
+  revalidatePath("/admin/eventos");
+  revalidatePath(`/admin/eventos/${eventId}`);
+  revalidatePath(`/admin/eventos/${eventId}/inscricoes`);
+  revalidatePath("/admin/correcao");
+  revalidatePath("/admin/correcao/eventos");
+  revalidatePath("/prova");
+  eventRegistrationRedirect(eventId, { ok: "vinculo" });
+}
+
+export async function removeEventRegistrationAssignmentAction(formData: FormData) {
+  const context = await requireAdminContext();
+  const eventId = String(formData.get("eventId") || "");
+  const assignmentId = String(formData.get("assignmentId") || "");
+  const errorPath = eventId ? `/admin/eventos/${eventId}/inscricoes` : "/admin/eventos";
+
+  if (!eventId || !assignmentId) {
+    errorRedirect(errorPath, "Vinculo de prova nao encontrado.");
+  }
+
+  const scopedChurchId = getScopedChurchId(context);
+  const assignment = await prisma.eventRegistrationAssignment.findFirst({
+    where: {
+      id: assignmentId,
+      registration: {
+        eventId,
+        ...(scopedChurchId ? { churchId: scopedChurchId } : {}),
+      },
+    },
+    include: {
+      registration: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+      eventApplication: {
+        select: {
+          applicationId: true,
+        },
+      },
+    },
+  });
+
+  if (!assignment) {
+    errorRedirect(errorPath, "Vinculo de prova nao encontrado.");
+  }
+
+  const existingAttempt = await prisma.attempt.findFirst({
+    where: {
+      applicationId: assignment.eventApplication.applicationId,
+      eventRegistrationId: assignment.registration.id,
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (existingAttempt) {
+    eventRegistrationRedirect(eventId, {
+      erro: `Nao e possivel desvincular esta prova de ${assignment.registration.name}, pois ela ja foi iniciada.`,
+    });
+  }
+
+  await prisma.eventRegistrationAssignment.delete({
+    where: { id: assignment.id },
+  });
+
+  revalidatePath("/admin/eventos");
+  revalidatePath(`/admin/eventos/${eventId}`);
+  revalidatePath(`/admin/eventos/${eventId}/inscricoes`);
+  revalidatePath("/admin/correcao/eventos");
+  revalidatePath("/prova");
+  eventRegistrationRedirect(eventId, { ok: "vinculo-removido" });
+}

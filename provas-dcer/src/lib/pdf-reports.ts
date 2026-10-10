@@ -95,6 +95,22 @@ export type EventBadgePdfData = {
   qrTargetUrl: string;
 };
 
+export type EventQrControlPdfData = {
+  eventTitle: string;
+  generatedAt: Date;
+  rows: Array<{
+    participantName: string;
+    registrationCode: string;
+    churchName: string;
+    category: string;
+    program: string;
+    applicationTitle: string;
+    examTitle: string;
+    typeLabel: string;
+    qrTargetUrl: string;
+  }>;
+};
+
 const pageMargin = 48;
 const brandColor = "#000060";
 const brandYellow = "#fff200";
@@ -427,6 +443,46 @@ export async function buildEventBadgePdf(data: EventBadgePdfData) {
   return done;
 }
 
+export async function buildEventQrControlPdf(data: EventQrControlPdfData) {
+  const rowsWithQr = await Promise.all(
+    data.rows.map(async (row) => ({
+      ...row,
+      qrBuffer: await QRCode.toBuffer(row.qrTargetUrl, {
+        errorCorrectionLevel: "M",
+        margin: 1,
+        width: 260,
+      }),
+    })),
+  );
+
+  return createPdfBuffer((doc) => {
+    doc.info.Title = `Controle QR - ${data.eventTitle}`;
+    drawQrControlCover(doc, data, rowsWithQr);
+
+    if (rowsWithQr.length === 0) {
+      return;
+    }
+
+    const groups = groupQrControlRows(rowsWithQr);
+
+    for (const group of groups) {
+      doc.addPage();
+      drawQrControlGroupHeader(doc, data.eventTitle, group);
+
+      group.rows.forEach((row, index) => {
+        const position = index % 6;
+
+        if (position === 0 && index > 0) {
+          doc.addPage();
+          drawQrControlGroupHeader(doc, data.eventTitle, group);
+        }
+
+        drawQrControlCard(doc, row, position);
+      });
+    }
+  });
+}
+
 function contentWidth(doc: PDFKit.PDFDocument) {
   return doc.page.width - doc.page.margins.left - doc.page.margins.right;
 }
@@ -503,6 +559,204 @@ function drawCenteredFittedText(
     width,
     height,
     align: "center",
+    ellipsis: true,
+    lineGap: 0,
+  });
+}
+
+function drawQrControlCover(
+  doc: PDFKit.PDFDocument,
+  data: EventQrControlPdfData,
+  rows: Array<EventQrControlPdfData["rows"][number] & { qrBuffer: Buffer }>,
+) {
+  drawHeader(doc, "Controle de QR Codes", data.eventTitle);
+  const registrations = new Set(rows.map((row) => row.registrationCode)).size;
+  const groups = groupQrControlRows(rows).length;
+
+  drawSummaryCards(doc, [
+    ["QR Codes", String(registrations)],
+    ["Alocacoes em provas", String(rows.length)],
+    ["Folhas prova/categoria", String(groups)],
+    ["Gerado em", data.generatedAt.toLocaleString("pt-BR")],
+  ]);
+
+  sectionTitle(doc, "Criterio de organizacao");
+  doc.font("Helvetica").fontSize(10).fillColor(mutedColor);
+  doc.text("Uma folha para cada combinacao de prova, grupo ER/MR e categoria.");
+  doc.moveDown(0.35);
+  doc.text("Cada item mostra QR Code, nome, igreja, grupo, categoria, numero de inscricao e campo de conferencia.");
+  doc.moveDown(0.35);
+  doc.text("Use este relatorio para imprimir e conferir os codigos antes da aplicacao das provas.");
+}
+
+function groupQrControlRows(rows: Array<EventQrControlPdfData["rows"][number] & { qrBuffer: Buffer }>) {
+  const grouped = new Map<
+    string,
+    {
+      applicationTitle: string;
+      examTitle: string;
+      typeLabel: string;
+      program: string;
+      category: string;
+      rows: Array<EventQrControlPdfData["rows"][number] & { qrBuffer: Buffer }>;
+    }
+  >();
+
+  for (const row of rows) {
+    const key = [row.applicationTitle, row.program, row.category].join("::");
+    const current = grouped.get(key);
+
+    if (current) {
+      current.rows.push(row);
+    } else {
+      grouped.set(key, {
+        applicationTitle: row.applicationTitle,
+        examTitle: row.examTitle,
+        typeLabel: row.typeLabel,
+        program: row.program,
+        category: row.category,
+        rows: [row],
+      });
+    }
+  }
+
+  return [...grouped.values()]
+    .map((group) => ({
+      ...group,
+      rows: group.rows.sort((first, second) => (
+        first.churchName.localeCompare(second.churchName, "pt-BR") ||
+        first.participantName.localeCompare(second.participantName, "pt-BR")
+      )),
+    }))
+    .sort((first, second) => (
+      first.applicationTitle.localeCompare(second.applicationTitle, "pt-BR") ||
+      first.program.localeCompare(second.program, "pt-BR") ||
+      getCategoryLabel(first.category).localeCompare(getCategoryLabel(second.category), "pt-BR")
+    ));
+}
+
+function drawQrControlGroupHeader(
+  doc: PDFKit.PDFDocument,
+  eventTitle: string,
+  group: {
+    applicationTitle: string;
+    examTitle: string;
+    typeLabel: string;
+    program: string;
+    category: string;
+    rows: unknown[];
+  },
+) {
+  const y = pageMargin - 12;
+  drawImageIfExists(doc, dcerLogoPath, pageMargin, y, { width: 80 });
+  drawImageIfExists(doc, erInsigniaPath, doc.page.width - pageMargin - 88, y + 4, { width: 36 });
+  drawImageIfExists(doc, mrLogoPath, doc.page.width - pageMargin - 42, y + 5, { width: 40 });
+
+  doc
+    .font("Helvetica-Bold")
+    .fontSize(14)
+    .fillColor(brandColor)
+    .text(group.applicationTitle, pageMargin + 96, y + 20, {
+      width: contentWidth(doc) - 190,
+      align: "center",
+    });
+  doc
+    .font("Helvetica-Bold")
+    .fontSize(10)
+    .fillColor(successColor)
+    .text(`${group.program} - ${getCategoryLabel(group.category)} - ${group.typeLabel} - ${group.rows.length} participante(s)`, pageMargin + 96, doc.y + 5, {
+      width: contentWidth(doc) - 190,
+      align: "center",
+    });
+  doc
+    .font("Helvetica")
+    .fontSize(8)
+    .fillColor(mutedColor)
+    .text(eventTitle, pageMargin + 96, doc.y + 3, {
+      width: contentWidth(doc) - 190,
+      align: "center",
+    });
+
+  const dividerY = pageMargin + 64;
+  doc.rect(pageMargin, dividerY, contentWidth(doc), 2).fill(brandYellow);
+  doc.y = dividerY + 24;
+}
+
+function drawQrControlCard(
+  doc: PDFKit.PDFDocument,
+  row: EventQrControlPdfData["rows"][number] & { qrBuffer: Buffer },
+  position: number,
+) {
+  const gapX = 14;
+  const gapY = 10;
+  const cardWidth = (contentWidth(doc) - gapX) / 2;
+  const cardHeight = 154;
+  const column = position % 2;
+  const line = Math.floor(position / 2);
+  const x = pageMargin + column * (cardWidth + gapX);
+  const y = pageMargin + 92 + line * (cardHeight + gapY);
+  const qrSize = 104;
+  const textX = x + qrSize + 22;
+  const textWidth = cardWidth - qrSize - 34;
+
+  doc.roundedRect(x, y, cardWidth, cardHeight, 6).fillAndStroke(lightFill, borderColor);
+  doc.image(row.qrBuffer, x + 12, y + 20, { width: qrSize, height: qrSize });
+
+  drawFittedText(doc, row.participantName, textX, y + 20, textWidth, 28, {
+    font: "Helvetica-Bold",
+    fontSize: 9.5,
+    minFontSize: 7,
+    color: "#111827",
+  });
+  drawFittedText(doc, row.churchName, textX, y + 53, textWidth, 16, {
+    font: "Helvetica-Bold",
+    fontSize: 8,
+    minFontSize: 6.2,
+    color: successColor,
+  });
+  drawFittedText(doc, `${row.program} - ${getCategoryLabel(row.category)}`, textX, y + 73, textWidth, 14, {
+    font: "Helvetica",
+    fontSize: 7.2,
+    minFontSize: 6,
+    color: mutedColor,
+  });
+
+  doc.font("Helvetica-Bold").fontSize(10).fillColor(brandColor).text(row.registrationCode, textX, y + 96, {
+    width: textWidth,
+    lineBreak: false,
+  });
+  doc.rect(textX, y + 124, 11, 11).stroke(borderColor);
+  doc.font("Helvetica").fontSize(7).fillColor(mutedColor).text("Conferido", textX + 18, y + 123, {
+    width: textWidth - 18,
+    lineBreak: false,
+  });
+}
+
+function drawFittedText(
+  doc: PDFKit.PDFDocument,
+  text: string,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  options: {
+    font: string;
+    fontSize: number;
+    minFontSize: number;
+    color: string;
+  },
+) {
+  let fontSize = options.fontSize;
+  doc.font(options.font).fontSize(fontSize);
+
+  while (fontSize > options.minFontSize && doc.heightOfString(text, { width }) > height) {
+    fontSize -= 0.4;
+    doc.fontSize(fontSize);
+  }
+
+  doc.fillColor(options.color).text(text, x, y, {
+    width,
+    height,
     ellipsis: true,
     lineGap: 0,
   });

@@ -5,6 +5,7 @@ import {
   EventRegistrationForm,
   type EventRegistrationInitialValues,
 } from "@/components/admin/EventRegistrationForm";
+import { EventBulkAssignmentForm } from "@/components/admin/EventBulkAssignmentForm";
 import { EventRegistrationsList } from "@/components/admin/EventRegistrationsList";
 import { AdminRole } from "@/generated/prisma/client";
 import { formatDateLabel } from "@/lib/application-availability";
@@ -141,8 +142,44 @@ export default async function EventRegistrationsPage({ params, searchParams }: E
   const registeredStudentIds = new Set(event.registrations.flatMap((registration) => (
     registration.studentId ? [registration.studentId] : []
   )));
+  const registrationByStudentId = new Map(
+    event.registrations
+      .filter((registration) => registration.studentId)
+      .map((registration) => [registration.studentId!, registration]),
+  );
   const defaultLeaderUserId = leaders.some((leader) => leader.id === context.user?.id) ? context.user?.id || "" : "";
   const initialValues = getInitialValues(query, scopedChurchId || "", defaultLeaderUserId);
+  const churchOptions = churches.map((church) => ({
+    id: church.id,
+    name: church.name,
+    embassyName: church.embassyName,
+  }));
+  const leaderOptions = leaders.map((leader) => ({
+    id: leader.id,
+    name: leader.name,
+    churchId: leader.churchId,
+    churchName: leader.church?.name || null,
+  }));
+  const applicationOptions = event.applications.map((eventApplication) => ({
+    id: eventApplication.id,
+    title: eventApplication.application.title,
+    examTitle: eventApplication.application.exam.title,
+    typeLabel: getEventApplicationTypeLabel(eventApplication.type),
+  }));
+  const studentOptions = students.map((student) => {
+    const registration = registrationByStudentId.get(student.id);
+
+    return {
+      id: student.id,
+      name: student.name,
+      category: student.category,
+      program: student.program,
+      churchId: student.churchId,
+      churchName: student.church.name,
+      alreadyRegistered: registeredStudentIds.has(student.id),
+      eventApplicationIds: registration?.assignments.map((assignment) => assignment.eventApplication.id) || [],
+    };
+  });
 
   return (
     <AdminShell title={`Inscricoes - ${event.title}`} description="Cadastre participantes e libere as provas deste evento.">
@@ -150,14 +187,22 @@ export default async function EventRegistrationsPage({ params, searchParams }: E
         <Link href="/admin/eventos" className="text-sm font-semibold text-[#000060]">
           Voltar para eventos
         </Link>
-        {canManageEvents ? (
+        <div className="flex flex-col gap-2 sm:flex-row">
           <Link
-            href={`/admin/eventos/${event.id}`}
-            className="rounded-md border border-[#000060] px-3 py-2 text-center text-sm font-semibold text-[#000060] hover:bg-[#f7f8ff]"
+            href={`/admin/eventos/${event.id}/inscricoes/controle-qr`}
+            className="rounded-md bg-[#000060] px-3 py-2 text-center text-sm font-semibold text-white hover:bg-[#000044]"
           >
-            Configurar evento
+            Baixar QR em lote
           </Link>
-        ) : null}
+          {canManageEvents ? (
+            <Link
+              href={`/admin/eventos/${event.id}`}
+              className="rounded-md border border-[#000060] px-3 py-2 text-center text-sm font-semibold text-[#000060] hover:bg-[#f7f8ff]"
+            >
+              Configurar evento
+            </Link>
+          ) : null}
+        </div>
       </div>
 
       {query.erro ? (
@@ -203,33 +248,31 @@ export default async function EventRegistrationsPage({ params, searchParams }: E
           <EventRegistrationForm
             eventId={event.id}
             maxApplicationsPerParticipant={event.maxApplicationsPerParticipant}
-            churches={churches.map((church) => ({
-              id: church.id,
-              name: church.name,
-              embassyName: church.embassyName,
-            }))}
-            students={students.map((student) => ({
-              id: student.id,
-              name: student.name,
-              category: student.category,
-              program: student.program,
-              churchId: student.churchId,
-              churchName: student.church.name,
-              alreadyRegistered: registeredStudentIds.has(student.id),
-            }))}
-            leaders={leaders.map((leader) => ({
-              id: leader.id,
-              name: leader.name,
-              churchId: leader.churchId,
-              churchName: leader.church?.name || null,
-            }))}
-            applications={event.applications.map((eventApplication) => ({
-              id: eventApplication.id,
-              title: eventApplication.application.title,
-              examTitle: eventApplication.application.exam.title,
-              typeLabel: getEventApplicationTypeLabel(eventApplication.type),
-            }))}
+            churches={churchOptions}
+            students={studentOptions}
+            leaders={leaderOptions}
+            applications={applicationOptions}
             initialValues={initialValues}
+          />
+        </div>
+      </section>
+
+      <section className="mb-5 rounded-lg border border-[#d8def0] bg-white p-4">
+        <div className="flex flex-col gap-1">
+          <h2 className="text-lg font-semibold">Vincular alunos a uma prova</h2>
+          <p className="text-sm text-[#5d6480]">
+            Use para selecionar varios alunos cadastrados e liberar uma prova do evento de uma vez.
+          </p>
+        </div>
+        <div className="mt-4">
+          <EventBulkAssignmentForm
+            eventId={event.id}
+            churches={churchOptions}
+            students={studentOptions}
+            leaders={leaderOptions}
+            applications={applicationOptions}
+            defaultChurchId={scopedChurchId || ""}
+            defaultLeaderUserId={defaultLeaderUserId}
           />
         </div>
       </section>
