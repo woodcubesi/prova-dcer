@@ -184,6 +184,13 @@ export default async function EventCorrectionPage({ searchParams }: EventCorrect
     }),
   ]);
   const sortedAttempts = [...attempts].sort(selectedApplicationId ? compareByRanking : compareByContextThenRanking);
+  const rankingPdfParams = new URLSearchParams();
+  if (selectedApplicationId) rankingPdfParams.set("prova", selectedApplicationId);
+  const rankingPdfHref = selectedEventId
+    ? `/admin/relatorios/eventos/${selectedEventId}/ranking${
+        rankingPdfParams.toString() ? `?${rankingPdfParams.toString()}` : ""
+      }`
+    : "";
 
   return (
     <AdminShell title="Correcao de eventos" description="Confira provas feitas pelo numero de inscricao do evento.">
@@ -248,6 +255,16 @@ export default async function EventCorrectionPage({ searchParams }: EventCorrect
             Filtrar
           </button>
         </form>
+        {rankingPdfHref ? (
+          <div className="mt-3 flex justify-end">
+            <Link
+              href={rankingPdfHref}
+              className="rounded-md border border-[#000060] px-4 py-3 text-center text-sm font-semibold text-[#000060] hover:bg-[#effaf2]"
+            >
+              Baixar PDF do resultado
+            </Link>
+          </div>
+        ) : null}
 
         <div className="mt-4 hidden overflow-x-auto md:block">
           <table className="w-full min-w-[1040px] text-left text-sm">
