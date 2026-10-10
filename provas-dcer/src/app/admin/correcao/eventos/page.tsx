@@ -36,6 +36,68 @@ function getAttemptResult(score?: number | null, totalPoints?: number | null, pa
   };
 }
 
+type EventAttempt = {
+  id: string;
+  status: AttemptStatus;
+  startedAt: Date;
+  submittedAt: Date | null;
+  score: number | null;
+  totalPoints: number | null;
+  timeUsedSeconds: number | null;
+  eventRegistration: {
+    name: string;
+    registrationCode: string;
+    category: string;
+    church: {
+      name: string;
+    };
+    event: {
+      title: string;
+    };
+  } | null;
+  application: {
+    title: string;
+    exam: {
+      title: string;
+      passingPercent: number;
+    };
+  };
+};
+
+function compareByRanking(first: EventAttempt, second: EventAttempt) {
+  const scoreDiff = (second.score ?? 0) - (first.score ?? 0);
+  if (scoreDiff !== 0) return scoreDiff;
+
+  const firstTime = first.timeUsedSeconds ?? Number.MAX_SAFE_INTEGER;
+  const secondTime = second.timeUsedSeconds ?? Number.MAX_SAFE_INTEGER;
+  const timeDiff = firstTime - secondTime;
+  if (timeDiff !== 0) return timeDiff;
+
+  return (first.eventRegistration?.name || "").localeCompare(second.eventRegistration?.name || "", "pt-BR");
+}
+
+function compareByContextThenRanking(first: EventAttempt, second: EventAttempt) {
+  const eventDiff = (first.eventRegistration?.event.title || "").localeCompare(
+    second.eventRegistration?.event.title || "",
+    "pt-BR",
+  );
+  if (eventDiff !== 0) return eventDiff;
+
+  const applicationDiff = `${first.application.exam.title} ${first.application.title}`.localeCompare(
+    `${second.application.exam.title} ${second.application.title}`,
+    "pt-BR",
+  );
+  if (applicationDiff !== 0) return applicationDiff;
+
+  const categoryDiff = getCategoryLabel(first.eventRegistration?.category || "").localeCompare(
+    getCategoryLabel(second.eventRegistration?.category || ""),
+    "pt-BR",
+  );
+  if (categoryDiff !== 0) return categoryDiff;
+
+  return compareByRanking(first, second);
+}
+
 export default async function EventCorrectionPage({ searchParams }: EventCorrectionPageProps) {
   const context = await requireAdminContext();
   const params = searchParams ? await searchParams : {};
@@ -121,6 +183,7 @@ export default async function EventCorrectionPage({ searchParams }: EventCorrect
       },
     }),
   ]);
+  const sortedAttempts = [...attempts].sort(selectedApplicationId ? compareByRanking : compareByContextThenRanking);
 
   return (
     <AdminShell title="Correcao de eventos" description="Confira provas feitas pelo numero de inscricao do evento.">
@@ -143,7 +206,7 @@ export default async function EventCorrectionPage({ searchParams }: EventCorrect
             <p className="text-sm text-[#5d6480]">Lista separada das provas por carteirinha oficial.</p>
           </div>
           <span className="rounded-full bg-[#effaf2] px-3 py-1 text-sm font-semibold text-[#1f623e]">
-            {attempts.length} envio(s)
+            {sortedAttempts.length} envio(s)
           </span>
         </div>
 
@@ -190,6 +253,7 @@ export default async function EventCorrectionPage({ searchParams }: EventCorrect
           <table className="w-full min-w-[1040px] text-left text-sm">
             <thead className="border-b border-[#d8def0] text-xs uppercase tracking-wide text-[#5d6480]">
               <tr>
+                <th className="py-3 pr-4">Class.</th>
                 <th className="py-3 pr-4">Inscrito</th>
                 <th className="py-3 pr-4">Evento</th>
                 <th className="py-3 pr-4">Prova</th>
@@ -201,13 +265,16 @@ export default async function EventCorrectionPage({ searchParams }: EventCorrect
               </tr>
             </thead>
             <tbody>
-              {attempts.map((attempt) => {
+              {sortedAttempts.map((attempt, index) => {
                 const registration = attempt.eventRegistration;
                 const passingPercent = attempt.application.exam.passingPercent ?? 70;
                 const result = getAttemptResult(attempt.score, attempt.totalPoints, passingPercent);
 
                 return (
                   <tr key={attempt.id} className="border-b border-[#e8ecf8] last:border-0">
+                    <td className="py-3 pr-4 font-semibold text-[#000060]">
+                      {selectedApplicationId ? `${index + 1}º` : "-"}
+                    </td>
                     <td className="py-3 pr-4">
                       <p className="font-medium">{registration?.name || "-"}</p>
                       <p className="font-mono text-xs text-[#5d6480]">{registration?.registrationCode || "-"}</p>
@@ -267,12 +334,19 @@ export default async function EventCorrectionPage({ searchParams }: EventCorrect
         </div>
 
         <div className="mt-4 grid gap-3 md:hidden">
-          {attempts.map((attempt) => {
+          {sortedAttempts.map((attempt, index) => {
             const registration = attempt.eventRegistration;
 
             return (
               <div key={attempt.id} className="rounded-md border border-[#e8ecf8] p-3">
-                <p className="font-medium">{registration?.name || "-"}</p>
+                <div className="flex items-start justify-between gap-2">
+                  <p className="font-medium">{registration?.name || "-"}</p>
+                  {selectedApplicationId ? (
+                    <span className="rounded-full bg-[#f8faff] px-2 py-1 text-xs font-semibold text-[#000060]">
+                      {index + 1}º
+                    </span>
+                  ) : null}
+                </div>
                 <p className="mt-1 text-sm text-[#5d6480]">
                   {registration?.event.title || "-"} - {registration?.registrationCode || "-"}
                 </p>
@@ -289,7 +363,7 @@ export default async function EventCorrectionPage({ searchParams }: EventCorrect
           })}
         </div>
 
-        {attempts.length === 0 ? (
+        {sortedAttempts.length === 0 ? (
           <div className="mt-4 rounded-md border border-[#e8ecf8] bg-[#fbfcff] p-4 text-sm text-[#5d6480]">
             Ainda nao ha provas de eventos enviadas.
           </div>
