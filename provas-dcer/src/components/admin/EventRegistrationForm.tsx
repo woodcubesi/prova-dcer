@@ -68,9 +68,21 @@ const participantPrograms = [
   { value: "ER", label: "Embaixador (ER)" },
   { value: "MR", label: "Mensageira (MR)" },
 ] as const;
+const categoryValues = CATEGORIES.map((category) => category.value);
 
 function churchLabel(church: ChurchOption) {
   return church.embassyName ? `${church.name} - ${church.embassyName}` : church.name;
+}
+
+function getEventCategoryOptions(currentCategory: string) {
+  const currentIndex = categoryValues.indexOf(currentCategory as (typeof categoryValues)[number]);
+  if (currentIndex < 0) return CATEGORIES;
+
+  return CATEGORIES.filter((_, index) => index === currentIndex || index === currentIndex + 1);
+}
+
+function isAllowedEventCategory(currentCategory: string, selectedCategory: string) {
+  return getEventCategoryOptions(currentCategory).some((category) => category.value === selectedCategory);
 }
 
 export function EventRegistrationForm({
@@ -88,6 +100,7 @@ export function EventRegistrationForm({
   const [mode, setMode] = useState<RegistrationMode>(initialValues.mode);
   const [churchId, setChurchId] = useState(initialChurchId);
   const [studentId, setStudentId] = useState(initialValues.studentId);
+  const [category, setCategory] = useState(initialValues.category);
   const [program, setProgram] = useState<ParticipantProgram>(initialValues.program);
   const [leaderUserId, setLeaderUserId] = useState(initialLeaderUserId);
 
@@ -100,6 +113,10 @@ export function EventRegistrationForm({
     [churchId, leaders],
   );
   const studentSelectValue = filteredStudents.some((student) => student.id === studentId) ? studentId : "";
+  const selectedStudent = filteredStudents.find((student) => student.id === studentSelectValue) || null;
+  const existingStudentCategoryOptions = selectedStudent ? getEventCategoryOptions(selectedStudent.category) : [];
+  const selectedStudentCategoryValue =
+    selectedStudent && isAllowedEventCategory(selectedStudent.category, category) ? category : selectedStudent?.category || "";
   const leaderSelectValue = filteredLeaders.some((leader) => leader.id === leaderUserId) ? leaderUserId : "";
   const selectedApplicationIds = new Set(initialValues.eventApplicationIds);
 
@@ -163,6 +180,7 @@ export function EventRegistrationForm({
               onChange={(event) => {
                 setChurchId(event.target.value);
                 setStudentId("");
+                setCategory("");
                 setLeaderUserId("");
               }}
               className="mt-1 w-full rounded-md border border-[#c5cce4] bg-white px-3 py-3 outline-none focus:ring-2 focus:ring-[#000060]"
@@ -183,7 +201,12 @@ export function EventRegistrationForm({
             <select
               name="studentId"
               value={studentSelectValue}
-              onChange={(event) => setStudentId(event.target.value)}
+              onChange={(event) => {
+                const nextStudentId = event.target.value;
+                const nextStudent = students.find((student) => student.id === nextStudentId);
+                setStudentId(nextStudentId);
+                setCategory(nextStudent?.category || "");
+              }}
               disabled={!churchId}
               className="mt-1 w-full rounded-md border border-[#c5cce4] bg-white px-3 py-3 outline-none focus:ring-2 focus:ring-[#000060] disabled:bg-[#f2f4fb]"
             >
@@ -195,6 +218,28 @@ export function EventRegistrationForm({
                 </option>
               ))}
             </select>
+          </label>
+        ) : null}
+
+        {mode === "existing" && selectedStudent ? (
+          <label className="block">
+            <span className="text-sm font-medium">Categoria do cadastro</span>
+            <select
+              name="category"
+              value={selectedStudentCategoryValue}
+              onChange={(event) => setCategory(event.target.value)}
+              className="mt-1 w-full rounded-md border border-[#c5cce4] bg-white px-3 py-3 outline-none focus:ring-2 focus:ring-[#000060]"
+            >
+              {existingStudentCategoryOptions.map((categoryOption) => (
+                <option key={categoryOption.value} value={categoryOption.value}>
+                  {categoryOption.label}
+                  {categoryOption.value === selectedStudent.category ? " (atual)" : " (subir categoria)"}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-xs text-[#5d6480]">
+              Ao salvar, esta categoria tambem sera atualizada no cadastro geral.
+            </p>
           </label>
         ) : null}
 
@@ -213,7 +258,8 @@ export function EventRegistrationForm({
               <span className="text-sm font-medium">Categoria</span>
               <select
                 name="category"
-                defaultValue={initialValues.category}
+                value={category}
+                onChange={(event) => setCategory(event.target.value)}
                 className="mt-1 w-full rounded-md border border-[#c5cce4] bg-white px-3 py-3 outline-none focus:ring-2 focus:ring-[#000060]"
               >
                 <option value="">Selecione a categoria</option>

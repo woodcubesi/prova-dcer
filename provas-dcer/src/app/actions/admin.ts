@@ -63,6 +63,7 @@ const categoryLabels: Record<Category, string> = {
   ADOLESCENTES: "Adolescentes",
   JUVENIL: "Juvenil",
 };
+const categoryOrder: Category[] = [Category.JUNIOR, Category.ADOLESCENTES, Category.JUVENIL];
 
 const staffUserSchema = z.object({
   name: z.string().trim().min(3, "Informe o nome completo.").max(120),
@@ -687,6 +688,36 @@ export async function loginAdminAction(formData: FormData) {
 
   await createAdminMfaChallenge(user.id);
   redirect(user.mfaEnabled ? "/admin/mfa" : "/admin/mfa/configurar");
+}
+
+async function ensureUniqueStudentForPath(
+  churchId: string,
+  category: Category,
+  normalizedName: string,
+  ignoredId: string,
+  fail: (message: string) => never,
+) {
+  const existingStudent = await prisma.student.findUnique({
+    where: {
+      churchId_category_normalizedName: {
+        churchId,
+        category,
+        normalizedName,
+      },
+    },
+    select: { id: true },
+  });
+
+  if (existingStudent && existingStudent.id !== ignoredId) {
+    fail(`Ja existe ER/MR com este nome, igreja e categoria ${categoryLabels[category]}.`);
+  }
+}
+
+function isAllowedEventCategoryChange(currentCategory: Category, requestedCategory: Category) {
+  const currentIndex = categoryOrder.indexOf(currentCategory);
+  const requestedIndex = categoryOrder.indexOf(requestedCategory);
+
+  return currentIndex >= 0 && requestedIndex >= currentIndex && requestedIndex <= currentIndex + 1;
 }
 
 export async function verifyAdminMfaAction(formData: FormData) {
@@ -2313,6 +2344,7 @@ export async function createEventRegistrationAction(formData: FormData) {
   const name = String(formData.get("name") || "").trim();
   const churchId = String(formData.get("churchId") || "").trim();
   const category = String(formData.get("category") || "") as Category;
+  const parsedCategory = categorySchema.safeParse(category);
   const parsedProgram = eventRegistrationProgramSchema.safeParse(String(formData.get("program") || ""));
   const adhocProgram = parsedProgram.success ? (parsedProgram.data as StudentProgram) : null;
   const selectedEventApplicationIds = Array.from(
@@ -2337,6 +2369,10 @@ export async function createEventRegistrationAction(formData: FormData) {
 
   if (registrationMode === "adhoc" && (name.length < 3 || !categorySchema.safeParse(category).success)) {
     failRegistration("Preencha nome e categoria do inscrito avulso.");
+  }
+
+  if (registrationMode === "existing" && category && !parsedCategory.success) {
+    failRegistration("Selecione uma categoria valida para o ER/MR.");
   }
 
   if (registrationMode === "adhoc" && !adhocProgram) {
@@ -2436,13 +2472,36 @@ export async function createEventRegistrationAction(formData: FormData) {
     failRegistration("Selecione apenas provas vinculadas a este evento.");
   }
 
+  const requestedStudentCategory = student && parsedCategory.success ? (parsedCategory.data as Category) : null;
+
+  if (student && requestedStudentCategory && !isAllowedEventCategoryChange(student.category, requestedStudentCategory)) {
+    failRegistration("Na inscricao do evento, o ER/MR so pode permanecer na categoria atual ou subir uma categoria.");
+  }
+
+  if (student && requestedStudentCategory && requestedStudentCategory !== student.category) {
+    await ensureUniqueStudentForPath(
+      student.churchId,
+      requestedStudentCategory,
+      student.normalizedName,
+      student.id,
+      failRegistration,
+    );
+  }
+
   const registrationName = student?.name || name;
   const registrationNormalizedName = student?.normalizedName || normalizeName(name);
-  const registrationCategory = student?.category || category;
+  const registrationCategory = requestedStudentCategory || student?.category || category;
   const registrationProgram = student?.program || adhocProgram || StudentProgram.ER;
   const registrationBirthDate = student?.birthDate || birthDate;
 
   await prisma.$transaction(async (tx) => {
+    if (student && registrationCategory !== student.category) {
+      await tx.student.update({
+        where: { id: student.id },
+        data: { category: registrationCategory },
+      });
+    }
+
     const existingRegistration = student
       ? await tx.eventRegistration.findUnique({
           where: {
