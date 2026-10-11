@@ -15,6 +15,15 @@ O sistema permite:
 - relatorio PDF individual do embaixador;
 - relatorio PDF geral da prova.
 
+## Modos oficiais de instalacao
+
+Este repositorio e a fonte unica do projeto. A aplicacao pode ser instalada de duas formas sem criar outro repositorio:
+
+- Docker: use `Dockerfile`, `docker-compose.yml` e a documentacao em `deploy/docker/README.md`.
+- Sem Docker: use Node.js, pnpm, PostgreSQL e systemd com a documentacao em `deploy/bare-metal/README.md`.
+
+Os scripts de producao sem Docker ficam em `deploy/bare-metal/`.
+
 ## Senhas padrao de desenvolvimento
 
 Use estes dados apenas em ambiente local ou de testes.

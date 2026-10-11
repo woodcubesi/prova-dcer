@@ -7,6 +7,9 @@ type ApplicationOption = {
   id: string;
   title: string;
   examTitle: string;
+  eventTitle: string | null;
+  eventTypeLabel: string | null;
+  eventRegistrationCode: string | null;
   durationMinutes: number;
   baseDurationMinutes: number;
   endsAt: string | null;
@@ -159,6 +162,7 @@ export function StudentEntry() {
 
           <form action={startAttemptAction} className="grid gap-4">
             <input type="hidden" name="registrationNumber" value={lookup.student.registrationNumber} />
+            <input type="hidden" name="eventRegistrationCode" value={application?.eventRegistrationCode || ""} />
 
             <label className="block">
               <span className="text-sm font-medium">Prova disponivel</span>
@@ -176,6 +180,7 @@ export function StudentEntry() {
                 )}
                 {lookup.applications.map((item) => (
                   <option key={item.id} value={item.id}>
+                    {item.eventTitle ? `${item.eventTitle} - ` : ""}
                     {item.title} - {item.examTitle}
                     {item.alreadyStarted ? " (continuar)" : ""}
                   </option>
@@ -185,6 +190,12 @@ export function StudentEntry() {
 
             {application ? (
               <div className="rounded-md bg-[#effaf2] px-3 py-2 text-sm text-[#1f623e]">
+                {application.eventTitle ? (
+                  <>
+                    Evento: <strong>{application.eventTitle}</strong>
+                    {application.eventTypeLabel ? ` (${application.eventTypeLabel})` : ""}.{" "}
+                  </>
+                ) : null}
                 Tempo total: <strong>{application.durationMinutes} minutos</strong>.
                 {application.durationMinutes !== application.baseDurationMinutes
                   ? ` A prova possui ${application.baseDurationMinutes} minutos e recebeu o adicional do laudo.`
@@ -209,11 +220,7 @@ export function StudentEntry() {
             </button>
           </form>
         </div>
-      ) : (
-        <p className="mt-4 text-sm leading-6 text-[#5d6480]">
-          Digite o numero da carteirinha para o sistema localizar seu cadastro, igreja, embaixada e provas liberadas.
-        </p>
-      )}
+      ) : null}
     </div>
   );
 }

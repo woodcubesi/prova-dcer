@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { AttemptStatus } from "@/generated/prisma/client";
 import { getAttemptExpirationDate } from "@/lib/exam-time";
+import { normalizeEventRegistrationCode, isEventWindowOpen } from "@/lib/event-registration";
 import { prisma } from "@/lib/prisma";
 import { filterQuestionsForCategory } from "@/lib/questions";
 import {
@@ -17,6 +18,12 @@ function studentError(message: string): never {
 
 export async function startAttemptAction(formData: FormData) {
   const applicationId = String(formData.get("applicationId") || "");
+  const eventRegistrationCode = normalizeEventRegistrationCode(String(formData.get("eventRegistrationCode") || ""));
+
+  if (eventRegistrationCode) {
+    await startEventAttempt(applicationId, eventRegistrationCode);
+  }
+
   const registrationNumber = String(formData.get("registrationNumber") || "");
   const normalizedRegistrationNumber = normalizeRegistrationNumber(registrationNumber);
 
@@ -53,6 +60,9 @@ export async function startAttemptAction(formData: FormData) {
       application: {
         include: {
           exam: true,
+          eventApplications: {
+            select: { id: true },
+          },
         },
       },
       student: true,
@@ -79,6 +89,10 @@ export async function startAttemptAction(formData: FormData) {
 
   if (application.purgeAt && now > application.purgeAt) {
     studentError("Esta prova ja foi eliminada do sistema.");
+  }
+
+  if (application.eventApplications.length > 0) {
+    studentError("Esta prova deve ser acessada pelo numero de inscricao do evento.");
   }
 
   const existingAttempt = await prisma.attempt.findUnique({
@@ -118,6 +132,107 @@ export async function startAttemptAction(formData: FormData) {
   redirect(`/prova/${attempt.id}`);
 }
 
+async function startEventAttempt(applicationId: string, registrationCode: string): Promise<never> {
+  if (!applicationId || registrationCode.length !== 6) {
+    studentError("Digite o numero de inscricao do evento e escolha uma prova disponivel.");
+  }
+
+  const now = new Date();
+  const registration = await prisma.eventRegistration.findUnique({
+    where: { registrationCode },
+    include: {
+      event: true,
+      student: true,
+      assignments: {
+        where: {
+          eventApplication: {
+            applicationId,
+          },
+        },
+        include: {
+          eventApplication: {
+            include: {
+              application: {
+                include: {
+                  exam: true,
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (!registration) {
+    studentError("Inscricao de evento nao encontrada.");
+  }
+
+  if (!isEventWindowOpen(registration.event, now)) {
+    studentError("Este evento nao esta liberado para provas agora.");
+  }
+
+  const assignment = registration.assignments[0];
+
+  if (!assignment) {
+    studentError("Esta prova nao esta liberada para sua inscricao no evento.");
+  }
+
+  const application = assignment.eventApplication.application;
+
+  if (!application.active) {
+    studentError("Esta aplicacao de prova nao esta ativa.");
+  }
+
+  if (application.startsAt && now < application.startsAt) {
+    studentError("Esta prova ainda nao foi liberada.");
+  }
+
+  if (application.endsAt && now > application.endsAt) {
+    studentError("Esta prova ja foi encerrada.");
+  }
+
+  if (application.purgeAt && now > application.purgeAt) {
+    studentError("Esta prova ja foi eliminada do sistema.");
+  }
+
+  const existingAttempt = await prisma.attempt.findUnique({
+    where: {
+      applicationId_eventRegistrationId: {
+        applicationId,
+        eventRegistrationId: registration.id,
+      },
+    },
+  });
+
+  if (existingAttempt?.status === AttemptStatus.SUBMITTED) {
+    redirect("/prova/finalizada?status=ja-enviada");
+  }
+
+  if (existingAttempt) {
+    if (existingAttempt.status === AttemptStatus.EXPIRED || now > existingAttempt.expiresAt) {
+      await prisma.attempt.update({
+        where: { id: existingAttempt.id },
+        data: { status: AttemptStatus.EXPIRED },
+      });
+      redirect("/prova/finalizada?status=expirada");
+    }
+
+    redirect(`/prova/${existingAttempt.id}`);
+  }
+
+  const attempt = await prisma.attempt.create({
+    data: {
+      applicationId,
+      eventRegistrationId: registration.id,
+      expiresAt: getAttemptExpirationDate(now, application.exam.durationMinutes, registration.student || {}),
+      totalPoints: 0,
+    },
+  });
+
+  redirect(`/prova/${attempt.id}`);
+}
+
 export async function submitAttemptAction(formData: FormData) {
   const attemptId = String(formData.get("attemptId") || "");
 
@@ -125,6 +240,11 @@ export async function submitAttemptAction(formData: FormData) {
     where: { id: attemptId },
     include: {
       student: {
+        select: {
+          category: true,
+        },
+      },
+      eventRegistration: {
         select: {
           category: true,
         },
@@ -157,7 +277,13 @@ export async function submitAttemptAction(formData: FormData) {
   }
 
   const now = new Date();
-  const questions = filterQuestionsForCategory(attempt.application.exam.questions, attempt.student.category);
+  const participantCategory = attempt.student?.category || attempt.eventRegistration?.category;
+
+  if (!participantCategory) {
+    redirect("/prova?erro=Participante da prova nao encontrado.");
+  }
+
+  const questions = filterQuestionsForCategory(attempt.application.exam.questions, participantCategory);
 
   if (questions.length === 0) {
     redirect("/prova?erro=Esta prova nao possui questoes ativas para sua categoria.");

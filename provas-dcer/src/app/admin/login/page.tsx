@@ -5,6 +5,7 @@ import { BrandLockup } from "@/components/BrandLockup";
 type LoginPageProps = {
   searchParams?: Promise<{
     erro?: string;
+    mfa?: string;
     senha?: string;
   }>;
 };
@@ -23,7 +24,7 @@ export default async function AdminLoginPage({ searchParams }: LoginPageProps) {
           </Link>
           <h1 className="mt-4 text-2xl font-semibold">Acesso administrativo</h1>
           <p className="mt-2 text-sm leading-6 text-[#5d6480]">
-            Entre com e-mail e senha cadastrados. No primeiro acesso, deixe o e-mail em branco e use a senha do ambiente.
+            Entre com e-mail e senha cadastrados.
           </p>
 
           {params.erro ? (
@@ -35,6 +36,12 @@ export default async function AdminLoginPage({ searchParams }: LoginPageProps) {
           {params.senha === "alterada" ? (
             <div className="mt-4 rounded-md border border-[#b9dfc7] bg-[#effaf2] px-3 py-2 text-sm text-[#1f623e]">
               Senha alterada. Entre novamente com a nova senha.
+            </div>
+          ) : null}
+
+          {params.mfa === "redefinido" ? (
+            <div className="mt-4 rounded-md border border-[#b9dfc7] bg-[#effaf2] px-3 py-2 text-sm text-[#1f623e]">
+              MFA redefinido. Entre novamente para configurar um novo autenticador.
             </div>
           ) : null}
 
@@ -66,9 +73,14 @@ export default async function AdminLoginPage({ searchParams }: LoginPageProps) {
             </button>
           </form>
 
-          <Link href="/admin/esqueci-senha" className="mt-4 inline-flex text-sm font-semibold text-[#000060]">
-            Esqueci minha senha
-          </Link>
+          <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2">
+            <Link href="/admin/esqueci-senha" className="inline-flex text-sm font-semibold text-[#000060]">
+              Esqueci minha senha
+            </Link>
+            <Link href="/admin/redefinir-mfa" className="inline-flex text-sm font-semibold text-[#000060]">
+              Redefinir MFA
+            </Link>
+          </div>
 
           <p className="mt-4 text-xs text-[#5d6480]">
             Cadastre administradores e conselheiros no menu Equipe depois de entrar.

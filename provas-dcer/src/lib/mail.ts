@@ -10,6 +10,8 @@ type SendAdminPasswordResetEmailParams = {
   expiresInMinutes: number;
 };
 
+type SendAdminMfaResetEmailParams = SendAdminPasswordResetEmailParams;
+
 function getEnv(name: string) {
   return process.env[name]?.trim();
 }
@@ -39,7 +41,7 @@ function getSmtpTransportOptions() {
 
   const port = Number(getEnv("SMTP_PORT") || "25");
   const user = getEnv("SMTP_USER");
-  const password = getEnv("SMTP_PASSWORD");
+  const password = getEnv("SMTP_PASSWORD") || getEnv("SMTP_PASS");
   const requireTLS = parseBoolean(getEnv("SMTP_REQUIRE_TLS"));
   const ignoreTLS = parseBoolean(getEnv("SMTP_IGNORE_TLS"));
   const rejectUnauthorized = parseBoolean(getEnv("SMTP_TLS_REJECT_UNAUTHORIZED"));
@@ -125,6 +127,49 @@ export async function sendAdminPasswordResetEmail({
 
   if (getMailDriver() === "console") {
     console.info("Password reset email generated:", message);
+    return;
+  }
+
+  const transporter = nodemailer.createTransport(getSmtpTransportOptions());
+  await transporter.sendMail(message);
+}
+
+export async function sendAdminMfaResetEmail({
+  to,
+  name,
+  resetUrl,
+  expiresInMinutes,
+}: SendAdminMfaResetEmailParams) {
+  const subject = "Redefinicao de MFA - Provas DCER Paulista";
+  const text = [
+    `Ola, ${name}.`,
+    "",
+    "Recebemos uma solicitacao para redefinir seu autenticador MFA administrativo.",
+    `Use este link nos proximos ${expiresInMinutes} minutos:`,
+    resetUrl,
+    "",
+    "Ao concluir a redefinicao, voce configurara um novo autenticador no proximo login.",
+    "Se voce nao solicitou a redefinicao, ignore este e-mail.",
+  ].join("\n");
+  const html = [
+    `<p>Ola, ${escapeHtml(name)}.</p>`,
+    "<p>Recebemos uma solicitacao para redefinir seu autenticador MFA administrativo.</p>",
+    `<p>Use este link nos proximos ${expiresInMinutes} minutos:</p>`,
+    `<p><a href="${escapeHtml(resetUrl)}">${escapeHtml(resetUrl)}</a></p>`,
+    "<p>Ao concluir a redefinicao, voce configurara um novo autenticador no proximo login.</p>",
+    "<p>Se voce nao solicitou a redefinicao, ignore este e-mail.</p>",
+  ].join("");
+
+  const message = {
+    from: getMailFrom(),
+    to,
+    subject,
+    text,
+    html,
+  };
+
+  if (getMailDriver() === "console") {
+    console.info("MFA reset email generated:", message);
     return;
   }
 

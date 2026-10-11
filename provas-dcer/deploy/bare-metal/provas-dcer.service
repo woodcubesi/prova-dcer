@@ -1,0 +1,22 @@
+[Unit]
+Description=Provas DCER Next.js application
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=provasdcer
+Group=provasdcer
+WorkingDirectory=/opt/provas-dcer/current
+EnvironmentFile=/opt/provas-dcer/current/.env
+Environment=NODE_ENV=production
+Environment=NEXT_TELEMETRY_DISABLED=1
+Environment=PORT=3001
+ExecStart=/usr/bin/bash -lc 'pnpm start'
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

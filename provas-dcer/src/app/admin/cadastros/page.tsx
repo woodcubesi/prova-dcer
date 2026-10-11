@@ -5,6 +5,7 @@ import {
   updateStudentAction,
 } from "@/app/actions/admin";
 import { AdminShell } from "@/components/admin/AdminShell";
+import { StudentCategoryAutoSelect } from "@/components/admin/StudentCategoryAutoSelect";
 import { AdminRole } from "@/generated/prisma/client";
 import { CATEGORIES, getCategoryLabel } from "@/lib/categories";
 import { requireAdminContext } from "@/lib/auth";
@@ -354,6 +355,7 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
           <form
             action={editingChurch ? updateChurchAction : createChurchAction}
             className="rounded-lg border border-[#d8def0] bg-white p-4"
+            data-form-draft-id={editingChurch ? `church-${editingChurch.id}` : "church-new"}
           >
             {editingChurch ? <input type="hidden" name="id" value={editingChurch.id} /> : null}
             <h2 className="text-lg font-semibold">{editingChurch ? "Editar igreja" : "Nova igreja"}</h2>
@@ -405,7 +407,10 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
         <form
           action={editingStudent ? updateStudentAction : createStudentAction}
           className="rounded-lg border border-[#d8def0] bg-white p-4"
+          data-form-draft-id={editingStudent ? `student-${editingStudent.id}` : "student-new"}
+          data-student-profile-form="true"
         >
+          <StudentCategoryAutoSelect />
           {editingStudent ? <input type="hidden" name="id" value={editingStudent.id} /> : null}
           <h2 className="text-lg font-semibold">{editingStudent ? "Editar embaixador" : "Novo embaixador"}</h2>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -629,10 +634,10 @@ export default async function RegistersPage({ searchParams }: RegisterPageProps)
                     {application._count.participants} participante(s) - {application._count.attempts} tentativa(s)
                   </p>
                   <a
-                    href={`/admin/provas/${application.id}/editar`}
+                    href={isTeacher ? `/admin/provas/${application.id}/relatorio` : `/admin/provas/${application.id}/editar`}
                     className="mt-2 inline-flex rounded-md border border-[#000060] px-3 py-2 text-sm font-semibold text-[#000060]"
                   >
-                    Editar prova
+                    {isTeacher ? "Relatorio PDF" : "Editar prova"}
                   </a>
                 </div>
               ))}

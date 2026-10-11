@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { AttemptStatus } from "@/generated/prisma/client";
 import { getCategoryLabel } from "@/lib/categories";
 import { getEffectiveExamDurationMinutes, getStudentExtraTimePercent } from "@/lib/exam-time";
+import { isEventWindowOpen } from "@/lib/event-registration";
+import { getEventApplicationTypeLabel } from "@/lib/events";
 import { prisma } from "@/lib/prisma";
 import {
   findActiveStudentsByRegistrationNumber,
@@ -15,6 +17,17 @@ type LookupPayload = {
 
 function isoDate(date?: Date | null) {
   return date ? date.toISOString() : null;
+}
+
+function isApplicationOpen(
+  application: { active: boolean; startsAt?: Date | null; endsAt?: Date | null; purgeAt?: Date | null },
+  now: Date,
+) {
+  if (!application.active) return false;
+  if (application.startsAt && now < application.startsAt) return false;
+  if (application.endsAt && now > application.endsAt) return false;
+  if (application.purgeAt && now > application.purgeAt) return false;
+  return true;
 }
 
 export async function POST(request: Request) {
@@ -59,45 +72,101 @@ export async function POST(request: Request) {
     );
   }
 
-  const applications = await prisma.examApplication.findMany({
-    where: {
-      active: true,
-      AND: [
-        {
-          OR: [{ startsAt: null }, { startsAt: { lte: now } }],
+  const [applications, eventRegistrations] = await Promise.all([
+    prisma.examApplication.findMany({
+      where: {
+        active: true,
+        AND: [
+          {
+            OR: [{ startsAt: null }, { startsAt: { lte: now } }],
+          },
+          {
+            OR: [{ endsAt: null }, { endsAt: { gte: now } }],
+          },
+          {
+            OR: [{ purgeAt: null }, { purgeAt: { gt: now } }],
+          },
+        ],
+        participants: {
+          some: {
+            studentId: student.id,
+          },
         },
-        {
-          OR: [{ endsAt: null }, { endsAt: { gte: now } }],
-        },
-        {
-          OR: [{ purgeAt: null }, { purgeAt: { gt: now } }],
-        },
-      ],
-      participants: {
-        some: {
-          studentId: student.id,
-        },
-      },
-    },
-    orderBy: { createdAt: "desc" },
-    include: {
-      exam: {
-        select: {
-          durationMinutes: true,
-          title: true,
+        eventApplications: {
+          none: {},
         },
       },
-      attempts: {
-        where: {
-          studentId: student.id,
+      orderBy: { createdAt: "desc" },
+      include: {
+        exam: {
+          select: {
+            durationMinutes: true,
+            title: true,
+          },
         },
-        select: {
-          expiresAt: true,
-          status: true,
+        attempts: {
+          where: {
+            studentId: student.id,
+          },
+          select: {
+            expiresAt: true,
+            status: true,
+          },
         },
       },
-    },
-  });
+    }),
+    prisma.eventRegistration.findMany({
+      where: {
+        studentId: student.id,
+        event: {
+          active: true,
+          AND: [
+            {
+              OR: [{ startsAt: null }, { startsAt: { lte: now } }],
+            },
+            {
+              OR: [{ endsAt: null }, { endsAt: { gte: now } }],
+            },
+          ],
+        },
+      },
+      orderBy: { createdAt: "desc" },
+      include: {
+        event: true,
+        assignments: {
+          orderBy: { createdAt: "asc" },
+          include: {
+            eventApplication: {
+              include: {
+                application: {
+                  include: {
+                    exam: {
+                      select: {
+                        durationMinutes: true,
+                        title: true,
+                      },
+                    },
+                    attempts: {
+                      where: {
+                        eventRegistration: {
+                          studentId: student.id,
+                        },
+                      },
+                      select: {
+                        eventRegistrationId: true,
+                        expiresAt: true,
+                        status: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    }),
+  ]);
 
   const availableApplications = applications.filter((application) => {
     const attempt = application.attempts[0];
@@ -105,6 +174,30 @@ export async function POST(request: Request) {
     if (!attempt) return true;
 
     return attempt.status === AttemptStatus.IN_PROGRESS && now <= attempt.expiresAt;
+  });
+
+  const availableEventApplications = eventRegistrations.flatMap((registration) => {
+    if (!isEventWindowOpen(registration.event, now)) return [];
+
+    return registration.assignments.flatMap((assignment) => {
+      const eventApplication = assignment.eventApplication;
+      const application = eventApplication.application;
+
+      if (!isApplicationOpen(application, now)) return [];
+
+      const attempt = application.attempts.find((item) => item.eventRegistrationId === registration.id);
+
+      if (attempt && !(attempt.status === AttemptStatus.IN_PROGRESS && now <= attempt.expiresAt)) return [];
+
+      return [
+        {
+          application,
+          attempt,
+          eventApplication,
+          registration,
+        },
+      ];
+    });
   });
 
   return NextResponse.json({
@@ -122,14 +215,31 @@ export async function POST(request: Request) {
       hasMedicalReport: student.hasMedicalReport,
       extraTimePercent: getStudentExtraTimePercent(student),
     },
-    applications: availableApplications.map((application) => ({
-      id: application.id,
-      title: application.title,
-      examTitle: application.exam.title,
-      durationMinutes: getEffectiveExamDurationMinutes(application.exam.durationMinutes, student),
-      baseDurationMinutes: application.exam.durationMinutes,
-      endsAt: isoDate(application.endsAt),
-      alreadyStarted: application.attempts[0]?.status === AttemptStatus.IN_PROGRESS,
-    })),
+    applications: [
+      ...availableApplications.map((application) => ({
+        id: application.id,
+        title: application.title,
+        examTitle: application.exam.title,
+        eventTitle: null,
+        eventTypeLabel: null,
+        eventRegistrationCode: null,
+        durationMinutes: getEffectiveExamDurationMinutes(application.exam.durationMinutes, student),
+        baseDurationMinutes: application.exam.durationMinutes,
+        endsAt: isoDate(application.endsAt),
+        alreadyStarted: application.attempts[0]?.status === AttemptStatus.IN_PROGRESS,
+      })),
+      ...availableEventApplications.map(({ application, attempt, eventApplication, registration }) => ({
+        id: application.id,
+        title: application.title,
+        examTitle: application.exam.title,
+        eventTitle: registration.event.title,
+        eventTypeLabel: getEventApplicationTypeLabel(eventApplication.type),
+        eventRegistrationCode: registration.registrationCode,
+        durationMinutes: getEffectiveExamDurationMinutes(application.exam.durationMinutes, student),
+        baseDurationMinutes: application.exam.durationMinutes,
+        endsAt: isoDate(application.endsAt),
+        alreadyStarted: attempt?.status === AttemptStatus.IN_PROGRESS,
+      })),
+    ],
   });
 }

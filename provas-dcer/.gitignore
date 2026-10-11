@@ -13,6 +13,8 @@
 # testing
 /coverage
 /tmp/
+/system-backups/
+/system-restores/
 
 # next.js
 /.next/

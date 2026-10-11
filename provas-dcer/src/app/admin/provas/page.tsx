@@ -26,6 +26,7 @@ export default async function ExamsPage({ searchParams }: ExamsPageProps) {
   const context = await requireAdminContext();
   const params = searchParams ? await searchParams : {};
   const isTeacher = context.role === AdminRole.TEACHER;
+  const canManageExams = !isTeacher;
   const scopedChurchId = isTeacher ? context.churchId : null;
   const now = new Date();
 
@@ -96,7 +97,14 @@ export default async function ExamsPage({ searchParams }: ExamsPageProps) {
   });
 
   return (
-    <AdminShell title="Provas" description="Consulte, edite provas ainda nao iniciadas e crie novas aplicacoes.">
+    <AdminShell
+      title="Provas"
+      description={
+        canManageExams
+          ? "Consulte, edite provas ainda nao iniciadas e crie novas aplicacoes."
+          : "Consulte provas da sua igreja e baixe relatorios."
+      }
+    >
       {isTeacher && !scopedChurchId ? (
         <div className="mb-4 rounded-md border border-[#f2b8bf] bg-[#fff4f2] px-4 py-3 text-sm text-[#b00018]">
           Seu usuario de conselheiro ainda nao esta vinculado a uma igreja.
@@ -161,12 +169,14 @@ export default async function ExamsPage({ searchParams }: ExamsPageProps) {
               Provas com tentativas iniciadas ficam protegidas contra edicao de conteudo, mas podem ser excluidas.
             </p>
           </div>
-          <Link
-            href="/admin/provas/nova"
-            className="rounded-md bg-[#000060] px-4 py-2 text-center text-sm font-semibold text-white hover:bg-[#000044]"
-          >
-            Nova prova
-          </Link>
+          {canManageExams ? (
+            <Link
+              href="/admin/provas/nova"
+              className="rounded-md bg-[#000060] px-4 py-2 text-center text-sm font-semibold text-white hover:bg-[#000044]"
+            >
+              Nova prova
+            </Link>
+          ) : null}
         </div>
 
         <div className="mt-4 grid gap-3 md:hidden">
@@ -207,27 +217,31 @@ export default async function ExamsPage({ searchParams }: ExamsPageProps) {
                   <p className="font-semibold">{formatPurgeDate(application)}</p>
                 </div>
               </div>
-              <Link
-                href={`/admin/provas/${application.id}/editar`}
-                className="mt-3 block rounded-md border border-[#000060] px-3 py-2 text-center text-sm font-semibold text-[#000060]"
-              >
-                Editar
-              </Link>
+              {canManageExams ? (
+                <Link
+                  href={`/admin/provas/${application.id}/editar`}
+                  className="mt-3 block rounded-md border border-[#000060] px-3 py-2 text-center text-sm font-semibold text-[#000060]"
+                >
+                  Editar
+                </Link>
+              ) : null}
               <Link
                 href={`/admin/provas/${application.id}/relatorio`}
-                className="mt-2 block rounded-md bg-[#000060] px-3 py-2 text-center text-sm font-semibold text-white"
+                className="mt-3 block rounded-md bg-[#000060] px-3 py-2 text-center text-sm font-semibold text-white"
               >
                 Relatorio PDF
               </Link>
-              <form action={deleteExamApplicationAction} className="mt-2">
-                <input type="hidden" name="applicationId" value={application.id} />
-                <ConfirmSubmitButton
-                  message={`Excluir a prova "${application.exam.title}"? Esta acao tambem remove envios e respostas desta aplicacao.`}
-                  className="w-full rounded-md border border-[#efb6bf] px-3 py-2 text-center text-sm font-semibold text-[#b00018]"
-                >
-                  Excluir
-                </ConfirmSubmitButton>
-              </form>
+              {canManageExams ? (
+                <form action={deleteExamApplicationAction} className="mt-2">
+                  <input type="hidden" name="applicationId" value={application.id} />
+                  <ConfirmSubmitButton
+                    message={`Excluir a prova "${application.exam.title}"? Esta acao tambem remove envios e respostas desta aplicacao.`}
+                    className="w-full rounded-md border border-[#efb6bf] px-3 py-2 text-center text-sm font-semibold text-[#b00018]"
+                  >
+                    Excluir
+                  </ConfirmSubmitButton>
+                </form>
+              ) : null}
             </div>
           ))}
         </div>
@@ -269,27 +283,31 @@ export default async function ExamsPage({ searchParams }: ExamsPageProps) {
                   </td>
                   <td className="py-3 pr-4">
                     <div className="flex flex-wrap gap-2">
-                      <Link
-                        href={`/admin/provas/${application.id}/editar`}
-                        className="rounded-md border border-[#000060] px-3 py-2 text-sm font-semibold text-[#000060] hover:bg-[#effaf2]"
-                      >
-                        Editar
-                      </Link>
+                      {canManageExams ? (
+                        <Link
+                          href={`/admin/provas/${application.id}/editar`}
+                          className="rounded-md border border-[#000060] px-3 py-2 text-sm font-semibold text-[#000060] hover:bg-[#effaf2]"
+                        >
+                          Editar
+                        </Link>
+                      ) : null}
                       <Link
                         href={`/admin/provas/${application.id}/relatorio`}
                         className="rounded-md bg-[#000060] px-3 py-2 text-sm font-semibold text-white hover:bg-[#000044]"
                       >
                         Relatorio PDF
                       </Link>
-                      <form action={deleteExamApplicationAction}>
-                        <input type="hidden" name="applicationId" value={application.id} />
-                        <ConfirmSubmitButton
-                          message={`Excluir a prova "${application.exam.title}"? Esta acao tambem remove envios e respostas desta aplicacao.`}
-                          className="rounded-md border border-[#efb6bf] px-3 py-2 text-sm font-semibold text-[#b00018] hover:bg-[#fff4f2]"
-                        >
-                          Excluir
-                        </ConfirmSubmitButton>
-                      </form>
+                      {canManageExams ? (
+                        <form action={deleteExamApplicationAction}>
+                          <input type="hidden" name="applicationId" value={application.id} />
+                          <ConfirmSubmitButton
+                            message={`Excluir a prova "${application.exam.title}"? Esta acao tambem remove envios e respostas desta aplicacao.`}
+                            className="rounded-md border border-[#efb6bf] px-3 py-2 text-sm font-semibold text-[#b00018] hover:bg-[#fff4f2]"
+                          >
+                            Excluir
+                          </ConfirmSubmitButton>
+                        </form>
+                      ) : null}
                     </div>
                   </td>
                 </tr>

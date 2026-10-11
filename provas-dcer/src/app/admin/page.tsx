@@ -25,6 +25,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const context = await requireAdminContext();
   const params = searchParams ? await searchParams : {};
   const isTeacher = context.role === AdminRole.TEACHER;
+  const canManageExams = !isTeacher;
   const scopedChurchId = isTeacher ? context.churchId : null;
   const scopedChurchFilter = scopedChurchId || "__missing_church__";
   const now = new Date();
@@ -177,12 +178,21 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               <h2 className="text-lg font-semibold">Aplicacoes recentes</h2>
               <p className="text-sm text-[#5d6480]">Use o codigo ou o link do embaixador para aplicar a prova.</p>
             </div>
-            <Link
-              href="/admin/provas/nova"
-              className="rounded-md bg-[#000060] px-4 py-2 text-sm font-semibold text-white hover:bg-[#000044]"
-            >
-              Nova prova
-            </Link>
+            {canManageExams ? (
+              <Link
+                href="/admin/provas/nova"
+                className="rounded-md bg-[#000060] px-4 py-2 text-sm font-semibold text-white hover:bg-[#000044]"
+              >
+                Nova prova
+              </Link>
+            ) : (
+              <Link
+                href="/admin/relatorios"
+                className="rounded-md bg-[#000060] px-4 py-2 text-sm font-semibold text-white hover:bg-[#000044]"
+              >
+                Relatorios
+              </Link>
+            )}
           </div>
 
           <div className="mt-4 grid gap-3 md:hidden">
@@ -224,10 +234,14 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   </div>
                 </div>
                 <Link
-                  href={`/admin/provas/${application.id}/editar`}
+                  href={
+                    canManageExams
+                      ? `/admin/provas/${application.id}/editar`
+                      : `/admin/provas/${application.id}/relatorio`
+                  }
                   className="mt-3 block rounded-md border border-[#000060] px-3 py-2 text-center text-sm font-semibold text-[#000060]"
                 >
-                  Editar
+                  {canManageExams ? "Editar" : "Relatorio PDF"}
                 </Link>
               </div>
             ))}
@@ -268,10 +282,14 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                     </td>
                     <td className="py-3 pr-4">
                       <Link
-                        href={`/admin/provas/${application.id}/editar`}
+                        href={
+                          canManageExams
+                            ? `/admin/provas/${application.id}/editar`
+                            : `/admin/provas/${application.id}/relatorio`
+                        }
                         className="rounded-md border border-[#000060] px-3 py-2 text-sm font-semibold text-[#000060] hover:bg-[#effaf2]"
                       >
-                        Editar
+                        {canManageExams ? "Editar" : "Relatorio PDF"}
                       </Link>
                     </td>
                   </tr>
@@ -301,19 +319,28 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             <p className="text-sm font-semibold text-[#000060]">Pre-cadastro</p>
             <p className="mt-1 text-sm text-[#5d6480]">Adicionar igrejas e embaixadores antes da aplicacao.</p>
           </Link>
-          <Link
-            href="/admin/equipe"
-            className="block rounded-lg border border-[#d8def0] bg-white p-4 transition hover:border-[#ffd500]"
-          >
-            <p className="text-sm font-semibold text-[#000060]">Equipe administrativa</p>
-            <p className="mt-1 text-sm text-[#5d6480]">Cadastrar administradores e conselheiros.</p>
-          </Link>
+          {canManageExams ? (
+            <Link
+              href="/admin/equipe"
+              className="block rounded-lg border border-[#d8def0] bg-white p-4 transition hover:border-[#ffd500]"
+            >
+              <p className="text-sm font-semibold text-[#000060]">Equipe administrativa</p>
+              <p className="mt-1 text-sm text-[#5d6480]">Cadastrar administradores e conselheiros.</p>
+            </Link>
+          ) : null}
           <Link
             href="/admin/correcao"
             className="block rounded-lg border border-[#d8def0] bg-white p-4 transition hover:border-[#ffd500]"
           >
             <p className="text-sm font-semibold text-[#000060]">Conferir provas</p>
             <p className="mt-1 text-sm text-[#5d6480]">Ver respostas, tempo total e pontuacao.</p>
+          </Link>
+          <Link
+            href="/admin/relatorios"
+            className="block rounded-lg border border-[#d8def0] bg-white p-4 transition hover:border-[#ffd500]"
+          >
+            <p className="text-sm font-semibold text-[#000060]">Relatorios</p>
+            <p className="mt-1 text-sm text-[#5d6480]">Baixar ranking e resultados das provas.</p>
           </Link>
 
           <div className="rounded-lg border border-[#d8def0] bg-[#fff9e8] p-4 text-sm text-[#6f5714]">
