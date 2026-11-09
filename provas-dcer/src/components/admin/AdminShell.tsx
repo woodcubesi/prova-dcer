@@ -24,10 +24,11 @@ export async function AdminShell({ title, description, children }: AdminShellPro
     { href: "/admin/correcao", label: "Correcao", visible: true },
     { href: "/admin/relatorios", label: "Relatorios", visible: true },
     { href: "/admin/seguranca", label: "Seguranca", visible: !isTeacher },
+    { href: "/admin/sistema", label: "Sistema", visible: !isTeacher },
   ];
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-7xl px-3 py-4 sm:px-6 lg:px-8">
+    <main data-admin-shell className="mx-auto min-h-screen w-full max-w-7xl px-3 py-4 sm:px-6 lg:px-8">
       <header className="overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-[#d8def0]">
         <div className="h-1.5 bg-[#000060]" />
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">

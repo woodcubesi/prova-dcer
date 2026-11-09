@@ -50,7 +50,7 @@ dc logs --tail 30 app
 
 Preserve `.env.production` e os volumes `postgres_data` e `system_backups`. Nao use `down -v` para atualizar. Nao altere as chaves MFA/sessao nem recrie a senha do banco em uma atualizacao comum.
 
-Para e-mail, configure o relay SMTP em `.env.production`. Um relay no host pode ser acessado por `host.docker.internal`.
+Para e-mail, configure **Sistema > E-mail / SMTP** no painel. Cada instalacao usa seu proprio provedor, inclusive relays sem autenticacao autorizados por IP. Um relay no host pode ser acessado por `host.docker.internal`. Veja [SMTP por instalacao](../SMTP.md).
 
 ## Desenvolvimento local
 

@@ -108,17 +108,21 @@ ADMIN_SESSION_SECRET="segredo-grande-aleatorio"
 ADMIN_MFA_ENCRYPTION_KEY="outro-segredo-grande-aleatorio"
 APP_URL="https://seu-dominio"
 PORT="3001"
-MAIL_DRIVER="smtp"
+MAIL_DRIVER="disabled"
 MAIL_FROM="Provas DCER Paulista <no-reply@seudominio.com.br>"
-SMTP_HOST="127.0.0.1"
+SMTP_HOST=""
 SMTP_PORT="25"
 SMTP_SECURE="false"
 SMTP_REQUIRE_TLS="false"
-SMTP_IGNORE_TLS="true"
+SMTP_IGNORE_TLS="false"
 SYSTEM_BACKUP_DIR="/opt/provas-dcer/backups/system"
 SYSTEM_RESTORE_DIR="/opt/provas-dcer/backups/restores"
 SYSTEM_APP_ROOT="/opt/provas-dcer/current"
 ```
+
+Configure o envio de e-mails em **Sistema > E-mail / SMTP** depois do primeiro
+login. Veja [SMTP por instalacao](../SMTP.md). Nao e necessario editar o
+servico systemd nem reinicia-lo para alterar o SMTP.
 
 ## Comandos uteis
 

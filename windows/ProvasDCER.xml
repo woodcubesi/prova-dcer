@@ -1,0 +1,19 @@
+<service>
+  <id>ProvasDCER</id>
+  <name>Provas DCER Paulista</name>
+  <description>Aplicacao e banco PostgreSQL locais do Provas DCER. A conta de Logon pode ser alterada em services.msc.</description>
+  <executable>%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe</executable>
+  <arguments>-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "%BASE%\Run-Service.ps1"</arguments>
+  <workingdirectory>%BASE%\..</workingdirectory>
+  <stopexecutable>%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe</stopexecutable>
+  <stoparguments>-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "%BASE%\Start-DCER.ps1" -Stop -ServiceMode</stoparguments>
+  <startmode>Automatic</startmode>
+  <delayedAutoStart>true</delayedAutoStart>
+  <stoptimeout>45 sec</stoptimeout>
+  <onfailure action="restart" delay="10 sec" />
+  <logpath>%BASE%\..\data\logs\service</logpath>
+  <log mode="roll-by-size">
+    <sizeThreshold>10240</sizeThreshold>
+    <keepFiles>3</keepFiles>
+  </log>
+</service>

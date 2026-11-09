@@ -1,7 +1,6 @@
 import nodemailer from "nodemailer";
 import type SMTPTransport from "nodemailer/lib/smtp-transport";
-
-type MailDriver = "console" | "smtp";
+import { getMailConfig, getPublicMailConfig, type MailConfig } from "@/lib/system-mail-config";
 
 type SendAdminPasswordResetEmailParams = {
   to: string;
@@ -16,68 +15,39 @@ function getEnv(name: string) {
   return process.env[name]?.trim();
 }
 
-function parseBoolean(value?: string) {
-  if (!value) return undefined;
-
-  return ["1", "true", "yes", "sim"].includes(value.trim().toLowerCase());
-}
-
-function getMailDriver(): MailDriver {
-  const driver = getEnv("MAIL_DRIVER")?.toLowerCase();
-
-  if (driver === "smtp" || driver === "console") {
-    return driver;
-  }
-
-  return getEnv("SMTP_HOST") ? "smtp" : "console";
-}
-
-function getSmtpTransportOptions() {
-  const host = getEnv("SMTP_HOST");
-
-  if (!host) {
-    throw new Error("SMTP_HOST must be configured when MAIL_DRIVER=smtp.");
-  }
-
-  const port = Number(getEnv("SMTP_PORT") || "25");
-  const user = getEnv("SMTP_USER");
-  const password = getEnv("SMTP_PASSWORD") || getEnv("SMTP_PASS");
-  const requireTLS = parseBoolean(getEnv("SMTP_REQUIRE_TLS"));
-  const ignoreTLS = parseBoolean(getEnv("SMTP_IGNORE_TLS"));
-  const rejectUnauthorized = parseBoolean(getEnv("SMTP_TLS_REJECT_UNAUTHORIZED"));
-
-  const options: SMTPTransport.Options = {
-    host,
-    port,
-    secure: parseBoolean(getEnv("SMTP_SECURE")) || false,
+export function getSmtpTransportOptions(config: MailConfig): SMTPTransport.Options {
+  return {
+    host: config.host, port: config.port,
+    secure: config.security === "TLS",
+    requireTLS: config.security === "STARTTLS" || (config.useAuth && config.security === "AUTO"),
+    ignoreTLS: config.security === "NONE",
+    ...(config.useAuth ? {auth:{user:config.username, pass:config.password}} : {}),
+    tls: {rejectUnauthorized:true},
+    connectionTimeout:10000, greetingTimeout:10000, socketTimeout:20000, dnsTimeout:10000,
+    disableFileAccess:true, disableUrlAccess:true,
   };
-
-  if (user && password) {
-    options.auth = {
-      user,
-      pass: password,
-    };
-  }
-
-  if (requireTLS !== undefined) {
-    options.requireTLS = requireTLS;
-  }
-
-  if (ignoreTLS !== undefined) {
-    options.ignoreTLS = ignoreTLS;
-  }
-
-  if (rejectUnauthorized !== undefined) {
-    options.tls = {
-      rejectUnauthorized,
-    };
-  }
-
-  return options;
 }
 
-function getMailFrom() {
-  return getEnv("MAIL_FROM") || getEnv("SMTP_FROM") || "Provas DCER Paulista <no-reply@localhost>";
+async function sendConfiguredMail(message: {to:string; subject:string; text:string; html?:string}, test = false) {
+  const config = await getMailConfig();
+  if (!test && config.source !== "database" && getEnv("MAIL_DRIVER") === "console") {
+    console.info("Development email generated:", message);
+    return;
+  }
+  if (!config.enabled || !config.host || !config.fromEmail) throw new Error("SMTP_DISABLED");
+  if (config.useAuth && !config.password) throw new Error("SMTP_PASSWORD_REQUIRED");
+  try {
+    const transporter = nodemailer.createTransport(getSmtpTransportOptions(config));
+    const result = await transporter.sendMail({...message, from:{name:config.fromName,address:config.fromEmail}});
+    if (!result.accepted?.length) throw new Error("SMTP_RECIPIENT_REJECTED");
+  } catch (error) {
+    const code = (error as {code?:string}).code;
+    throw new Error(code === "EAUTH" ? "SMTP_AUTH_FAILED" : code === "ETIMEDOUT" ? "SMTP_TIMEOUT" : "SMTP_SEND_FAILED");
+  }
+}
+
+export async function sendSmtpTestEmail(to: string) {
+  await sendConfiguredMail({to, subject:"Teste SMTP - Provas DCER Paulista", text:"A configuracao SMTP desta instalacao foi validada pelo envio desta mensagem."}, true);
 }
 
 function escapeHtml(value: string) {
@@ -89,8 +59,8 @@ function escapeHtml(value: string) {
     .replaceAll("'", "&#039;");
 }
 
-export function getAppUrl() {
-  return (getEnv("APP_URL") || getEnv("NEXT_PUBLIC_APP_URL") || "http://localhost:3000").replace(/\/+$/, "");
+export async function getAppUrl() {
+  return (await getPublicMailConfig()).appUrl;
 }
 
 export async function sendAdminPasswordResetEmail({
@@ -118,20 +88,13 @@ export async function sendAdminPasswordResetEmail({
   ].join("");
 
   const message = {
-    from: getMailFrom(),
     to,
     subject,
     text,
     html,
   };
 
-  if (getMailDriver() === "console") {
-    console.info("Password reset email generated:", message);
-    return;
-  }
-
-  const transporter = nodemailer.createTransport(getSmtpTransportOptions());
-  await transporter.sendMail(message);
+  await sendConfiguredMail(message);
 }
 
 export async function sendAdminMfaResetEmail({
@@ -161,18 +124,11 @@ export async function sendAdminMfaResetEmail({
   ].join("");
 
   const message = {
-    from: getMailFrom(),
     to,
     subject,
     text,
     html,
   };
 
-  if (getMailDriver() === "console") {
-    console.info("MFA reset email generated:", message);
-    return;
-  }
-
-  const transporter = nodemailer.createTransport(getSmtpTransportOptions());
-  await transporter.sendMail(message);
+  await sendConfiguredMail(message);
 }

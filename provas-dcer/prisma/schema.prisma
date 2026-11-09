@@ -64,6 +64,21 @@ enum ApplicationParticipantOverrideMode {
   EXCLUDE
 }
 
+model SystemMailSettings {
+  id                Int      @id @default(1)
+  enabled           Boolean  @default(false)
+  host              String   @default("")
+  port              Int      @default(587)
+  security          String   @default("STARTTLS")
+  useAuth           Boolean  @default(false)
+  username          String   @default("")
+  passwordEncrypted String?
+  fromName          String   @default("Provas DCER Paulista")
+  fromEmail         String   @default("")
+  appUrl            String
+  updatedAt         DateTime @updatedAt
+}
+
 model AdminUser {
   id                  String                    @id @default(cuid())
   name                String

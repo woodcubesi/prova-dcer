@@ -61,6 +61,6 @@ pnpm admin:create
 
 ## E-mail e backups
 
-Use `MAIL_DRIVER=console` somente em desenvolvimento; os links de recuperacao aparecem nos logs. Em servidor, configure `APP_URL`, `MAIL_DRIVER=smtp` e os dados do relay. Se o SMTP fica no host e a aplicacao em Docker, use `SMTP_HOST=host.docker.internal`; sem Docker, um SMTP no mesmo host pode usar `127.0.0.1`.
+Configure o envio em **Sistema > E-mail / SMTP**. A configuracao e individual por instalacao e vale para redefinicao de senha e MFA, em Docker, Linux e Windows. Veja [SMTP por instalacao](deploy/SMTP.md). As variaveis de ambiente anteriores sao mantidas como compatibilidade ate salvar a configuracao pela tela. `MAIL_DRIVER=console` e exclusivo para desenvolvimento.
 
 Mantenha `ADMIN_SESSION_SECRET` e `ADMIN_MFA_ENCRYPTION_KEY` estaveis entre atualizacoes. Os guias de instalacao explicam os backups e os caminhos persistentes.

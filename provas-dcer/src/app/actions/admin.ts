@@ -499,14 +499,14 @@ function hashMfaResetToken(token: string) {
   return hashResetToken(token);
 }
 
-function buildPasswordResetUrl(token: string) {
-  const url = new URL("/admin/redefinir-senha", getAppUrl());
+async function buildPasswordResetUrl(token: string) {
+  const url = new URL("/admin/redefinir-senha", await getAppUrl());
   url.searchParams.set("token", token);
   return url.toString();
 }
 
-function buildMfaResetUrl(token: string) {
-  const url = new URL("/admin/redefinir-mfa/confirmar", getAppUrl());
+async function buildMfaResetUrl(token: string) {
+  const url = new URL("/admin/redefinir-mfa/confirmar", await getAppUrl());
   url.searchParams.set("token", token);
   return url.toString();
 }
@@ -846,7 +846,7 @@ export async function requestAdminPasswordResetAction(formData: FormData) {
     await sendAdminPasswordResetEmail({
       to: user.email,
       name: user.name,
-      resetUrl: buildPasswordResetUrl(token),
+      resetUrl: await buildPasswordResetUrl(token),
       expiresInMinutes: passwordResetExpirationMinutes,
     });
   } catch (error) {
@@ -999,7 +999,7 @@ export async function requestAdminMfaResetAction(formData: FormData) {
     await sendAdminMfaResetEmail({
       to: user.email,
       name: user.name,
-      resetUrl: buildMfaResetUrl(token),
+      resetUrl: await buildMfaResetUrl(token),
       expiresInMinutes: mfaResetExpirationMinutes,
     });
   } catch (error) {

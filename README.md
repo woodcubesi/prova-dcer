@@ -2,7 +2,9 @@
 
 Sistema de cadastro de ER/MR, provas, eventos, correcao, rankings, relatorios e administracao com MFA.
 
-A mesma aplicacao pode ser instalada **com Docker** ou **diretamente no Linux**, no mesmo repositorio. Nao existem duas versoes do codigo.
+A mesma aplicacao pode ser instalada **com Docker**, **diretamente no Linux** ou **no Windows sem Docker**, no mesmo repositorio. O codigo da aplicacao e compartilhado entre os tres modos.
+
+**Windows:** [baixar instalador 1.1.0](https://github.com/woodcubesi/prova-dcer/releases/download/v1.1.0/Provas-DCER-1.1.0-windows-x64-setup.exe) ou consultar [todas as versoes](https://github.com/woodcubesi/prova-dcer/releases).
 
 ## Escolha a instalacao
 
@@ -10,6 +12,7 @@ A mesma aplicacao pode ser instalada **com Docker** ou **diretamente no Linux**,
 | --- | --- | --- |
 | Docker em servidor | [Instalar com Docker](provas-dcer/deploy/docker/README.md) | Aplicacao e PostgreSQL em containers |
 | Linux sem Docker | [Instalar direto no Linux](provas-dcer/deploy/bare-metal/README.md) | Node.js 24, pnpm, PostgreSQL e systemd |
+| Windows sem Docker | [Instalar no Windows](windows/README.md) | Instalador x64 com Node.js, PostgreSQL e servico Windows |
 | Desenvolvimento | [Guia de desenvolvimento](provas-dcer/README.md) | Codigo em `provas-dcer/` |
 
 ## 1. Instalacao com Docker
@@ -37,7 +40,7 @@ Edite `.env.production` e preencha:
 
 Use um segredo diferente para cada campo. As demais variaveis podem manter os
 valores do modelo na primeira instalacao. Para recuperacao de senha e MFA por
-e-mail, configure tambem o relay SMTP.
+e-mail, configure o SMTP na aba Sistema apos entrar no painel.
 
 ### Criar o banco e construir a aplicacao
 
@@ -171,3 +174,17 @@ de rede, volumes e caminhos; nao a recrie como uma instalacao nova.
 
 Credenciais, bancos e backups reais ficam fora do Git. Nao execute o seed de
 demonstracao nem comandos de reset em bancos com dados reais.
+
+## E-mail de cada instalacao
+
+Configure o servidor de envio em **Sistema > E-mail / SMTP** no painel
+administrativo. A tela e compartilhada por Docker, Linux nativo e Windows.
+Nao e necessario usar um relay do desenvolvedor nem reiniciar a aplicacao.
+Veja [SMTP por instalacao](provas-dcer/deploy/SMTP.md).
+
+## Windows nativo
+
+O instalador Windows usa o mesmo codigo da pasta `provas-dcer`, com Node.js,
+PostgreSQL e servico Windows incluidos, sem Docker. O assistente permite
+escolher a porta e os dados do administrador inicial. Consulte
+[Windows: instalacao e compilacao](windows/README.md).

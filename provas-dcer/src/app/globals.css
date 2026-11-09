@@ -42,6 +42,11 @@ html {
   overflow-x: hidden;
 }
 
+body:has([data-admin-shell]) > footer {
+  position: static;
+  padding-block: 0.5rem;
+}
+
 .grid > *,
 .flex > * {
   min-width: 0;
