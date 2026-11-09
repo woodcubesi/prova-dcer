@@ -11,6 +11,7 @@ APP_BASE="${APP_BASE:-/opt/provas-dcer}"
 APP_DIR="${APP_DIR:-$APP_BASE/current}"
 SERVICE_NAME="${SERVICE_NAME:-provas-dcer}"
 NODE_MAJOR="${NODE_MAJOR:-24}"
+PNPM_VERSION="${PNPM_VERSION:-10.11.0}"
 APP_PORT="${APP_PORT:-3001}"
 DB_NAME="${DB_NAME:-provas_dcer}"
 DB_USER="${DB_USER:-provas_dcer}"
@@ -36,8 +37,12 @@ else
 fi
 
 echo "[3/7] Habilitando pnpm"
-corepack enable
-corepack prepare pnpm@latest --activate
+if command -v corepack >/dev/null 2>&1; then
+  corepack enable
+  corepack prepare "pnpm@$PNPM_VERSION" --activate
+else
+  npm install --global "pnpm@$PNPM_VERSION"
+fi
 
 echo "[4/7] Preparando usuario e diretorios"
 if ! id "$APP_USER" >/dev/null 2>&1; then
@@ -55,7 +60,7 @@ if [ ! -s "$DB_PASSWORD_FILE" ]; then
   chown root:root "$DB_PASSWORD_FILE"
 fi
 DB_PASSWORD="$(cat "$DB_PASSWORD_FILE")"
-runuser -u postgres -- psql <<SQL
+runuser -u postgres -- psql -v ON_ERROR_STOP=1 <<SQL
 DO \$\$
 BEGIN
   IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = '$DB_USER') THEN
@@ -71,12 +76,10 @@ SQL
 
 echo "[6/7] Criando .env se necessario"
 if [ ! -f "$APP_DIR/.env" ]; then
-  ADMIN_PASSWORD="$(openssl rand -hex 12)"
   ADMIN_SESSION_SECRET="$(openssl rand -hex 32)"
   ADMIN_MFA_ENCRYPTION_KEY="$(openssl rand -hex 32)"
   cat > "$APP_DIR/.env" <<EOF
 DATABASE_URL="postgresql://$DB_USER:$DB_PASSWORD@127.0.0.1:5432/$DB_NAME?schema=public"
-ADMIN_PASSWORD="$ADMIN_PASSWORD"
 ADMIN_SESSION_SECRET="$ADMIN_SESSION_SECRET"
 ADMIN_MFA_ENCRYPTION_KEY="$ADMIN_MFA_ENCRYPTION_KEY"
 APP_URL="http://127.0.0.1:$APP_PORT"
@@ -97,11 +100,15 @@ SYSTEM_APP_ROOT="$APP_DIR"
 EOF
   chmod 600 "$APP_DIR/.env"
   chown "$APP_USER:$APP_USER" "$APP_DIR/.env"
-  echo "Senha administrativa inicial gerada em $APP_DIR/.env"
+  echo "Ambiente criado em $APP_DIR/.env. Crie o primeiro administrador apos o deploy com pnpm admin:create."
 fi
 
 echo "[7/7] Instalando servico systemd"
-install -m 0644 "$SCRIPT_DIR/provas-dcer.service" "/etc/systemd/system/$SERVICE_NAME.service"
+sed -e "s|User=provasdcer|User=$APP_USER|" \
+    -e "s|Group=provasdcer|Group=$APP_USER|" \
+    -e "s|/opt/provas-dcer/current|$APP_DIR|g" \
+    "$SCRIPT_DIR/provas-dcer.service" > "/etc/systemd/system/$SERVICE_NAME.service"
+chmod 644 "/etc/systemd/system/$SERVICE_NAME.service"
 systemctl daemon-reload
 systemctl enable "$SERVICE_NAME"
 

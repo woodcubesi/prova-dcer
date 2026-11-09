@@ -8,7 +8,6 @@ services:
       - "host.docker.internal:host-gateway"
     environment:
       DATABASE_URL: postgresql://provas_dcer:provas_dcer_dev@db:5432/provas_dcer?schema=public
-      ADMIN_PASSWORD: admin123
       ADMIN_SESSION_SECRET: troque-este-segredo-no-servidor-linux
       PORT: "3002"
       NEXT_TELEMETRY_DISABLED: "1"

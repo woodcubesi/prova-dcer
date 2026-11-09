@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+umask 077
 
 APP_BASE="${APP_BASE:-/opt/provas-dcer}"
 APP_DIR="${APP_DIR:-$APP_BASE/current}"
@@ -22,6 +23,8 @@ target_dir="$BACKUP_DIR/$timestamp"
 mkdir -p "$target_dir"
 
 echo "[1/3] Backup do banco"
+# Prisma's schema query parameter is not a libpq connection option.
+DATABASE_URL="$(DATABASE_URL="$DATABASE_URL" node -e 'const u = new URL(process.env.DATABASE_URL); u.searchParams.delete("schema"); process.stdout.write(u.toString())')"
 pg_dump "$DATABASE_URL" | gzip -9 > "$target_dir/provas_dcer.sql.gz"
 
 echo "[2/3] Snapshot da aplicacao"

@@ -11,8 +11,7 @@ WorkingDirectory=/opt/provas-dcer/current
 EnvironmentFile=/opt/provas-dcer/current/.env
 Environment=NODE_ENV=production
 Environment=NEXT_TELEMETRY_DISABLED=1
-Environment=PORT=3001
-ExecStart=/usr/bin/bash -lc 'pnpm start'
+ExecStart=/usr/bin/bash -lc 'exec pnpm start --hostname 127.0.0.1'
 Restart=always
 RestartSec=5
 NoNewPrivileges=true

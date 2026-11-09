@@ -1,54 +1,64 @@
-# Deploy com Docker
+# Instalacao com Docker
 
-O modo Docker usa os arquivos na raiz da aplicacao:
+Use Docker Engine e o plugin Docker Compose no Linux. A aplicacao e o PostgreSQL rodam em containers, com volumes persistentes. A imagem e construida do codigo deste repositorio.
 
-- `Dockerfile`
-- `docker-compose.yml`
-- `.env` ou variaveis de ambiente do servidor
+## Primeira instalacao em servidor
+
+```bash
+git clone https://github.com/woodcubesi/prova-dcer.git
+cd prova-dcer/provas-dcer
+cp deploy/docker/production.env.example .env.production
+chmod 600 .env.production
+```
+
+Edite `.env.production`: preencha `POSTGRES_PASSWORD`, `ADMIN_SESSION_SECRET` e `ADMIN_MFA_ENCRYPTION_KEY` com valores diferentes gerados por `openssl rand -hex 32`. Defina `APP_URL` com o dominio HTTPS. Use senha hexadecimal no banco para compor a URL sem caracteres reservados.
+
+Defina um atalho de shell para os comandos abaixo:
+
+```bash
+dc() { docker compose --env-file .env.production -f docker-compose.production.yml "$@"; }
+dc up -d db
+dc build app
+dc run --rm app pnpm db:push
+```
+
+Crie o primeiro administrador (senha inicial padrao: `dcerpaulista`):
+
+```bash
+export BOOTSTRAP_ADMIN_NAME="Administrador"
+export BOOTSTRAP_ADMIN_EMAIL="admin@seudominio.com.br"
+dc run --rm -e BOOTSTRAP_ADMIN_NAME -e BOOTSTRAP_ADMIN_EMAIL app pnpm admin:create
+dc up -d app
+dc logs --tail 30 app
+```
+
+A aplicacao escuta em `127.0.0.1:3001` e o banco fica acessivel apenas na rede interna do Compose. Configure seu proxy HTTPS para essa porta e acesse `https://seu-dominio/admin/login`. Entre com e-mail/senha e configure o autenticador MFA.
+
+Os volumes pertencem ao projeto `provas-dcer-production`. Essa configuracao e para instalacoes novas; uma instalacao existente com rede e volumes proprios deve preservar os seus nomes e parametros.
+
+## Atualizacoes e backup
+
+Antes de atualizar, faca o backup completo na aba Seguranca e guarde a imagem anterior para rollback.
+
+```bash
+git pull --ff-only
+dc build app
+dc run --rm app pnpm db:push
+dc up -d app
+dc logs --tail 30 app
+```
+
+Preserve `.env.production` e os volumes `postgres_data` e `system_backups`. Nao use `down -v` para atualizar. Nao altere as chaves MFA/sessao nem recrie a senha do banco em uma atualizacao comum.
+
+Para e-mail, configure o relay SMTP em `.env.production`. Um relay no host pode ser acessado por `host.docker.internal`.
 
 ## Desenvolvimento local
 
+O arquivo `docker-compose.yml` e separado da configuracao de servidor:
+
 ```bash
-cd provas-dcer
-cp .env.example .env
 docker compose up -d --build
-docker compose exec app ./node_modules/.bin/prisma db push
+docker compose run --rm app pnpm db:push
 ```
 
-A aplicacao local do compose atual fica em:
-
-```text
-http://127.0.0.1:3002
-```
-
-## Homologacao/producao
-
-No servidor, mantenha:
-
-- banco em volume persistente;
-- backup antes de cada deploy;
-- imagem anterior tagueada para rollback;
-- `.env` real fora do Git.
-
-Fluxo recomendado:
-
-```bash
-docker build -t provas-dcer-app:release-YYYYMMDDHHMMSS -t provas-dcer-app:production .
-docker run --rm --network provas_dcer_net --env-file .env provas-dcer-app:release-YYYYMMDDHHMMSS ./node_modules/.bin/prisma db push
-docker rm -f provas_dcer_app
-docker run -d --name provas_dcer_app \
-  --restart unless-stopped \
-  --network provas_dcer_net \
-  --env-file .env \
-  -p 127.0.0.1:3001:3001 \
-  -v provas_dcer_system_backups:/app/system-backups \
-  provas-dcer-app:production
-```
-
-Quando o build remoto tiver problema de rede, gere a imagem localmente e envie com:
-
-```bash
-docker save prova-dcer-local:eventos -o provas-dcer-image.tar
-scp provas-dcer-image.tar root@SERVIDOR:/tmp/
-ssh root@SERVIDOR 'docker load -i /tmp/provas-dcer-image.tar'
-```
+Aplicacao em `http://127.0.0.1:3002`; PostgreSQL em `127.0.0.1:5434`.

@@ -3,6 +3,9 @@
 .git
 .next
 node_modules
+system-backups
+system-restores
+tmp
 src/generated/prisma
 npm-debug.log*
 pnpm-debug.log*

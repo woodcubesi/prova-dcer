@@ -62,12 +62,33 @@ O `deploy-linux.sh`:
 - gera o build Next.js;
 - reinicia o servico.
 
+Nao execute esses scripts sobre uma instalacao Docker existente: este guia prepara
+uma instalacao Linux independente. Mantenha o checkout fora de
+`/opt/provas-dcer/current` (por exemplo, `/srv/prova-dcer`).
+
+Depois do primeiro deploy, crie o primeiro administrador (senha inicial padrao: `dcerpaulista`):
+
+```bash
+sudo -u provasdcer env \
+  BOOTSTRAP_ADMIN_NAME="Administrador" \
+  BOOTSTRAP_ADMIN_EMAIL="admin@seudominio.com.br" \
+  pnpm --dir /opt/provas-dcer/current admin:create
+```
+
+O comando recusa criar outra conta inicial se ja houver administrador.
+Nao rode o seed de demonstracao em bancos reais.
+
+Configure um proxy HTTPS (Nginx/Apache) para `127.0.0.1:3001` e defina
+`APP_URL` com o dominio publico no `.env`. Acesse `/admin/login` com e-mail e
+senha e configure o autenticador MFA. O servico escuta somente em loopback.
+
 ## Atualizar uma instalacao
 
 No checkout do Git:
 
 ```bash
 git pull
+sudo bash deploy/bare-metal/backup.sh
 sudo bash deploy/bare-metal/deploy-linux.sh
 ```
 
@@ -83,7 +104,6 @@ Minimo esperado:
 
 ```text
 DATABASE_URL="postgresql://provas_dcer:SENHA@127.0.0.1:5432/provas_dcer?schema=public"
-ADMIN_PASSWORD="troque-esta-senha"
 ADMIN_SESSION_SECRET="segredo-grande-aleatorio"
 ADMIN_MFA_ENCRYPTION_KEY="outro-segredo-grande-aleatorio"
 APP_URL="https://seu-dominio"
@@ -116,3 +136,8 @@ sudo bash deploy/bare-metal/backup.sh
 ```
 
 O backup inclui banco e snapshot da aplicacao, inclusive `.env`. Guarde o arquivo em local seguro.
+
+Os scripts aceitam `APP_USER`, `APP_BASE`, `APP_DIR` e `SERVICE_NAME` para
+instalacoes personalizadas. Passe os mesmos valores ao instalar e atualizar.
+A porta vem de `PORT` no arquivo `.env`. A instalacao usa pnpm 10.11.0 por padrao
+e permite sobrescrever `PNPM_VERSION`.

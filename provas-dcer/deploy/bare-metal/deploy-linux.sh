@@ -25,6 +25,8 @@ rsync -a --delete \
   --exclude='node_modules' \
   --exclude='.env' \
   --exclude='tmp' \
+  --exclude='system-backups' \
+  --exclude='system-restores' \
   "$SOURCE_DIR/" "$APP_DIR/"
 chown -R "$APP_USER:$APP_USER" "$APP_DIR"
 chmod 600 "$APP_DIR/.env"
