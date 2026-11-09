@@ -68,21 +68,9 @@ const participantPrograms = [
   { value: "ER", label: "Embaixador (ER)" },
   { value: "MR", label: "Mensageira (MR)" },
 ] as const;
-const categoryValues = CATEGORIES.map((category) => category.value);
 
 function churchLabel(church: ChurchOption) {
   return church.embassyName ? `${church.name} - ${church.embassyName}` : church.name;
-}
-
-function getEventCategoryOptions(currentCategory: string) {
-  const currentIndex = categoryValues.indexOf(currentCategory as (typeof categoryValues)[number]);
-  if (currentIndex < 0) return CATEGORIES;
-
-  return CATEGORIES.filter((_, index) => index === currentIndex || index === currentIndex + 1);
-}
-
-function isAllowedEventCategory(currentCategory: string, selectedCategory: string) {
-  return getEventCategoryOptions(currentCategory).some((category) => category.value === selectedCategory);
 }
 
 export function EventRegistrationForm({
@@ -114,9 +102,8 @@ export function EventRegistrationForm({
   );
   const studentSelectValue = filteredStudents.some((student) => student.id === studentId) ? studentId : "";
   const selectedStudent = filteredStudents.find((student) => student.id === studentSelectValue) || null;
-  const existingStudentCategoryOptions = selectedStudent ? getEventCategoryOptions(selectedStudent.category) : [];
   const selectedStudentCategoryValue =
-    selectedStudent && isAllowedEventCategory(selectedStudent.category, category) ? category : selectedStudent?.category || "";
+    CATEGORIES.some((option) => option.value === category) ? category : selectedStudent?.category || "";
   const leaderSelectValue = filteredLeaders.some((leader) => leader.id === leaderUserId) ? leaderUserId : "";
   const selectedApplicationIds = new Set(initialValues.eventApplicationIds);
 
@@ -230,10 +217,10 @@ export function EventRegistrationForm({
               onChange={(event) => setCategory(event.target.value)}
               className="mt-1 w-full rounded-md border border-[#c5cce4] bg-white px-3 py-3 outline-none focus:ring-2 focus:ring-[#000060]"
             >
-              {existingStudentCategoryOptions.map((categoryOption) => (
+              {CATEGORIES.map((categoryOption) => (
                 <option key={categoryOption.value} value={categoryOption.value}>
                   {categoryOption.label}
-                  {categoryOption.value === selectedStudent.category ? " (atual)" : " (subir categoria)"}
+                  {categoryOption.value === selectedStudent.category ? " (atual)" : ""}
                 </option>
               ))}
             </select>

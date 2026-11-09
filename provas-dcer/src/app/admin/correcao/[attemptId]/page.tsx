@@ -5,7 +5,7 @@ import { AdminRole } from "@/generated/prisma/client";
 import { getCategoryLabel } from "@/lib/categories";
 import { requireAdminContext } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { filterQuestionsForCategory } from "@/lib/questions";
+import { getCorrectionQuestions } from "@/lib/questions";
 import { formatDuration } from "@/lib/text";
 
 export const dynamic = "force-dynamic";
@@ -111,8 +111,8 @@ export default async function CorrectionDetailPage({ params }: CorrectionDetailP
   }
 
   const answerByQuestion = new Map(attempt.answers.map((answer) => [answer.questionId, answer]));
-  const questions = filterQuestionsForCategory(attempt.application.exam.questions, participant.category);
-  const totalPoints = questions.reduce((sum, question) => sum + question.points, 0);
+  const questions = getCorrectionQuestions(attempt.application.exam.questions, attempt.answers, participant.category);
+  const totalPoints = attempt.totalPoints ?? questions.reduce((sum, question) => sum + question.points, 0);
   const score = attempt.answers.reduce((sum, answer) => sum + (answer.pointsAwarded || 0), 0);
   const passingPercent = attempt.application.exam.passingPercent ?? 70;
   const scorePercent = totalPoints ? (score / totalPoints) * 100 : 0;

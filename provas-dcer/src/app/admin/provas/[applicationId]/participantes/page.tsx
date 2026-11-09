@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { linkApplicationParticipantAction, unlinkApplicationParticipantAction } from "@/app/actions/admin";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { ConfirmSubmitButton } from "@/components/admin/ConfirmSubmitButton";
+import { ParticipantCategoryForm } from "@/components/admin/ParticipantCategoryForm";
 import { AdminRole, ApplicationParticipantOverrideMode } from "@/generated/prisma/client";
 import { getCategoryLabel, type CategoryCode } from "@/lib/categories";
 import { requireAdminRole } from "@/lib/auth";
@@ -156,6 +157,11 @@ export default async function ExamParticipantsPage({ params, searchParams }: Par
           Aluno vinculado a esta prova.
         </div>
       ) : null}
+      {query.ok === "categoria" ? (
+        <div className="mb-4 rounded-md border border-[#b9dfc7] bg-[#effaf2] px-4 py-3 text-sm text-[#1f623e]">
+          Categoria atualizada no cadastro geral e nas inscricoes de eventos.
+        </div>
+      ) : null}
       {query.ok === "aluno-desvinculado" ? (
         <div className="mb-4 rounded-md border border-[#b9dfc7] bg-[#effaf2] px-4 py-3 text-sm text-[#1f623e]">
           Aluno desvinculado desta prova.
@@ -231,7 +237,9 @@ export default async function ExamParticipantsPage({ params, searchParams }: Par
                       ) : null}
                     </td>
                     <td className="py-3 pr-4">{participant.student.church.name}</td>
-                    <td className="py-3 pr-4">{getCategoryLabel(participant.student.category as CategoryCode)}</td>
+                    <td className="py-3 pr-4">
+                      <ParticipantCategoryForm applicationId={application.id} studentId={participant.studentId} category={participant.student.category} />
+                    </td>
                     <td className="py-3 pr-4">
                       <span className="rounded-full bg-[#f8faff] px-2 py-1 text-xs text-[#5d6480]">{linkLabel}</span>
                     </td>

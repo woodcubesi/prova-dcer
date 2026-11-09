@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { deleteEventRegistrationAction, removeEventRegistrationAssignmentAction } from "@/app/actions/admin";
 import { ConfirmSubmitButton } from "@/components/admin/ConfirmSubmitButton";
+import { ParticipantCategoryForm } from "@/components/admin/ParticipantCategoryForm";
 import { getCategoryLabel } from "@/lib/categories";
 import { getEventLeaderRoleLabel } from "@/lib/events";
 
@@ -71,6 +72,9 @@ export function EventRegistrationsList({ eventId, registrations }: EventRegistra
                 </ConfirmSubmitButton>
               </form>
             </div>
+          </div>
+          <div className="mt-3">
+            <ParticipantCategoryForm eventId={eventId} registrationId={registration.id} category={registration.category} />
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
             {registration.assignments.map((assignment) => (

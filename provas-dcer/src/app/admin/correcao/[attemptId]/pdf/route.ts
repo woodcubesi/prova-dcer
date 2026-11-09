@@ -3,7 +3,7 @@ import { AdminRole } from "@/generated/prisma/client";
 import { requireAdminContext } from "@/lib/auth";
 import { buildStudentCorrectionPdf, makePdfFilename } from "@/lib/pdf-reports";
 import { prisma } from "@/lib/prisma";
-import { filterQuestionsForCategory } from "@/lib/questions";
+import { getCorrectionQuestions } from "@/lib/questions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -99,7 +99,7 @@ export async function GET(_request: Request, { params }: CorrectionPdfRouteConte
     notFound();
   }
 
-  const questions = filterQuestionsForCategory(attempt.application.exam.questions, participant.category);
+  const questions = getCorrectionQuestions(attempt.application.exam.questions, attempt.answers, participant.category);
   const totalPoints = attempt.totalPoints ?? questions.reduce((sum, question) => sum + question.points, 0);
   const score =
     attempt.score ?? attempt.answers.reduce((sum, answer) => sum + (answer.pointsAwarded || 0), 0);

@@ -46,6 +46,7 @@ import {
   normalizeRegistrationNumber,
 } from "@/lib/student-registration";
 import { normalizeName } from "@/lib/text";
+import { CategoryChangeError, changeStudentCategory } from "@/lib/student-category";
 
 const categorySchema = z.enum(["JUNIOR", "ADOLESCENTES", "JUVENIL"]);
 const staffRoleSchema = z.enum(["ADMIN", "TEACHER", "ADMIN_TEACHER"]);
@@ -63,7 +64,6 @@ const categoryLabels: Record<Category, string> = {
   ADOLESCENTES: "Adolescentes",
   JUVENIL: "Juvenil",
 };
-const categoryOrder: Category[] = [Category.JUNIOR, Category.ADOLESCENTES, Category.JUVENIL];
 
 const staffUserSchema = z.object({
   name: z.string().trim().min(3, "Informe o nome completo.").max(120),
@@ -688,36 +688,6 @@ export async function loginAdminAction(formData: FormData) {
 
   await createAdminMfaChallenge(user.id);
   redirect(user.mfaEnabled ? "/admin/mfa" : "/admin/mfa/configurar");
-}
-
-async function ensureUniqueStudentForPath(
-  churchId: string,
-  category: Category,
-  normalizedName: string,
-  ignoredId: string,
-  fail: (message: string) => never,
-) {
-  const existingStudent = await prisma.student.findUnique({
-    where: {
-      churchId_category_normalizedName: {
-        churchId,
-        category,
-        normalizedName,
-      },
-    },
-    select: { id: true },
-  });
-
-  if (existingStudent && existingStudent.id !== ignoredId) {
-    fail(`Ja existe ER/MR com este nome, igreja e categoria ${categoryLabels[category]}.`);
-  }
-}
-
-function isAllowedEventCategoryChange(currentCategory: Category, requestedCategory: Category) {
-  const currentIndex = categoryOrder.indexOf(currentCategory);
-  const requestedIndex = categoryOrder.indexOf(requestedCategory);
-
-  return currentIndex >= 0 && requestedIndex >= currentIndex && requestedIndex <= currentIndex + 1;
 }
 
 export async function verifyAdminMfaAction(formData: FormData) {
@@ -2474,33 +2444,15 @@ export async function createEventRegistrationAction(formData: FormData) {
 
   const requestedStudentCategory = student && parsedCategory.success ? (parsedCategory.data as Category) : null;
 
-  if (student && requestedStudentCategory && !isAllowedEventCategoryChange(student.category, requestedStudentCategory)) {
-    failRegistration("Na inscricao do evento, o ER/MR so pode permanecer na categoria atual ou subir uma categoria.");
-  }
-
-  if (student && requestedStudentCategory && requestedStudentCategory !== student.category) {
-    await ensureUniqueStudentForPath(
-      student.churchId,
-      requestedStudentCategory,
-      student.normalizedName,
-      student.id,
-      failRegistration,
-    );
-  }
-
   const registrationName = student?.name || name;
   const registrationNormalizedName = student?.normalizedName || normalizeName(name);
   const registrationCategory = requestedStudentCategory || student?.category || category;
   const registrationProgram = student?.program || adhocProgram || StudentProgram.ER;
   const registrationBirthDate = student?.birthDate || birthDate;
 
-  await prisma.$transaction(async (tx) => {
-    if (student && registrationCategory !== student.category) {
-      await tx.student.update({
-        where: { id: student.id },
-        data: { category: registrationCategory },
-      });
-    }
+  try {
+    await prisma.$transaction(async (tx) => {
+    if (student) await changeStudentCategory(tx, student.id, registrationCategory);
 
     const existingRegistration = student
       ? await tx.eventRegistration.findUnique({
@@ -2559,8 +2511,13 @@ export async function createEventRegistrationAction(formData: FormData) {
         eventApplicationId,
       })),
     });
-  });
+    });
+  } catch (error) {
+    if (error instanceof CategoryChangeError) failRegistration(error.message);
+    throw error;
+  }
 
+  revalidatePath("/admin", "layout");
   revalidatePath("/admin/eventos");
   revalidatePath(`/admin/eventos/${eventId}`);
   revalidatePath(`/admin/eventos/${eventId}/inscricoes`);
@@ -2568,6 +2525,60 @@ export async function createEventRegistrationAction(formData: FormData) {
   revalidatePath("/admin/correcao/eventos");
   revalidatePath("/prova");
   eventRegistrationRedirect(eventId, { ok: "inscricao" });
+}
+
+export async function updateParticipantCategoryAction(formData: FormData) {
+  const context = await requireAdminContext();
+  const eventId = String(formData.get("eventId") || "");
+  const registrationId = String(formData.get("registrationId") || "");
+  const applicationId = String(formData.get("applicationId") || "");
+  const studentId = String(formData.get("studentId") || "");
+  const returnPath = eventId
+    ? `/admin/eventos/${eventId}/inscricoes`
+    : applicationId ? `/admin/provas/${applicationId}/participantes` : "/admin/provas";
+  const parsed = categorySchema.safeParse(String(formData.get("category") || ""));
+  if (!parsed.success) errorRedirect(returnPath, "Selecione uma categoria valida.");
+  const category = parsed.data as Category;
+  const scopedChurchId = context.role === AdminRole.TEACHER ? context.churchId || "__missing_church__" : null;
+
+  try {
+    if (eventId && registrationId) {
+      await prisma.$transaction(async (tx) => {
+        const registration = await tx.eventRegistration.findFirst({
+          where: { id: registrationId, eventId, ...(scopedChurchId ? { churchId: scopedChurchId } : {}) },
+        });
+        if (!registration) throw new CategoryChangeError("Inscricao nao encontrada ou fora do seu escopo.");
+        if (registration.studentId) {
+          await changeStudentCategory(tx, registration.studentId, category);
+        } else {
+          const runningAttempt = await tx.attempt.findFirst({
+            where: { eventRegistrationId: registration.id, status: "IN_PROGRESS", expiresAt: { gt: new Date() } },
+            select: { id: true },
+          });
+          if (runningAttempt) throw new CategoryChangeError("O inscrito possui uma prova em andamento. Aguarde a conclusao.");
+        }
+        await tx.eventRegistration.update({ where: { id: registration.id }, data: { category } });
+      });
+    } else if (applicationId && studentId && hasAdministratorAccess(context)) {
+      await getManageableExamApplication(applicationId, context, returnPath);
+      await prisma.$transaction(async (tx) => {
+        const participant = await tx.applicationParticipant.findUnique({
+          where: { applicationId_studentId: { applicationId, studentId } },
+        });
+        if (!participant) throw new CategoryChangeError("Aluno nao vinculado a esta prova.");
+        await changeStudentCategory(tx, studentId, category);
+      });
+    } else {
+      errorRedirect(returnPath, "Participante nao encontrado ou sem permissao.");
+    }
+  } catch (error) {
+    if (error instanceof CategoryChangeError) errorRedirect(returnPath, error.message);
+    throw error;
+  }
+
+  revalidatePath("/admin", "layout");
+  revalidatePath("/prova", "layout");
+  redirect(`${returnPath}?ok=categoria`);
 }
 
 export async function deleteEventRegistrationAction(formData: FormData) {
